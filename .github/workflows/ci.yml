@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging, develop]
+  pull_request:
+    branches: [main, staging, develop]
+
+jobs:
+  quality:
+    name: Format · Lint · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rokit toolchain
+        uses: CompeyDev/setup-rokit@v0.1.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: StyLua (format check)
+        run: stylua --check .
+
+      - name: Selene (lint)
+        run: |
+          selene generate-roblox-std || true
+          selene .
+
+      - name: Rojo (build check)
+        run: rojo build --output build.rbxlx
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: place-build
+          path: build.rbxlx
+          retention-days: 7

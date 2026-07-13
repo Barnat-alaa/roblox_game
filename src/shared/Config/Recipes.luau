@@ -1,0 +1,74 @@
+--!strict
+local Types = require(script.Parent.Parent.Types)
+
+-- The five MVP recipes. Expand toward ~20 during month one (see ROADMAP.md).
+-- ingredientCost must stay below basePrice so every serve is profitable.
+local Recipes: { [string]: Types.RecipeDefinition } = {
+	espresso = {
+		id = "espresso",
+		displayName = "Espresso",
+		category = "Coffee",
+		ingredientCost = 4,
+		basePrice = 12,
+		preparationTime = 3,
+		applianceId = "coffee_machine",
+		requiredLevel = 1,
+		requiredReputation = 0,
+		baseQuality = 1,
+		masteryThresholds = { 5, 15, 40, 100 },
+	},
+	cappuccino = {
+		id = "cappuccino",
+		displayName = "Cappuccino",
+		category = "Coffee",
+		ingredientCost = 7,
+		basePrice = 20,
+		preparationTime = 5,
+		applianceId = "coffee_machine",
+		requiredLevel = 2,
+		requiredReputation = 30,
+		baseQuality = 1,
+		masteryThresholds = { 5, 15, 40, 100 },
+	},
+	tea = {
+		id = "tea",
+		displayName = "House Tea",
+		category = "Tea",
+		ingredientCost = 3,
+		basePrice = 10,
+		preparationTime = 4,
+		applianceId = "coffee_machine",
+		requiredLevel = 1,
+		requiredReputation = 0,
+		baseQuality = 1,
+		masteryThresholds = { 5, 15, 40, 100 },
+	},
+	croissant = {
+		id = "croissant",
+		displayName = "Croissant",
+		category = "Pastry",
+		ingredientCost = 8,
+		basePrice = 22,
+		preparationTime = 8,
+		applianceId = "oven",
+		requiredLevel = 3,
+		requiredReputation = 80,
+		baseQuality = 1,
+		masteryThresholds = { 5, 15, 40, 100 },
+	},
+	sandwich = {
+		id = "sandwich",
+		displayName = "Café Sandwich",
+		category = "Sandwich",
+		ingredientCost = 11,
+		basePrice = 28,
+		preparationTime = 7,
+		applianceId = "prep_counter",
+		requiredLevel = 2,
+		requiredReputation = 40,
+		baseQuality = 1,
+		masteryThresholds = { 5, 15, 40, 100 },
+	},
+}
+
+return Recipes

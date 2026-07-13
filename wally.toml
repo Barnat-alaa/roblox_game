@@ -1,0 +1,15 @@
+[package]
+name = "barnatalaa/social-cafe-city"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+license = "MIT"
+
+# No third-party dependencies are required to build the MVP scaffold.
+# Planned fast-follows (add with `wally add <pkg>` after reviewing licence + source):
+#   ProfileStore  -> session-locked, autosaving player data (production save layer)
+#   Signal/Trove  -> from Sleitnick's RbxUtil, only the pieces we actually use
+[dependencies]
+
+[dev-dependencies]
+# TestEZ = "roblox/testez@0.4.1"   # enable when we wire the Studio test runner (see docs/TEST_PLAN.md)

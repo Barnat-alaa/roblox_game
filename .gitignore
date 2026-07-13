@@ -1,0 +1,29 @@
+# Wally packages (restored via `wally install`; wally.lock IS committed)
+/Packages/
+/DevPackages/
+/ServerPackages/
+
+# Rojo / build artifacts
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+sourcemap.json
+
+# Secrets — NEVER commit API keys or tokens
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Keep shared VS Code settings, ignore per-user ones
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

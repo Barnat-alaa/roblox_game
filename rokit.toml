@@ -1,0 +1,13 @@
+# Rokit toolchain manifest — https://github.com/rojo-rbx/rokit
+# Run `rokit install` to fetch these into your PATH for this project.
+#
+# If `rokit install` reports a version as unavailable, run:
+#   rokit add rojo-rbx/rojo UpliftGames/wally JohnnyMorganz/StyLua Kampfkarren/selene JohnnyMorganz/luau-lsp
+# which auto-pins the latest published versions and rewrites this file.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
+wally = "UpliftGames/wally@0.3.2"
+stylua = "JohnnyMorganz/StyLua@2.0.2"
+selene = "Kampfkarren/selene@0.27.1"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.30.0"
