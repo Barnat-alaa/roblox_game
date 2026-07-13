@@ -1,38 +1,53 @@
 # Current status
 
-_Last updated: 2026-07-13 — Day 1 verified live in Studio; first push to GitHub._
+_Last updated: 2026-07-14 — Day 3 complete in code; brew minigame awaiting live playtest._
 
 ## What was completed
 
-- **Toolchain installed and working**: rokit 1.2.0, rojo 7.4.4, stylua 2.0.2, selene 0.27.1, gh 2.95.0 (authenticated as Barnat-alaa).
-- **MCP connected**: Claude Code drives Studio directly (game-tree inspection, Luau execution, play/stop, console reads).
-- **Day 1 scaffold verified live**: server boots clean — 6 plots built, 12 services, profile loads, client boots 6 controllers.
-- **All 21 logic tests pass** (Economy/RewardMath, Grid placement, Progression) — run inside Studio against the live DataModel via an MCP TestEZ-compatible harness.
-- **End-to-end serve loop verified behaviourally**: order created → client `ClaimOrder` → +7 coins espresso payout (matches config), reputation/XP granted, re-claim of the same order rejected (no double payment).
-- **Fixed first real bug**: client `Main` waited on `script:WaitForChild("Controllers")` but `Controllers` is a *sibling* — controllers/UI never loaded. Fixed to `script.Parent` (src + Studio patch + place rebuilt).
-- **CI gates green locally**: StyLua check, Selene 0 errors (added `testez.yml` std for spec globals), Rojo build.
-- Repo pushed to <https://github.com/Barnat-alaa/roblox_game> with GitHub Actions CI.
+- **Day 1 verified live** (2026-07-13): 21/21 unit specs in Studio, clean boot,
+  e2e serve loop through real remotes, duplicate claim pays nothing, client
+  boot-path bug found and fixed. Pushed; CI green.
+- **Day 3 part 1 — visible customer NPCs** (verified live in play mode):
+  street spawn → walk in → order bubble → serve reaction (😊 +N 🪙) → walk out
+  → next customer cycles in. Patience timeout (120s) cancels the order
+  server-side and the NPC leaves angry. Stuck-NPC teleport recovery.
+- **Day 3 part 2 — manual brew minigame** (code complete, gates green):
+  ProximityPrompt on your own coffee machine → oscillating timing bar →
+  Space/tap to stop in the green zone. Server-authoritative: RecipeService
+  starts its own clock on StartCooking and re-derives the bar position on
+  FinishCooking from shared Config/Cooking constants; a hit arms a ONE-SHOT
+  manual bonus consumed at claim. The client's `manualCook` argument is now
+  ignored entirely.
+- SocialCafe.rbxlx rebuilt from the repo — reopening it loads everything.
 
 ## What was tested
 
-- 21/21 unit specs in live Studio (Edit DataModel).
-- Playtest boot: no errors in Output except the expected in-memory DataStore warning (place unpublished).
-- E2E via real remotes from the Client VM: `RequestProfile`, `ClaimOrder` (150 → 157 → 164 coins across two distinct orders; duplicate claim paid 0).
-- Customer generator cadence: one pending order per user, next order ≤8 s after resolution — confirmed live.
+- All CI gates: StyLua ✓ · Selene 0 errors ✓ · Rojo build ✓ (21/21 specs from Day 1 unaffected).
+- NPC lifecycle end-to-end in play mode, including the accidental-but-real
+  patience-expiry test (order cancelled, banner cleared, NPC left).
+- Serve economics: payouts match config exactly (espresso 8, tea 7 — the
+  "7,7" mystery was random recipe selection, not a bug).
 
 ## What failed / is not done
 
-- Zero-gap duplicate-claim race (two `ClaimOrder` fires in the same frame) not yet behaviourally tested — code path is guarded (claim marked before grant); retest scheduled with the Day-6 security review.
-- Visible walking NPCs, manual-cook minigame, café-visit interaction, lighting/audio, onboarding flow, mobile pass: Days 3–6.
-- Persistence is in-memory in Studio until the place is published with API access.
-- Studio was closed mid-session; SocialCafe.rbxlx has been rebuilt from the repo (contains the boot fix) and is ready to reopen.
+- **Brew minigame not yet exercised in a live playtest** (Studio was closed
+  mid-session for the language switch). Next session: verify prompt →
+  bar → server verdict → bonus payout, plus the forged-claim negative test.
+- Croissant/sandwich recipes reference `oven`/`prep_counter` appliances that
+  have no interaction yet (machine-only brewing for now) — fine for MVP.
+- Days 5–7 pending: onboarding, neighbourhood pass, mobile, publish.
 
 ## What YOU need to do next
 
-1. Reopen `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` in Studio (double-click the file).
-2. Later this week: publish the place as a private experience + enable Studio Access to API Services (see NEXT_ACTIONS.md) so saves persist.
+1. Reopen `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` in Studio.
+2. Publish it: **Alt+P** → name `Social Cafe DEV` → Create, then
+   Game Settings → Security → **Enable Studio Access to API Services** → Save.
+3. Press Play and try the loop yourself: walk to the coffee machine, press
+   **E** when a customer orders, stop the bar in the green, then **Serve ☕**.
+   You should see a bigger payout than an unbrewed serve.
 
 ## Exact command to continue
 
-Open a Claude Code session in `C:\Users\barna\Desktop\roblox` and say "continue" —
-tasks are tracked; next up is Day 3 (visible customer NPCs + coffee minigame).
+Open a Claude Code session in `C:\Users\barna\Desktop\roblox` and say
+"continue" — next up is the live brew verification, then Day 5 (onboarding +
+neighbourhood + lighting).

@@ -26,6 +26,7 @@ local EconomyService: any
 local CafeService: any
 local CustomerService: any
 local AnalyticsService: any
+local RecipeService: any
 
 local activeOrders: { [string]: Types.Order } = {}
 local nextId = 0
@@ -82,11 +83,12 @@ local function isNearOwnCafe(player: Player): boolean
 	return (hrp.Position - centre).Magnitude <= 60
 end
 
-local function handleClaim(player: Player, orderId: unknown, manualCook: unknown)
+local function handleClaim(player: Player, orderId: unknown, _manualCook: unknown)
 	if typeof(orderId) ~= "string" then
 		return
 	end
-	local isManual = typeof(manualCook) == "boolean" and manualCook or false
+	-- NOTE: the client's manualCook argument is deliberately IGNORED. The only
+	-- path to the manual bonus is a server-verified brew (RecipeService).
 
 	if not claimLimiter:check(player.UserId, os.clock()) then
 		Log.warn("Rate-limited claim from", player.Name)
@@ -121,6 +123,9 @@ local function handleClaim(player: Player, orderId: unknown, manualCook: unknown
 	order.status = "served"
 	activeOrders[orderId] = nil
 
+	-- One-shot, armed only by a server-judged brew for exactly this order.
+	local isManual = RecipeService:ConsumeManualCook(player, orderId)
+
 	local recipe = Recipes[order.recipeId]
 	local customer = Customers[order.customerId]
 	local tipMult = if customer then customer.tipMultiplier else 1
@@ -154,6 +159,11 @@ local function handleClaim(player: Player, orderId: unknown, manualCook: unknown
 	})
 end
 
+-- Server-internal lookup for sibling services (never exposed to clients).
+function OrderService.GetActiveOrder(_self: any, orderId: string): Types.Order?
+	return activeOrders[orderId]
+end
+
 -- Server-internal (called by CustomerService when patience runs out).
 -- Never grants anything; a claimed order can no longer be cancelled.
 function OrderService.CancelOrder(_self: any, orderId: string): boolean
@@ -178,6 +188,7 @@ function OrderService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	CustomerService = ServiceRegistry.get("CustomerService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	RecipeService = ServiceRegistry.get("RecipeService")
 end
 
 function OrderService.Start(_self: any)

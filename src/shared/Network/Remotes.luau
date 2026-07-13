@@ -15,7 +15,8 @@ local EVENTS = {
 	"PlaceFurniture", -- c->s: request a placement
 	"RemoveFurniture", -- c->s: pick up a placed item
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
-	"StartCooking", -- c->s: begin a manual cook (Day 3)
+	"StartCooking", -- c->s: begin a manual brew for an order (server starts its clock)
+	"FinishCooking", -- c->s: stop the brew bar (server judges the timing)
 	"ClaimOrder", -- c->s: serve a completed order
 	"CompleteTutorialStep", -- c->s: onboarding progress
 	"VisitCafe", -- c->s: request to visit another plot

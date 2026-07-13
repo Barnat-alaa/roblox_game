@@ -5,6 +5,22 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-14 — Day 3: customers you can see, coffee you can brew
+- **Visible customer NPCs** (CustomerService rewrite): greybox walk-in customers
+  spawn on the street, walk to the service spot, order with a recipe bubble,
+  wait, react (😊 +coins / 😠 timeout), walk out. Teleport recovery for stuck
+  NPCs; 120s patience cancels the order server-side (OrderService.CancelOrder).
+- **Manual coffee-brew minigame**: ProximityPrompt on your own coffee machine
+  opens a timing bar (Space/tap to stop). Shared constants in Config/Cooking.
+- **Security hardening**: the client's `manualCook` claim argument is now
+  IGNORED — the server judges the brew timing from its own clock
+  (RecipeService sessions) and arms a one-shot bonus flag consumed at claim
+  time. New remotes: FinishCooking. New CafeService.IsNearOwnPlot guard;
+  plot models carry an `ownerUserId` attribute for client-side lookup.
+- Verified live (NPC lifecycle, serve payout +tip/rep/xp exactly once,
+  cancel path, customer cycling). Brew minigame verified by unit-level gates;
+  live playtest pending the next Studio session.
+
 ### Fixed — 2026-07-13 — Day 1 live verification
 - **Client boot**: `Main.client.luau` waited on `script:WaitForChild("Controllers")`, but `Controllers` is a sibling folder — no controllers or UI ever loaded. Now `script.Parent:WaitForChild("Controllers")`. Found in the first live playtest via MCP console read.
 - StyLua formatting drift in test specs; repo now passes `stylua --check .`.

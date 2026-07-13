@@ -144,14 +144,32 @@ function CafeService.GetFurnitureFolder(_self: any, player: Player): Folder?
 	return if plot then plot.furnitureFolder else nil
 end
 
+-- Shared proximity guard for interactions that must happen at your own café.
+function CafeService.IsNearOwnPlot(_self: any, player: Player, maxDistance: number): boolean
+	local plot = plotByUser[player.UserId]
+	local character = player.Character
+	if not plot or not character then
+		return false
+	end
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not (hrp and hrp:IsA("BasePart")) then
+		return false
+	end
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
+	local centre = (plot.origin * CFrame.new(width / 2, 0, depth / 2)).Position
+	return (hrp.Position - centre).Magnitude <= maxDistance
+end
+
 local function assignPlot(player: Player): Plot?
 	for _, plot in plots do
 		if plot.ownerUserId == nil then
 			plot.ownerUserId = player.UserId
 			plot.ownerLabel.Text = player.DisplayName .. "'s Café"
 			plotByUser[player.UserId] = plot
-			-- Client reads this to compute grid coordinates for placement previews.
+			-- Clients read these to find their own plot (placement, appliances).
 			player:SetAttribute("PlotOrigin", plot.origin)
+			plot.model:SetAttribute("ownerUserId", player.UserId)
 			return plot
 		end
 	end
@@ -199,6 +217,7 @@ local function onPlayerRemoving(player: Player)
 		plot.ownerUserId = nil
 		plot.ownerLabel.Text = "Empty Café"
 		plot.furnitureFolder:ClearAllChildren()
+		plot.model:SetAttribute("ownerUserId", nil)
 		plotByUser[player.UserId] = nil
 	end
 end
