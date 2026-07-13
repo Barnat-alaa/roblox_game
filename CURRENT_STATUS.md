@@ -1,37 +1,38 @@
 # Current status
 
-_Last updated: 2026-07-13 — Day 1 scaffold._
+_Last updated: 2026-07-13 — Day 1 verified live in Studio; first push to GitHub._
 
 ## What was completed
 
-- Full Rojo project scaffold in strict Luau that is intended to build and play as a greybox.
-- Toolchain manifests: `rokit.toml`, `wally.toml`, `default.project.json`, `stylua.toml`, `selene.toml`, `.luaurc`.
-- CI workflow (`.github/workflows/ci.yml`): StyLua check → Selene lint → Rojo build → artifact upload.
-- **Shared:** typed `PlayerData`/recipe/furniture/customer/order types; data-driven Config (Economy, Recipes×5, Furniture×7, Customers×3, Progression, Staff); `Remotes` registry; pure `Grid`, `RateLimiter`, `RewardMath`, `Log` utilities.
-- **Server:** service framework (`ServiceRegistry` + two-phase Init/Start loader) and services: `DataService` (load/reconcile/migrate/autosave/BindToClose + in-memory fallback), `EconomyService` (authoritative coins/rep/xp + purchase), `CafeService` (builds 6 greybox plots, assigns + teleports, renders furniture), `BuildService` (server-validated placement), `OrderService` (serve/claim with double-claim + distance guards), `CustomerService` (order generator), `RecipeService`, `ProgressionService`, `AnalyticsService`, plus Staff/Social/Monetization placeholders.
-- **Client:** loader + `UIController` (HUD: coins/rep/level, order banner, Serve button, shop, toasts), `BuildController` (grid preview + place/rotate), `TutorialController` (learn-by-doing hints), and Interaction/Camera/Cooking placeholders.
-- **Tests:** TestEZ specs for RewardMath, Grid placement, Progression.
-- Docs set (this file + README, ROADMAP, ARCHITECTURE, SECURITY, TEST_PLAN, RELEASE_CHECKLIST, ECONOMY_BALANCE, ANALYTICS_EVENTS, ASSET_LICENSES, KNOWN_ISSUES, THIRD_PARTY_NOTICES).
+- **Toolchain installed and working**: rokit 1.2.0, rojo 7.4.4, stylua 2.0.2, selene 0.27.1, gh 2.95.0 (authenticated as Barnat-alaa).
+- **MCP connected**: Claude Code drives Studio directly (game-tree inspection, Luau execution, play/stop, console reads).
+- **Day 1 scaffold verified live**: server boots clean — 6 plots built, 12 services, profile loads, client boots 6 controllers.
+- **All 21 logic tests pass** (Economy/RewardMath, Grid placement, Progression) — run inside Studio against the live DataModel via an MCP TestEZ-compatible harness.
+- **End-to-end serve loop verified behaviourally**: order created → client `ClaimOrder` → +7 coins espresso payout (matches config), reputation/XP granted, re-claim of the same order rejected (no double payment).
+- **Fixed first real bug**: client `Main` waited on `script:WaitForChild("Controllers")` but `Controllers` is a *sibling* — controllers/UI never loaded. Fixed to `script.Parent` (src + Studio patch + place rebuilt).
+- **CI gates green locally**: StyLua check, Selene 0 errors (added `testez.yml` std for spec globals), Rojo build.
+- Repo pushed to <https://github.com/Barnat-alaa/roblox_game> with GitHub Actions CI.
 
 ## What was tested
 
-- File/JSON authoring validated locally (see `NEXT_ACTIONS.md` for the JSON check).
-- **Not yet run inside Studio** — Rojo/Studio are not installed on this machine yet, so a live build + playtest is the immediate next step.
+- 21/21 unit specs in live Studio (Edit DataModel).
+- Playtest boot: no errors in Output except the expected in-memory DataStore warning (place unpublished).
+- E2E via real remotes from the Client VM: `RequestProfile`, `ClaimOrder` (150 → 157 → 164 coins across two distinct orders; duplicate claim paid 0).
+- Customer generator cadence: one pending order per user, next order ≤8 s after resolution — confirmed live.
 
 ## What failed / is not done
 
-- No live Studio build has run (toolchain not installed here).
-- Visible walking NPCs, manual-cook minigame, café-visit interaction, lighting/audio pass, and the mobile control polish are pending (Days 3/5/6).
-- DataStore persistence is single-key with retries, **not** ProfileStore session-locking yet (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)).
+- Zero-gap duplicate-claim race (two `ClaimOrder` fires in the same frame) not yet behaviourally tested — code path is guarded (claim marked before grant); retest scheduled with the Day-6 security review.
+- Visible walking NPCs, manual-cook minigame, café-visit interaction, lighting/audio, onboarding flow, mobile pass: Days 3–6.
+- Persistence is in-memory in Studio until the place is published with API access.
+- Studio was closed mid-session; SocialCafe.rbxlx has been rebuilt from the repo (contains the boot fix) and is ready to reopen.
 
 ## What YOU need to do next
 
-See [NEXT_ACTIONS.md](NEXT_ACTIONS.md). In short: install Rokit, run `rokit install`,
-connect Studio↔Claude Code over MCP, then press Play and report what you see.
+1. Reopen `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` in Studio (double-click the file).
+2. Later this week: publish the place as a private experience + enable Studio Access to API Services (see NEXT_ACTIONS.md) so saves persist.
 
 ## Exact command to continue
 
-```sh
-cd C:\Users\barna\Desktop\roblox
-rokit install && rojo build --output SocialCafe.rbxlx
-```
+Open a Claude Code session in `C:\Users\barna\Desktop\roblox` and say "continue" —
+tasks are tracked; next up is Day 3 (visible customer NPCs + coffee minigame).

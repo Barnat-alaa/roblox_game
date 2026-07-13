@@ -20,7 +20,8 @@ EconomyService.Name = "EconomyService"
 local DataService: any
 local ProgressionService: any
 
-local buyLimiter = RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
+local buyLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 
 function EconomyService.TrySpendCoins(_self: any, player: Player, amount: number): boolean
 	if amount < 0 then
@@ -94,7 +95,8 @@ local function handlePurchase(player: Player, catalogId: unknown)
 		return
 	end
 	if not EconomyService:TrySpendCoins(player, def.price) then
-		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "insufficient_coins" })
+		Remotes.event("Notify")
+			:FireClient(player, { kind = "error", reason = "insufficient_coins" })
 		return
 	end
 	data.inventory[catalogId] = (data.inventory[catalogId] or 0) + 1

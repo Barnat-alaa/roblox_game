@@ -46,14 +46,33 @@ local function defaultProfile(): Types.PlayerData
 		cafeStars = 0,
 		inventory = { table_round = 2, chair_wood = 4, plant_small = 1 },
 		placedFurniture = {
-			{ instanceId = "seed_coffee", catalogId = "coffee_machine", gridX = 1, gridY = 0, floor = 0, rotation = 0 },
-			{ instanceId = "seed_counter", catalogId = "counter", gridX = 4, gridY = 0, floor = 0, rotation = 0 },
+			{
+				instanceId = "seed_coffee",
+				catalogId = "coffee_machine",
+				gridX = 1,
+				gridY = 0,
+				floor = 0,
+				rotation = 0,
+			},
+			{
+				instanceId = "seed_counter",
+				catalogId = "counter",
+				gridX = 4,
+				gridY = 0,
+				floor = 0,
+				rotation = 0,
+			},
 		},
 		unlockedRecipes = { espresso = true, tea = true },
 		recipeMastery = {},
 		staff = {},
 		settings = { musicVolume = 0.6, sfxVolume = 0.8, reducedEffects = false },
-		stats = { customersServed = 0, totalCoinsEarned = 0, recipesCooked = 0, tutorialCompleted = false },
+		stats = {
+			customersServed = 0,
+			totalCoinsEarned = 0,
+			recipesCooked = 0,
+			tutorialCompleted = false,
+		},
 	}
 end
 

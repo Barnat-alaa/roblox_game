@@ -29,7 +29,8 @@ local AnalyticsService: any
 
 local activeOrders: { [string]: Types.Order } = {}
 local nextId = 0
-local claimLimiter = RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
+local claimLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 local rng = Random.new()
 
 local function newOrderId(): string
@@ -37,7 +38,12 @@ local function newOrderId(): string
 	return "order_" .. nextId
 end
 
-function OrderService.CreateOrder(_self: any, player: Player, recipeId: string, customerId: string): string?
+function OrderService.CreateOrder(
+	_self: any,
+	player: Player,
+	recipeId: string,
+	customerId: string
+): string?
 	if not Recipes[recipeId] then
 		return nil
 	end
@@ -134,7 +140,11 @@ local function handleClaim(player: Player, orderId: unknown, manualCook: unknown
 	end
 	if AnalyticsService then
 		AnalyticsService:TrackOnce(player, "first_customer_served", { recipe = order.recipeId })
-		AnalyticsService:Track(player, "customer_served", { recipe = order.recipeId, coins = payout + tip })
+		AnalyticsService:Track(
+			player,
+			"customer_served",
+			{ recipe = order.recipeId, coins = payout + tip }
+		)
 	end
 
 	Remotes.event("Notify"):FireClient(player, {

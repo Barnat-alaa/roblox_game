@@ -5,6 +5,17 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-13 — Day 1 live verification
+- **Client boot**: `Main.client.luau` waited on `script:WaitForChild("Controllers")`, but `Controllers` is a sibling folder — no controllers or UI ever loaded. Now `script.Parent:WaitForChild("Controllers")`. Found in the first live playtest via MCP console read.
+- StyLua formatting drift in test specs; repo now passes `stylua --check .`.
+- Selene reported 55 `undefined_variable` errors for TestEZ globals in `tests/*.spec.luau`; added `testez.yml` standard library and switched `selene.toml` to `std = "roblox+testez"` (0 errors).
+- `.gitignore`: ignore Studio `*.rbxlx.lock`/`*.rbxl.lock` files and local `.mcp.json`.
+
+### Verified — 2026-07-13
+- 21/21 unit specs pass inside Studio (MCP harness, live DataModel).
+- Clean server boot (6 plots, 12 services) and client boot (6 controllers).
+- E2E serve loop through real remotes: payout matches config, duplicate claim pays nothing.
+
 ### Added — 2026-07-13 — Day 1 scaffold
 - Rojo project in strict Luau: toolchain manifests, CI, project mapping.
 - Shared layer: type definitions, data-driven config (economy, 5 recipes, 7 furniture items, 3 customers, progression, staff), remotes registry, pure utilities (Grid, RateLimiter, RewardMath, Log).

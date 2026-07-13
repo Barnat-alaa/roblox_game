@@ -22,7 +22,8 @@ BuildService.Name = "BuildService"
 local DataService: any
 local CafeService: any
 
-local placeLimiter = RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
+local placeLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 local nextInstance = 0
 
 local function newInstanceId(): string
@@ -30,7 +31,13 @@ local function newInstanceId(): string
 	return "f_" .. nextInstance
 end
 
-local function validatePlacement(data: Types.PlayerData, def: Types.FurnitureDefinition, gridX: number, gridY: number, rotation: number): (boolean, string?)
+local function validatePlacement(
+	data: Types.PlayerData,
+	def: Types.FurnitureDefinition,
+	gridX: number,
+	gridY: number,
+	rotation: number
+): (boolean, string?)
 	-- Reject NaN / non-integers / bad rotation up front.
 	if gridX ~= gridX or gridY ~= gridY then
 		return false, "nan_coords"
@@ -75,10 +82,19 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 	local part = Instance.new("Part")
 	part.Anchored = true
 	part.Name = placed.catalogId
-	part.Size = Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
+	part.Size =
+		Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
 	part.Color = def.color
 	part.Material = Enum.Material.SmoothPlastic
-	part.CFrame = Grid.cellToWorld(origin, placed.gridX, placed.gridY, def.width, def.depth, placed.rotation, def.height)
+	part.CFrame = Grid.cellToWorld(
+		origin,
+		placed.gridX,
+		placed.gridY,
+		def.width,
+		def.depth,
+		placed.rotation,
+		def.height
+	)
 	part:SetAttribute("instanceId", placed.instanceId)
 	part.Parent = folder
 end

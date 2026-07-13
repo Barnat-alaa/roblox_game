@@ -17,6 +17,13 @@ sourcemap.json
 *.pem
 secrets/
 
+# Local machine-specific MCP config (contains an absolute path to Studio's bridge)
+.mcp.json
+
+# Studio lock files for open places
+*.rbxlx.lock
+*.rbxl.lock
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

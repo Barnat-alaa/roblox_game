@@ -33,7 +33,14 @@ type Plot = {
 local plots: { Plot } = {}
 local plotByUser: { [number]: Plot } = {}
 
-local function makePart(name: string, size: Vector3, cframe: CFrame, color: Color3, parent: Instance, material: Enum.Material?): Part
+local function makePart(
+	name: string,
+	size: Vector3,
+	cframe: CFrame,
+	color: Color3,
+	parent: Instance,
+	material: Enum.Material?
+): Part
 	local part = Instance.new("Part")
 	part.Name = name
 	part.Anchored = true
@@ -53,14 +60,45 @@ local function buildPlot(index: number, parent: Instance): Plot
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 
-	makePart("Floor", Vector3.new(width, 1, depth), origin * CFrame.new(width / 2, -0.5, depth / 2), Color3.fromRGB(225, 210, 185), model, Enum.Material.WoodPlanks)
+	makePart(
+		"Floor",
+		Vector3.new(width, 1, depth),
+		origin * CFrame.new(width / 2, -0.5, depth / 2),
+		Color3.fromRGB(225, 210, 185),
+		model,
+		Enum.Material.WoodPlanks
+	)
 
 	local wallH = 8
-	makePart("WallBack", Vector3.new(width, wallH, 1), origin * CFrame.new(width / 2, wallH / 2, depth), Color3.fromRGB(205, 125, 95), model)
-	makePart("WallLeft", Vector3.new(1, wallH, depth), origin * CFrame.new(0, wallH / 2, depth / 2), Color3.fromRGB(210, 178, 150), model)
-	makePart("WallRight", Vector3.new(1, wallH, depth), origin * CFrame.new(width, wallH / 2, depth / 2), Color3.fromRGB(210, 178, 150), model)
+	makePart(
+		"WallBack",
+		Vector3.new(width, wallH, 1),
+		origin * CFrame.new(width / 2, wallH / 2, depth),
+		Color3.fromRGB(205, 125, 95),
+		model
+	)
+	makePart(
+		"WallLeft",
+		Vector3.new(1, wallH, depth),
+		origin * CFrame.new(0, wallH / 2, depth / 2),
+		Color3.fromRGB(210, 178, 150),
+		model
+	)
+	makePart(
+		"WallRight",
+		Vector3.new(1, wallH, depth),
+		origin * CFrame.new(width, wallH / 2, depth / 2),
+		Color3.fromRGB(210, 178, 150),
+		model
+	)
 
-	local sign = makePart("Sign", Vector3.new(width, 2, 0.5), origin * CFrame.new(width / 2, wallH + 1, depth), Color3.fromRGB(120, 90, 70), model)
+	local sign = makePart(
+		"Sign",
+		Vector3.new(width, 2, 0.5),
+		origin * CFrame.new(width / 2, wallH + 1, depth),
+		Color3.fromRGB(120, 90, 70),
+		model
+	)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "SignGui"
 	gui.Size = UDim2.fromScale(12, 2.4)

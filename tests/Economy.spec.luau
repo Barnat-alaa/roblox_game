@@ -9,16 +9,32 @@ return function()
 	describe("RewardMath", function()
 		it("pays base profit for an auto-cooked order", function()
 			local espresso = Recipes.espresso
-			expect(RewardMath.orderPayout(espresso, false)).to.equal(espresso.basePrice - espresso.ingredientCost)
+			expect(RewardMath.orderPayout(espresso, false)).to.equal(
+				espresso.basePrice - espresso.ingredientCost
+			)
 		end)
 
 		it("adds a bonus for a manual cook", function()
 			local espresso = Recipes.espresso
-			expect(RewardMath.orderPayout(espresso, true) > RewardMath.orderPayout(espresso, false)).to.equal(true)
+			expect(RewardMath.orderPayout(espresso, true) > RewardMath.orderPayout(espresso, false)).to.equal(
+				true
+			)
 		end)
 
 		it("never returns a negative payout", function()
-			local fake = { id = "x", displayName = "x", category = "x", ingredientCost = 999, basePrice = 1, preparationTime = 1, applianceId = "x", requiredLevel = 1, requiredReputation = 0, baseQuality = 1, masteryThresholds = {} }
+			local fake = {
+				id = "x",
+				displayName = "x",
+				category = "x",
+				ingredientCost = 999,
+				basePrice = 1,
+				preparationTime = 1,
+				applianceId = "x",
+				requiredLevel = 1,
+				requiredReputation = 0,
+				baseQuality = 1,
+				masteryThresholds = {},
+			}
 			expect(RewardMath.orderPayout(fake, false)).to.equal(0)
 		end)
 

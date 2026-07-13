@@ -12,15 +12,24 @@ local TutorialController = {}
 TutorialController.Name = "TutorialController"
 
 local steps: { { text: string, done: (any) -> boolean } } = {
-	{ text = "👋 Welcome! Tap 🔨 Build, pick a chair or table, and tap the floor to place it.", done = function(p)
-		return #p.placedFurniture > 2
-	end },
-	{ text = "☕ A customer is arriving — tap the green Serve button when their order appears.", done = function(p)
-		return p.stats.customersServed >= 1
-	end },
-	{ text = "🛒 Tap Shop, buy a decoration, then place it in Build to make the café yours.", done = function(p)
-		return #p.placedFurniture > 3
-	end },
+	{
+		text = "👋 Welcome! Tap 🔨 Build, pick a chair or table, and tap the floor to place it.",
+		done = function(p)
+			return #p.placedFurniture > 2
+		end,
+	},
+	{
+		text = "☕ A customer is arriving — tap the green Serve button when their order appears.",
+		done = function(p)
+			return p.stats.customersServed >= 1
+		end,
+	},
+	{
+		text = "🛒 Tap Shop, buy a decoration, then place it in Build to make the café yours.",
+		done = function(p)
+			return #p.placedFurniture > 3
+		end,
+	},
 }
 
 local current = 1

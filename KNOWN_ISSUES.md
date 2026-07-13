@@ -31,7 +31,17 @@ Tracked shortcomings of the current build. Each has an owner-facing note and a p
   `CompleteTutorialStep`. Day-5.
 - No audio, no lighting/atmosphere pass yet (greybox).
 
+## Security (to retest)
+- **Zero-gap duplicate-claim race**: two `ClaimOrder` fires in the same frame have
+  not been behaviourally tested (Studio session ended mid-test). The code path is
+  guarded — `order.claimed = true` and removal from `activeOrders` happen *before*
+  any grant — and a sequential re-claim was observed to pay nothing.
+  **Plan:** rerun the zero-gap test during the Day-6 security review.
+
 ## Tooling
-- Toolchain versions in `rokit.toml` are best-guess pins; if `rokit install`
-  rejects one, use the `rokit add …` fallback in NEXT_ACTIONS.md.
-- Selene may need a one-time `selene generate-roblox-std`.
+- Toolchain verified working: rokit 1.2.0, rojo 7.4.4, stylua 2.0.2, selene 0.27.1.
+- Selene needs `testez.yml` (committed) and the Roblox std (auto-generated in CI
+  via `selene generate-roblox-std`).
+- The MCP `execute_luau` context has its **own module cache** — it cannot reach the
+  running game's module singletons. Drive live tests through DataModel objects
+  (remotes, instances), not `require`.

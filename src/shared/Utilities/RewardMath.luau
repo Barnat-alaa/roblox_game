@@ -18,7 +18,11 @@ end
 
 -- Tip coins. `roll` is a 1..100 value supplied by the caller (Random on the server,
 -- a fixed value in tests) so this stays deterministic and testable.
-function RewardMath.tipAmount(recipe: Types.RecipeDefinition, roll: number, tipMultiplier: number): number
+function RewardMath.tipAmount(
+	recipe: Types.RecipeDefinition,
+	roll: number,
+	tipMultiplier: number
+): number
 	if roll <= EconomyConfig.tipChancePercent then
 		return math.floor(recipe.basePrice * EconomyConfig.tipFraction * tipMultiplier)
 	end

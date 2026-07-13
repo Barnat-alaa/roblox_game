@@ -14,13 +14,23 @@ AnalyticsService.Name = "AnalyticsService"
 
 local firedOnce: { [number]: { [string]: boolean } } = {}
 
-function AnalyticsService.Track(_self: any, player: Player, eventName: string, params: { [string]: any }?)
+function AnalyticsService.Track(
+	_self: any,
+	player: Player,
+	eventName: string,
+	params: { [string]: any }?
+)
 	local encoded = if params then HttpService:JSONEncode(params) else "{}"
 	Log.info("[analytics]", player.Name, eventName, encoded)
 	-- TODO(Day 6): AnalyticsService:LogCustomEvent(player, eventName, value) + funnels.
 end
 
-function AnalyticsService.TrackOnce(self: any, player: Player, eventName: string, params: { [string]: any }?)
+function AnalyticsService.TrackOnce(
+	self: any,
+	player: Player,
+	eventName: string,
+	params: { [string]: any }?
+)
 	local set = firedOnce[player.UserId]
 	if not set then
 		set = {}

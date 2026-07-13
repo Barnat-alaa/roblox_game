@@ -1,7 +1,7 @@
 # Selene linter config — https://github.com/Kampfkarren/selene
 # Uses the Roblox standard library. If Selene reports "std roblox not found",
 # run once:  selene generate-roblox-std   (writes roblox.toml alongside this file)
-std = "roblox"
+std = "roblox+testez"
 
 exclude = ["Packages", "DevPackages", "ServerPackages"]
 

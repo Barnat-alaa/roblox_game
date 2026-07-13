@@ -1,53 +1,31 @@
 # Next actions
 
-Ordered. Items marked **[you]** need your account/machine; the rest I can do once
-MCP or the repo is connected.
+Ordered. Items marked **[you]** need your account/machine; the rest Claude does via MCP/repo.
 
-## 1. Install the toolchain **[you]**
-1. Install Rokit from <https://github.com/rojo-rbx/rokit/releases> (Windows installer).
-2. Reopen your terminal, then:
-   ```sh
-   cd C:\Users\barna\Desktop\roblox
-   rokit install
-   ```
-3. If it reports a version as unavailable, run:
-   ```sh
-   rokit add rojo-rbx/rojo UpliftGames/wally JohnnyMorganz/StyLua Kampfkarren/selene JohnnyMorganz/luau-lsp
-   ```
-4. Verify: `rojo --version` and `stylua --version`.
-→ **Send me:** those two version lines.
+## 1. Reopen the place in Studio **[you]** — needed to resume live work
+1. Double-click `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` (rebuilt today from the repo — includes the client boot fix).
+2. Wait for Studio to load, keep it open.
+→ **Send me:** "Studio open" (I'll reconnect via MCP and verify).
 
-## 2. Build & open in Studio **[you]**
-```sh
-rojo build --output SocialCafe.rbxlx
-```
-Open `SocialCafe.rbxlx` in Studio (or use `rojo serve` + the Rojo Studio plugin → Connect).
-→ **Send me:** the Output panel contents after pressing **Play** (copy any red errors verbatim).
+## 2. Publish the Dev experience **[you]** — needed for real persistence
+1. In Studio: **File → Publish to Roblox** → create a **new experience** named `Social Cafe DEV`, private.
+2. **Home → Game Settings → Security → Enable Studio Access to API Services** → Save.
+3. This makes DataStore work so saves survive rejoining.
+→ **Send me:** a screenshot of Game Settings → Security, or just "published + API on".
 
-## 3. Connect Studio ↔ Claude Code over MCP **[you]**
-Studio → Assistant panel → ⋯ → **Manage MCP Servers** → enable **Studio as MCP server** →
-**Quick connect** → **Claude Code** → toggle on → restart Studio + Claude Code.
-→ **Send me:** "green, 1 client." Then I can inspect the DataModel and drive playtests directly.
+## 3. Day 3 build (Claude, via MCP + repo — no account needed)
+- Visible walking customer NPC: spawn at street → walk to counter/seat → order bubble → wait → react → leave.
+- Manual coffee-brew timing minigame at the machine (`StartCooking` remote is already reserved; `manualCook=true` bonus path exists in RewardMath).
+- Stuck-NPC recovery (teleport/reset).
 
-## 4. First playtest checklist (what "working" looks like)
-- [ ] You spawn on a plot; a street of 6 greybox cafés is visible.
-- [ ] HUD shows coins (150), reputation (0), level 1.
-- [ ] Within ~8s an order banner + green **Serve** button appears.
-- [ ] Serve → toast `+N 🪙`, coins increase.
-- [ ] **Build** → catalogue of owned items → tap floor to place (green/red preview) → item appears.
-- [ ] **Shop** → Buy an item → it shows up in Build.
-- [ ] Rejoin (Studio: stop + Play again) → placed items persist **only if** DataStore API is enabled on a published place; in Studio it's in-memory per session (expected).
+## 4. First playtest checklist (unchanged — re-verify after Day 3)
+- [ ] Spawn on a plot; street of 6 greybox cafés visible.
+- [ ] HUD shows coins 150 / reputation 0 / level 1.
+- [ ] Order banner + **Serve** within ~8 s; serve pays and toasts.
+- [ ] **Build** → place/rotate with green/red preview; **Shop** → buy → place.
+- [ ] Rejoin restores data (only after step 2 publishes the place).
 
-## 5. Publish the Dev experience **[you]** (needed for real persistence)
-Enable **Studio Access to API Services** (Game Settings → Security) and publish the place,
-so DataStore works. Then re-test persistence across rejoins.
-
-## 6. GitHub **[you]**
-Create the private repo, then I'll give you the exact `git remote add origin … && git push` commands.
-
----
-### Backlog I pick up next (no account needed)
-- Visible walking customer NPC + seat/counter routing (Day 3).
-- Manual-cook timing minigame → `manualCook=true` bonus (Day 3).
-- Café-visit interaction + a lighting/atmosphere pass (Day 5).
-- Mobile control tuning + `test.project.json` + TestEZ runner wiring (Day 6).
+## Backlog (tracked as tasks in-session)
+- Day 5: onboarding flow, plaza/lighting pass, café-visit interaction.
+- Day 6: mobile pass, security review (incl. zero-gap duplicate-claim race test), TestEZ runner wiring, 2-client test, analytics events.
+- Day 7: private publication, content maturity, icon/thumbnail, tester access, smoke test.

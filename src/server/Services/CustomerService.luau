@@ -63,7 +63,8 @@ function CustomerService.Start(_self: any)
 					if data then
 						local recipeId = pickUnlockedRecipe(data)
 						if recipeId then
-							local orderId = OrderService:CreateOrder(player, recipeId, pickCustomer())
+							local orderId =
+								OrderService:CreateOrder(player, recipeId, pickCustomer())
 							if orderId then
 								pendingByUser[player.UserId] = true
 							end

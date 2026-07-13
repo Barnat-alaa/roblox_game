@@ -88,7 +88,8 @@ local function updatePreview()
 		previewPart = part
 	end
 	local pv = previewPart :: Part
-	pv.Size = Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
+	pv.Size =
+		Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
 	pv.CFrame = Grid.cellToWorld(origin, gx, gy, def.width, def.depth, rotation, def.height)
 	local fits = Grid.inBounds(gx, gy, def.width, def.depth, rotation)
 	pv.Color = if fits then Color3.fromRGB(90, 200, 110) else Color3.fromRGB(220, 80, 80)
@@ -132,7 +133,9 @@ local function refreshCatalogue()
 			local btn = Instance.new("TextButton")
 			btn.Size = UDim2.new(1, -6, 0, 38)
 			btn.LayoutOrder = order
-			btn.BackgroundColor3 = if selectedId == id then Color3.fromRGB(120, 190, 130) else Color3.fromRGB(255, 250, 240)
+			btn.BackgroundColor3 = if selectedId == id
+				then Color3.fromRGB(120, 190, 130)
+				else Color3.fromRGB(255, 250, 240)
 			btn.TextColor3 = DARK
 			btn.Font = Enum.Font.GothamMedium
 			btn.TextSize = 15
@@ -246,7 +249,10 @@ function BuildController.Start(_self: any)
 		if gameProcessed then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
 			tryPlace(Vector2.new(input.Position.X, input.Position.Y))
 		elseif input.KeyCode == Enum.KeyCode.R then
 			rotation = (rotation + 1) % 4

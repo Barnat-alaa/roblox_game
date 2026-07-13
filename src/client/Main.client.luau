@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Log = require(Shared.Utilities.Log)
 
-local controllersFolder = script:WaitForChild("Controllers")
+local controllersFolder = script.Parent:WaitForChild("Controllers")
 
 local controllers: { any } = {}
 for _, module in controllersFolder:GetChildren() do

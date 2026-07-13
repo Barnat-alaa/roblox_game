@@ -16,17 +16,41 @@ function Grid.footprintSize(width: number, depth: number, rotation: number): (nu
 	return width, depth
 end
 
-function Grid.inBounds(gridX: number, gridY: number, width: number, depth: number, rotation: number): boolean
+function Grid.inBounds(
+	gridX: number,
+	gridY: number,
+	width: number,
+	depth: number,
+	rotation: number
+): boolean
 	local w, d = Grid.footprintSize(width, depth, rotation)
-	return gridX >= 0 and gridY >= 0 and (gridX + w) <= Grid.PLOT_WIDTH and (gridY + d) <= Grid.PLOT_DEPTH
+	return gridX >= 0
+		and gridY >= 0
+		and (gridX + w) <= Grid.PLOT_WIDTH
+		and (gridY + d) <= Grid.PLOT_DEPTH
 end
 
 -- Axis-aligned rectangle overlap in cell space.
-function Grid.rectsOverlap(ax: number, ay: number, aw: number, ad: number, bx: number, by: number, bw: number, bd: number): boolean
+function Grid.rectsOverlap(
+	ax: number,
+	ay: number,
+	aw: number,
+	ad: number,
+	bx: number,
+	by: number,
+	bw: number,
+	bd: number
+): boolean
 	return ax < bx + bw and bx < ax + aw and ay < by + bd and by < ay + ad
 end
 
-function Grid.occupiedCells(gridX: number, gridY: number, width: number, depth: number, rotation: number): { { x: number, y: number } }
+function Grid.occupiedCells(
+	gridX: number,
+	gridY: number,
+	width: number,
+	depth: number,
+	rotation: number
+): { { x: number, y: number } }
 	local w, d = Grid.footprintSize(width, depth, rotation)
 	local cells = {}
 	for dx = 0, w - 1 do
@@ -40,7 +64,15 @@ end
 -- World CFrame for the centre of a footprint, given the plot origin.
 -- The caller sizes the part with the ORIGINAL width/depth and lets this rotation
 -- swap the world extents, keeping the render aligned with the occupancy grid.
-function Grid.cellToWorld(origin: CFrame, gridX: number, gridY: number, width: number, depth: number, rotation: number, height: number): CFrame
+function Grid.cellToWorld(
+	origin: CFrame,
+	gridX: number,
+	gridY: number,
+	width: number,
+	depth: number,
+	rotation: number,
+	height: number
+): CFrame
 	local w, d = Grid.footprintSize(width, depth, rotation)
 	local localX = (gridX + w / 2) * Grid.CELL_SIZE
 	local localZ = (gridY + d / 2) * Grid.CELL_SIZE
