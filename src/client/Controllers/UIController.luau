@@ -316,6 +316,9 @@ function UIController.Start(_self: any)
 			UIController.toast("+" .. tostring(msg.coins) .. " 🪙")
 		elseif msg.kind == "purchased" then
 			UIController.toast("Bought — open 🔨 Build to place it")
+		elseif msg.kind == "order_cancelled" then
+			clearOrder()
+			UIController.toast("The customer left 😞")
 		elseif msg.kind == "error" then
 			UIController.toast(FRIENDLY_ERROR[msg.reason] or tostring(msg.reason))
 		end

@@ -136,7 +136,7 @@ local function handleClaim(player: Player, orderId: unknown, manualCook: unknown
 	DataService:Push(player)
 
 	if CustomerService then
-		CustomerService:OnOrderResolved(player.UserId)
+		CustomerService:OnOrderResolved(player.UserId, payout + tip)
 	end
 	if AnalyticsService then
 		AnalyticsService:TrackOnce(player, "first_customer_served", { recipe = order.recipeId })
@@ -152,6 +152,24 @@ local function handleClaim(player: Player, orderId: unknown, manualCook: unknown
 		coins = payout + tip,
 		recipe = order.recipeId,
 	})
+end
+
+-- Server-internal (called by CustomerService when patience runs out).
+-- Never grants anything; a claimed order can no longer be cancelled.
+function OrderService.CancelOrder(_self: any, orderId: string): boolean
+	local order = activeOrders[orderId]
+	if not order or order.claimed then
+		return false
+	end
+	activeOrders[orderId] = nil
+	local player = Players:GetPlayerByUserId(order.ownerUserId)
+	if player then
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "order_cancelled",
+			reason = "customer_left",
+		})
+	end
+	return true
 end
 
 function OrderService.Init(_self: any)
