@@ -25,6 +25,7 @@ local FRIENDLY_ERROR = {
 	too_many_objects = "Your café is full.",
 	too_far = "Get closer to your counter.",
 	not_rotatable = "That item can't rotate.",
+	plot_empty = "Nobody owns that café yet.",
 }
 
 local UIController = {}
@@ -319,6 +320,12 @@ function UIController.Start(_self: any)
 		elseif msg.kind == "order_cancelled" then
 			clearOrder()
 			UIController.toast("The customer left 😞")
+		elseif msg.kind == "visitor" then
+			UIController.toast("👀 " .. tostring(msg.name) .. " is visiting your café!")
+		elseif msg.kind == "compliment" then
+			UIController.toast(
+				"💖 " .. tostring(msg.from) .. " " .. tostring(msg.text) .. " (+2 ⭐)"
+			)
 		elseif msg.kind == "error" then
 			UIController.toast(FRIENDLY_ERROR[msg.reason] or tostring(msg.reason))
 		end

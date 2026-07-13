@@ -72,6 +72,7 @@ local function defaultProfile(): Types.PlayerData
 			totalCoinsEarned = 0,
 			recipesCooked = 0,
 			tutorialCompleted = false,
+			tutorialStep = 0,
 		},
 	}
 end

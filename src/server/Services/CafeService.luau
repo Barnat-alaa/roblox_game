@@ -5,6 +5,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
@@ -59,6 +60,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
+	model:SetAttribute("plotIndex", index)
 
 	makePart(
 		"Floor",
@@ -118,6 +120,17 @@ local function buildPlot(index: number, parent: Instance): Plot
 	label.Text = "Empty Café"
 	label.Parent = gui
 
+	-- Doormat pad at the café front; the client attaches a "Visit Café" prompt.
+	local pad = makePart(
+		"VisitPad",
+		Vector3.new(6, 0.3, 3),
+		origin * CFrame.new(width / 2, 0.15, -2.5),
+		Color3.fromRGB(196, 152, 112),
+		model,
+		Enum.Material.Fabric
+	)
+	pad:SetAttribute("plotIndex", index)
+
 	local furnitureFolder = Instance.new("Folder")
 	furnitureFolder.Name = "Furniture"
 	furnitureFolder.Parent = model
@@ -134,6 +147,233 @@ local function buildPlot(index: number, parent: Instance): Plot
 	}
 end
 
+-- Warm golden-hour pass: the street should feel like a Mediterranean evening.
+local function applyLighting()
+	Lighting.ClockTime = 16.4
+	Lighting.Brightness = 2.4
+	Lighting.Ambient = Color3.fromRGB(140, 120, 105)
+	Lighting.OutdoorAmbient = Color3.fromRGB(150, 130, 110)
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 200, 150)
+	Lighting.ColorShift_Bottom = Color3.fromRGB(200, 160, 130)
+	Lighting.EnvironmentDiffuseScale = 0.6
+	Lighting.EnvironmentSpecularScale = 0.6
+
+	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	atmo.Density = 0.35
+	atmo.Offset = 0.4
+	atmo.Color = Color3.fromRGB(214, 180, 150)
+	atmo.Decay = Color3.fromRGB(120, 90, 70)
+	atmo.Glare = 0.25
+	atmo.Haze = 1.6
+	atmo.Parent = Lighting
+
+	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
+	bloom.Intensity = 0.6
+	bloom.Size = 32
+	bloom.Threshold = 1.1
+	bloom.Parent = Lighting
+
+	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
+	rays.Intensity = 0.08
+	rays.Spread = 0.6
+	rays.Parent = Lighting
+end
+
+-- Lamp posts and trees give the greybox street a silhouette.
+local function buildStreetDecor(parent: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "StreetDecor"
+	folder.Parent = parent
+
+	for i = 0, NUM_PLOTS do
+		local x = i * PLOT_SPACING - 6
+		local pole = makePart(
+			"LampPole",
+			Vector3.new(0.6, 7, 0.6),
+			CFrame.new(x, 3, -18),
+			Color3.fromRGB(70, 60, 55),
+			folder,
+			Enum.Material.Metal
+		)
+		local head = makePart(
+			"LampHead",
+			Vector3.new(1.4, 1.4, 1.4),
+			CFrame.new(x, 7, -18),
+			Color3.fromRGB(255, 214, 150),
+			folder,
+			Enum.Material.Neon
+		)
+		head.Shape = Enum.PartType.Ball
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 205, 140)
+		light.Range = 22
+		light.Brightness = 1.1
+		light.Parent = head
+		pole.Name = "LampPole_" .. i
+	end
+
+	for i = 1, 4 do
+		local x = (i - 0.5) * (NUM_PLOTS * PLOT_SPACING) / 4 - 12
+		local z = -44
+		makePart(
+			"Trunk",
+			Vector3.new(1.4, 5, 1.4),
+			CFrame.new(x, 2, z),
+			Color3.fromRGB(110, 82, 60),
+			folder,
+			Enum.Material.Wood
+		)
+		local canopy = makePart(
+			"Canopy",
+			Vector3.new(7, 7, 7),
+			CFrame.new(x, 6.4, z),
+			Color3.fromRGB(105, 150, 88),
+			folder,
+			Enum.Material.Grass
+		)
+		canopy.Shape = Enum.PartType.Ball
+	end
+end
+
+-- Central plaza: paved circle, fountain, benches, planters, and the
+-- neighbourhood board — the social heart of the street (master plan §19).
+local function buildPlaza(parent: Instance)
+	local folder = Instance.new("Folder")
+	folder.Name = "Plaza"
+	folder.Parent = parent
+
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local midX = ((NUM_PLOTS - 1) * PLOT_SPACING + width) / 2
+	local centre = Vector3.new(midX, 0, -32)
+
+	local disc = makePart(
+		"PlazaFloor",
+		Vector3.new(0.5, 30, 30),
+		CFrame.new(midX, -0.25, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(205, 185, 160),
+		folder,
+		Enum.Material.Cobblestone
+	)
+	disc.Shape = Enum.PartType.Cylinder
+
+	local base = makePart(
+		"FountainBase",
+		Vector3.new(1.2, 10, 10),
+		CFrame.new(midX, 0.6, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(180, 170, 155),
+		folder,
+		Enum.Material.Slate
+	)
+	base.Shape = Enum.PartType.Cylinder
+	local water = makePart(
+		"FountainWater",
+		Vector3.new(0.4, 8.6, 8.6),
+		CFrame.new(midX, 1.1, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(120, 175, 200),
+		folder,
+		Enum.Material.Glass
+	)
+	water.Shape = Enum.PartType.Cylinder
+	water.Transparency = 0.35
+	local column = makePart(
+		"FountainColumn",
+		Vector3.new(1.6, 3, 1.6),
+		CFrame.new(midX, 2.4, -32),
+		Color3.fromRGB(180, 170, 155),
+		folder,
+		Enum.Material.Slate
+	)
+	column.Name = "FountainColumn"
+	local bowl = makePart(
+		"FountainBowl",
+		Vector3.new(0.6, 4, 4),
+		CFrame.new(midX, 4, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		Color3.fromRGB(180, 170, 155),
+		folder,
+		Enum.Material.Slate
+	)
+	bowl.Shape = Enum.PartType.Cylinder
+
+	for angle = 0, 270, 90 do
+		local rot = CFrame.new(centre) * CFrame.Angles(0, math.rad(angle + 45), 0)
+		makePart(
+			"BenchSeat",
+			Vector3.new(5, 0.5, 1.6),
+			rot * CFrame.new(0, 0.85, 11),
+			Color3.fromRGB(150, 110, 80),
+			folder,
+			Enum.Material.WoodPlanks
+		)
+		makePart(
+			"BenchBack",
+			Vector3.new(5, 1.4, 0.3),
+			rot * CFrame.new(0, 1.7, 11.8),
+			Color3.fromRGB(150, 110, 80),
+			folder,
+			Enum.Material.WoodPlanks
+		)
+		local planter = makePart(
+			"Planter",
+			Vector3.new(2, 1, 2),
+			CFrame.new(centre) * CFrame.Angles(0, math.rad(angle), 0) * CFrame.new(0, 0.5, 13),
+			Color3.fromRGB(185, 115, 90),
+			folder,
+			Enum.Material.Concrete
+		)
+		local bush = makePart(
+			"Bush",
+			Vector3.new(2.2, 2.2, 2.2),
+			planter.CFrame * CFrame.new(0, 1.4, 0),
+			Color3.fromRGB(110, 155, 92),
+			folder,
+			Enum.Material.Grass
+		)
+		bush.Shape = Enum.PartType.Ball
+	end
+
+	local board = makePart(
+		"NeighbourhoodBoard",
+		Vector3.new(8, 4, 0.4),
+		CFrame.new(midX, 3.4, -46) * CFrame.Angles(0, math.rad(180), 0),
+		Color3.fromRGB(120, 90, 70),
+		folder,
+		Enum.Material.Wood
+	)
+	makePart(
+		"BoardLegL",
+		Vector3.new(0.5, 3.4, 0.5),
+		CFrame.new(midX - 3.5, 1.7, -46),
+		Color3.fromRGB(100, 75, 58),
+		folder,
+		Enum.Material.Wood
+	)
+	makePart(
+		"BoardLegR",
+		Vector3.new(0.5, 3.4, 0.5),
+		CFrame.new(midX + 3.5, 1.7, -46),
+		Color3.fromRGB(100, 75, 58),
+		folder,
+		Enum.Material.Wood
+	)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(800, 400)
+	gui.Parent = board
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.fromScale(1, 1)
+	text.BackgroundTransparency = 1
+	text.Font = Enum.Font.GothamBold
+	text.TextScaled = true
+	text.TextColor3 = Color3.fromRGB(255, 246, 232)
+	text.Text =
+		"🏘️ Neighbourhood Board\nVisit your neighbours — leave a compliment!\nCommunity goals coming soon"
+	text.TextWrapped = true
+	text.Parent = gui
+
+	-- Clients read this to detect "player reached the plaza" (tutorial).
+	workspace:SetAttribute("PlazaCenter", centre)
+end
+
 function CafeService.GetPlotOrigin(_self: any, player: Player): CFrame?
 	local plot = plotByUser[player.UserId]
 	return if plot then plot.origin else nil
@@ -142,6 +382,15 @@ end
 function CafeService.GetFurnitureFolder(_self: any, player: Player): Folder?
 	local plot = plotByUser[player.UserId]
 	return if plot then plot.furnitureFolder else nil
+end
+
+-- Plot lookup by street index, for SocialService (visits/compliments).
+function CafeService.GetPlotInfo(_self: any, index: number): (CFrame?, number?)
+	local plot = plots[index]
+	if not plot then
+		return nil, nil
+	end
+	return plot.origin, plot.ownerUserId
 end
 
 -- Shared proximity guard for interactions that must happen at your own café.
@@ -245,6 +494,10 @@ function CafeService.Start(_self: any)
 	ground.Color = Color3.fromRGB(158, 158, 148)
 	ground.Material = Enum.Material.Concrete
 	ground.Parent = workspace
+
+	applyLighting()
+	buildStreetDecor(workspace)
+	buildPlaza(workspace)
 
 	for _, player in Players:GetPlayers() do
 		task.spawn(onPlayerAdded, player)

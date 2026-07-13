@@ -5,6 +5,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-14 — Day 5: a neighbourhood worth visiting
+- **Golden-hour lighting pass**: warm Mediterranean evening (Atmosphere, bloom,
+  sun rays, colour-shifted ambient), lamp posts with warm point lights, trees.
+- **Central plaza**: cobblestone circle, three-tier fountain, four benches with
+  planters, and a Neighbourhood Board — the social heart of the street (§19).
+- **Café visits** (SocialService + InteractionController): "Visit Café" prompt
+  on every neighbour's doormat pad teleports you to their door; a compliment
+  panel offers three predefined reactions (whitelist only, no free text). A
+  compliment gives the owner +2 reputation, once per visitor per owner per
+  session, validated for physical presence. "🏠 Go home" returns you.
+- **Persistent learn-by-doing tutorial** (ProgressionService + rewritten
+  TutorialController): six strictly-ordered steps (place furniture → brew →
+  serve → buy → decorate → reach the plaza) tracked server-side in
+  stats.tutorialStep; +25 coin completion gift, exactly once per profile.
+  Funnel analytics: tutorial_started / step_completed / completed,
+  first_cafe_visit, compliment_sent.
+- Plot models now expose `plotIndex`; workspace exposes `PlazaCenter`.
+
 ### Added — 2026-07-14 — Day 3: customers you can see, coffee you can brew
 - **Visible customer NPCs** (CustomerService rewrite): greybox walk-in customers
   spawn on the street, walk to the service spot, order with a recipe bubble,

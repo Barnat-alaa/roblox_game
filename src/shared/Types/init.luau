@@ -38,6 +38,7 @@ export type PlayerStats = {
 	totalCoinsEarned: number,
 	recipesCooked: number,
 	tutorialCompleted: boolean,
+	tutorialStep: number, -- index of the last completed onboarding step (0 = none)
 }
 
 -- The full persisted player document. Bump `schemaVersion` and add a migration
