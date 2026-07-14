@@ -71,6 +71,198 @@ local function validatePlacement(
 	return true, nil
 end
 
+-- ————— Composite furniture builders (art direction pass) —————
+-- Original procedural pieces that give the greybox its café-sim read:
+-- red-cloth tables, kettle-topped machine, counter with plates. Offsets are
+-- in the item's LOCAL space (cf carries the grid rotation). All greybox —
+-- Blender replacements slot in per-catalogId later.
+
+local WHITE = Color3.fromRGB(245, 242, 235)
+local WOOD = Color3.fromRGB(150, 110, 80)
+local DARKWOOD = Color3.fromRGB(96, 70, 52)
+local CLOTH_RED = Color3.fromRGB(196, 60, 50)
+local STEEL = Color3.fromRGB(192, 197, 204)
+
+local function decor(
+	model: Model,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	material: Enum.Material?
+): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Anchored = true
+	part.CanCollide = false
+	part.Size = size
+	part.CFrame = cf
+	part.Color = color
+	part.Material = material or Enum.Material.SmoothPlastic
+	part.Parent = model
+	return part
+end
+
+type Builder = (model: Model, cf: CFrame, def: Types.FurnitureDefinition) -> ()
+
+local Builders: { [string]: Builder } = {
+	table_round = function(model, cf, _def)
+		-- Red tablecloth over a white skirt — the classic checkered-table read.
+		local top = decor(
+			model,
+			"Top",
+			Vector3.new(6.8, 0.5, 6.8),
+			cf * CFrame.new(0, 0.75, 0),
+			CLOTH_RED,
+			Enum.Material.Fabric
+		)
+		top.CanCollide = true
+		decor(
+			model,
+			"Skirt",
+			Vector3.new(6.2, 0.9, 6.2),
+			cf * CFrame.new(0, 0.2, 0),
+			WHITE,
+			Enum.Material.Fabric
+		)
+		decor(
+			model,
+			"Pedestal",
+			Vector3.new(1.3, 1.5, 1.3),
+			cf * CFrame.new(0, -0.25, 0),
+			DARKWOOD,
+			Enum.Material.Wood
+		)
+	end,
+	chair_wood = function(model, cf, _def)
+		local seat = decor(
+			model,
+			"Seat",
+			Vector3.new(2.6, 0.4, 2.6),
+			cf * CFrame.new(0, -0.1, 0),
+			WOOD,
+			Enum.Material.Wood
+		)
+		seat.CanCollide = true
+		decor(
+			model,
+			"Back",
+			Vector3.new(2.6, 1.9, 0.4),
+			cf * CFrame.new(0, 0.85, 1.1),
+			WOOD,
+			Enum.Material.Wood
+		)
+		decor(
+			model,
+			"Legs",
+			Vector3.new(2.2, 0.9, 2.2),
+			cf * CFrame.new(0, -0.65, 0),
+			DARKWOOD,
+			Enum.Material.Wood
+		)
+	end,
+	coffee_machine = function(model, cf, _def)
+		local body =
+			decor(model, "Body", Vector3.new(3.2, 2.4, 3.2), cf * CFrame.new(0, -0.3, 0), WHITE)
+		body.CanCollide = true
+		decor(
+			model,
+			"Cooktop",
+			Vector3.new(3.4, 0.3, 3.4),
+			cf * CFrame.new(0, 1.05, 0),
+			Color3.fromRGB(70, 62, 58)
+		)
+		local kettle = decor(
+			model,
+			"Kettle",
+			Vector3.new(1.2, 1.7, 1.7),
+			cf * CFrame.new(0, 1.75, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			STEEL,
+			Enum.Material.Metal
+		)
+		kettle.Shape = Enum.PartType.Cylinder
+		decor(
+			model,
+			"Lid",
+			Vector3.new(0.7, 0.7, 0.7),
+			cf * CFrame.new(0, 2.45, 0),
+			Color3.fromRGB(70, 62, 58)
+		)
+		decor(model, "Accent", Vector3.new(3.24, 0.4, 3.24), cf * CFrame.new(0, 0.35, 0), CLOTH_RED)
+	end,
+	counter = function(model, cf, _def)
+		local body =
+			decor(model, "Body", Vector3.new(11.6, 2.6, 3.4), cf * CFrame.new(0, -0.2, 0), WHITE)
+		body.CanCollide = true
+		decor(
+			model,
+			"Top",
+			Vector3.new(11.8, 0.4, 3.8),
+			cf * CFrame.new(0, 1.15, 0),
+			WOOD,
+			Enum.Material.WoodPlanks
+		)
+		for _, x in { -3.4, 0, 3.4 } do
+			local plate = decor(
+				model,
+				"Plate",
+				Vector3.new(0.25, 1.7, 1.7),
+				cf * CFrame.new(x, 1.5, 0) * CFrame.Angles(0, 0, math.rad(90)),
+				WHITE,
+				Enum.Material.Glass
+			)
+			plate.Shape = Enum.PartType.Cylinder
+		end
+	end,
+	plant_small = function(model, cf, _def)
+		local pot = decor(
+			model,
+			"Pot",
+			Vector3.new(1.4, 1.7, 1.7),
+			cf * CFrame.new(0, -0.8, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(185, 115, 90),
+			Enum.Material.Concrete
+		)
+		pot.Shape = Enum.PartType.Cylinder
+		pot.CanCollide = true
+		local bush = decor(
+			model,
+			"Bush",
+			Vector3.new(2.5, 2.5, 2.5),
+			cf * CFrame.new(0, 0.5, 0),
+			Color3.fromRGB(105, 150, 88),
+			Enum.Material.Grass
+		)
+		bush.Shape = Enum.PartType.Ball
+	end,
+	lamp_floor = function(model, cf, _def)
+		local base =
+			decor(model, "Base", Vector3.new(1.4, 0.3, 1.4), cf * CFrame.new(0, -1.85, 0), DARKWOOD)
+		base.CanCollide = true
+		decor(
+			model,
+			"Pole",
+			Vector3.new(0.35, 3.4, 0.35),
+			cf * CFrame.new(0, 0, 0),
+			DARKWOOD,
+			Enum.Material.Metal
+		)
+		local shade = decor(
+			model,
+			"Shade",
+			Vector3.new(1.8, 1.4, 1.8),
+			cf * CFrame.new(0, 1.8, 0),
+			Color3.fromRGB(255, 218, 150),
+			Enum.Material.Neon
+		)
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 208, 140)
+		light.Range = 14
+		light.Brightness = 0.9
+		light.Parent = shade
+	end,
+}
+
 function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.PlacedFurniture)
 	local def = Furniture[placed.catalogId]
 	local origin = CafeService:GetPlotOrigin(player)
@@ -79,14 +271,7 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		return
 	end
 
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.Name = placed.catalogId
-	part.Size =
-		Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
-	part.Color = def.color
-	part.Material = Enum.Material.SmoothPlastic
-	part.CFrame = Grid.cellToWorld(
+	local cf = Grid.cellToWorld(
 		origin,
 		placed.gridX,
 		placed.gridY,
@@ -95,8 +280,31 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		placed.rotation,
 		def.height
 	)
-	part:SetAttribute("instanceId", placed.instanceId)
-	part.Parent = folder
+
+	local model = Instance.new("Model")
+	model.Name = placed.catalogId
+	model:SetAttribute("instanceId", placed.instanceId)
+
+	local builder = Builders[placed.catalogId]
+	if builder then
+		builder(model, cf, def)
+	else
+		-- Fallback: the original greybox box.
+		local part = decor(
+			model,
+			placed.catalogId,
+			Vector3.new(
+				def.width * Grid.CELL_SIZE - 0.2,
+				def.height,
+				def.depth * Grid.CELL_SIZE - 0.2
+			),
+			cf,
+			def.color
+		)
+		part.CanCollide = true
+	end
+
+	model.Parent = folder
 end
 
 function BuildService.RenderProfile(_self: any, player: Player)

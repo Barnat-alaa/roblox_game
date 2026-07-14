@@ -62,11 +62,13 @@ local function buildPlot(index: number, parent: Instance): Plot
 	model.Name = "Plot_" .. index
 	model:SetAttribute("plotIndex", index)
 
+	-- Warm oak planks + deep maroon walls: the cosy interior read of the
+	-- classic café sims (see docs/ART_DIRECTION.md).
 	makePart(
 		"Floor",
 		Vector3.new(width, 1, depth),
 		origin * CFrame.new(width / 2, -0.5, depth / 2),
-		Color3.fromRGB(225, 210, 185),
+		Color3.fromRGB(176, 132, 90),
 		model,
 		Enum.Material.WoodPlanks
 	)
@@ -76,22 +78,50 @@ local function buildPlot(index: number, parent: Instance): Plot
 		"WallBack",
 		Vector3.new(width, wallH, 1),
 		origin * CFrame.new(width / 2, wallH / 2, depth),
-		Color3.fromRGB(205, 125, 95),
+		Color3.fromRGB(150, 60, 50),
 		model
 	)
 	makePart(
 		"WallLeft",
 		Vector3.new(1, wallH, depth),
 		origin * CFrame.new(0, wallH / 2, depth / 2),
-		Color3.fromRGB(210, 178, 150),
+		Color3.fromRGB(158, 70, 58),
 		model
 	)
 	makePart(
 		"WallRight",
 		Vector3.new(1, wallH, depth),
 		origin * CFrame.new(width, wallH / 2, depth / 2),
-		Color3.fromRGB(210, 178, 150),
+		Color3.fromRGB(158, 70, 58),
 		model
+	)
+
+	-- White-framed windows + a wooden door on the back wall.
+	for _, fx in { 0.25, 0.72 } do
+		makePart(
+			"WindowFrame",
+			Vector3.new(4.4, 3.6, 0.4),
+			origin * CFrame.new(width * fx, 4.6, depth - 0.55),
+			Color3.fromRGB(245, 242, 235),
+			model
+		)
+		local glass = makePart(
+			"WindowGlass",
+			Vector3.new(3.6, 2.8, 0.3),
+			origin * CFrame.new(width * fx, 4.6, depth - 0.62),
+			Color3.fromRGB(170, 210, 230),
+			model,
+			Enum.Material.Glass
+		)
+		glass.Transparency = 0.15
+	end
+	makePart(
+		"Door",
+		Vector3.new(3.2, 5.6, 0.4),
+		origin * CFrame.new(width * 0.5, 2.8, depth - 0.55),
+		Color3.fromRGB(112, 78, 55),
+		model,
+		Enum.Material.Wood
 	)
 
 	local sign = makePart(

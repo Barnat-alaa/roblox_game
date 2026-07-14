@@ -30,6 +30,22 @@ local WALK_SPEED = 9
 local WALK_TIMEOUT = 12 -- seconds before a walking NPC is teleported to its goal
 local PATIENCE_SECONDS = 120 -- waiting cap before the customer leaves angry
 
+-- Floating first names give walk-ins the classic café-sim personality.
+local NAMES = {
+	"Alicia",
+	"Ben",
+	"Mia",
+	"Leo",
+	"Sofia",
+	"Omar",
+	"Nina",
+	"Marco",
+	"Prisha",
+	"Yara",
+	"Kenji",
+	"Zoe",
+}
+
 type ActiveCustomer = {
 	userId: number,
 	model: Model,
@@ -74,7 +90,8 @@ local function buildNpcModel(def: Types.CustomerDefinition): (Model, Humanoid, B
 
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 2.6, 1)
+	-- Chibi proportions: short body, oversized head (classic café-sim read).
+	root.Size = Vector3.new(2, 2, 1.1)
 	root.Color = def.color
 	root.Material = Enum.Material.SmoothPlastic
 	root.Parent = model
@@ -82,11 +99,11 @@ local function buildNpcModel(def: Types.CustomerDefinition): (Model, Humanoid, B
 	local head = Instance.new("Part")
 	head.Name = "Head"
 	head.Shape = Enum.PartType.Ball
-	head.Size = Vector3.new(1.4, 1.4, 1.4)
+	head.Size = Vector3.new(2.2, 2.2, 2.2)
 	head.Color = def.color:Lerp(Color3.new(1, 1, 1), 0.35)
 	head.Material = Enum.Material.SmoothPlastic
 	head.CanCollide = false
-	head.CFrame = root.CFrame * CFrame.new(0, 2, 0)
+	head.CFrame = root.CFrame * CFrame.new(0, 2.05, 0)
 	head.Parent = model
 
 	local weld = Instance.new("WeldConstraint")
@@ -124,6 +141,24 @@ local function buildNpcModel(def: Types.CustomerDefinition): (Model, Humanoid, B
 	labelCorner.CornerRadius = UDim.new(0, 12)
 	labelCorner.Parent = label
 	label.Parent = gui
+
+	-- Floating first name above the bubble.
+	local nameGui = Instance.new("BillboardGui")
+	nameGui.Name = "NameTag"
+	nameGui.Size = UDim2.fromScale(4, 0.9)
+	nameGui.StudsOffset = Vector3.new(0, 3, 0)
+	nameGui.AlwaysOnTop = true
+	nameGui.MaxDistance = 90
+	nameGui.Parent = head
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.fromScale(1, 1)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamMedium
+	nameLabel.TextColor3 = Color3.fromRGB(255, 236, 190)
+	nameLabel.TextStrokeTransparency = 0.2
+	nameLabel.Text = NAMES[rng:NextInteger(1, #NAMES)]
+	nameLabel.Parent = nameGui
 
 	model.PrimaryPart = root
 	return model, humanoid, root, label
