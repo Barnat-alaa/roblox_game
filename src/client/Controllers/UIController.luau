@@ -26,6 +26,11 @@ local FRIENDLY_ERROR = {
 	too_far = "Get closer to your counter.",
 	not_rotatable = "That item can't rotate.",
 	plot_empty = "Nobody owns that café yet.",
+	stove_busy = "That appliance is already cooking.",
+	not_ready = "Not ready yet — give it a moment.",
+	cant_afford_ingredients = "Not enough coins for ingredients.",
+	busy_cooking = "It's mid-batch — collect the food first.",
+	wrong_appliance = "That recipe needs a different appliance.",
 }
 
 local UIController = {}
@@ -82,6 +87,7 @@ local function updateStats()
 	ui.coins.Text = "🪙 " .. tostring(profile.coins)
 	ui.rep.Text = "⭐ " .. tostring(profile.reputation)
 	ui.level.Text = "Lv " .. tostring(profile.level) .. " " .. string.rep("★", profile.cafeStars)
+	ui.buzz.Text = "🔥 " .. tostring(profile.buzz or 0)
 end
 
 local function setProfile(newProfile: any)
@@ -203,7 +209,7 @@ function UIController.Start(_self: any)
 
 	-- Stat bar (top-left)
 	local statBar = Instance.new("Frame")
-	statBar.Size = UDim2.fromOffset(300, 42)
+	statBar.Size = UDim2.fromOffset(392, 42)
 	statBar.Position = UDim2.fromOffset(12, 12)
 	statBar.BackgroundColor3 = DARK
 	statBar.BackgroundTransparency = 0.1
@@ -232,6 +238,7 @@ function UIController.Start(_self: any)
 	ui.coins = stat(1)
 	ui.rep = stat(2)
 	ui.level = stat(3)
+	ui.buzz = stat(4)
 
 	-- Order banner (top-center)
 	ui.orderBanner = Instance.new("TextLabel")
@@ -323,11 +330,22 @@ function UIController.Start(_self: any)
 			end
 		elseif msg.kind == "recipe_unlocked" then
 			UIController.toast("📖 New recipe unlocked: " .. tostring(msg.recipe) .. "!")
+		elseif msg.kind == "cook_started" then
+			UIController.toast("🍳 " .. tostring(msg.recipe) .. " is cooking…")
+		elseif msg.kind == "cook_collected" then
+			local text = "🍽️ +" .. tostring(msg.servings) .. " " .. tostring(msg.recipe)
+			if msg.fresh and tonumber(msg.bonus) and msg.bonus > 0 then
+				text ..= "  ✨ Fresh +" .. tostring(msg.bonus) .. " 🪙"
+			end
+			UIController.toast(text)
 		elseif msg.kind == "purchased" then
 			UIController.toast("Bought — open 🔨 Build to place it")
 		elseif msg.kind == "order_cancelled" then
 			clearOrder()
 			UIController.toast("The customer left 😞")
+		elseif msg.kind == "order_fed_from_stock" then
+			clearOrder()
+			UIController.toast("🍽️ Served from your counter!")
 		elseif msg.kind == "visitor" then
 			UIController.toast("👀 " .. tostring(msg.name) .. " is visiting your café!")
 		elseif msg.kind == "compliment" then

@@ -17,6 +17,8 @@ local EVENTS = {
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
 	"StartCooking", -- c->s: begin a manual brew for an order (server starts its clock)
 	"FinishCooking", -- c->s: stop the brew bar (server judges the timing)
+	"StartCook", -- c->s: start a stove batch {applianceInstanceId, recipeId}
+	"CollectCook", -- c->s: collect a finished batch {applianceInstanceId}
 	"ClaimOrder", -- c->s: serve a completed order
 	"CompleteTutorialStep", -- c->s: onboarding progress
 	"VisitCafe", -- c->s: request to visit another plot

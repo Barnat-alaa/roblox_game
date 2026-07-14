@@ -13,6 +13,7 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.Shared
 local Customers = require(Shared.Config.Customers)
 local Recipes = require(Shared.Config.Recipes)
+local Kitchen = require(Shared.Config.Kitchen)
 local Grid = require(Shared.Utilities.Grid)
 local Types = require(Shared.Types)
 
@@ -24,8 +25,8 @@ CustomerService.Name = "CustomerService"
 local DataService: any
 local OrderService: any
 local CafeService: any
+local KitchenService: any
 
-local SPAWN_INTERVAL = 8
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
 local WALK_SPEED = 9
@@ -474,6 +475,20 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		return
 	end
 
+	-- Counter stock first (cook-ahead loop): if the café has food ready,
+	-- the customer eats immediately — no tap needed. Empty counters fall
+	-- back to a manual order (serve/brew), which still pays the full rate.
+	local consumedId, paid = KitchenService:TryConsume(player)
+	if consumedId ~= nil then
+		local dish = Recipes[consumedId]
+		cust.bubble.Text = "🍽️ " .. (if dish then dish.displayName else tostring(consumedId))
+		task.wait(1.6)
+		cust.bubble.Text = "😊 +" .. tostring(paid) .. " 🪙"
+		task.wait(1.2)
+		depart(cust, streetPos)
+		return
+	end
+
 	local data = DataService:GetProfile(player)
 	local recipeId = if data then pickUnlockedRecipe(data) else nil
 	local orderId = if recipeId
@@ -488,7 +503,19 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	cust.bubble.Text = "🗨️ " .. recipe.displayName
 
 	local deadline = os.clock() + PATIENCE_SECONDS
+	local nextStockCheck = 0
 	while os.clock() < deadline and cust.orderId ~= nil and not cust.leaving do
+		-- A batch may land while they wait — feed them straight from it.
+		if os.clock() >= nextStockCheck then
+			nextStockCheck = os.clock() + 2
+			local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string)
+			if ate and cust.orderId ~= nil then
+				OrderService:CancelOrder(cust.orderId, true)
+				cust.orderId = nil
+				cust.served = true
+				cust.bubble.Text = "😊 +" .. tostring(paidNow) .. " 🪙"
+			end
+		end
 		task.wait(0.25)
 	end
 
@@ -504,6 +531,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		OrderService:CancelOrder(cust.orderId)
 		cust.orderId = nil
 		cust.bubble.Text = "😠 Too slow…"
+		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 	end
 	task.wait(1.4) -- let the reaction (happy or angry) read before walking off
 
@@ -528,6 +556,7 @@ function CustomerService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	OrderService = ServiceRegistry.get("OrderService")
 	CafeService = ServiceRegistry.get("CafeService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 end
 
 function CustomerService.Start(_self: any)
@@ -535,9 +564,11 @@ function CustomerService.Start(_self: any)
 	customersFolder.Name = "Customers"
 	customersFolder.Parent = workspace
 
+	-- Buzz drives the crowd: high-Buzz cafés get customers every few seconds.
+	local nextSpawnAt: { [number]: number } = {}
 	task.spawn(function()
 		while true do
-			task.wait(SPAWN_INTERVAL)
+			task.wait(1)
 			for _, player in Players:GetPlayers() do
 				if DataService:IsLoaded(player) then
 					local q = queues[player.UserId]
@@ -546,7 +577,13 @@ function CustomerService.Start(_self: any)
 						queues[player.UserId] = q
 					end
 					local origin = CafeService:GetPlotOrigin(player)
-					if origin and #q < MAX_QUEUE then
+					local due = os.clock() >= (nextSpawnAt[player.UserId] or 0)
+					if origin and #q < MAX_QUEUE and due then
+						local buzz = KitchenService:GetBuzz(player)
+						local interval = Kitchen.spawnIntervalBase
+							- (Kitchen.spawnIntervalBase - Kitchen.spawnIntervalBest)
+								* (buzz / Kitchen.buzzMax)
+						nextSpawnAt[player.UserId] = os.clock() + interval
 						local def = pickCustomer()
 						local style = STYLES[rng:NextInteger(1, #STYLES)]
 						local model, humanoid, root, bubble = buildNpcModel(def, style)

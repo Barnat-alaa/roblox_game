@@ -41,6 +41,18 @@ export type PlayerStats = {
 	tutorialStep: number, -- index of the last completed onboarding step (0 = none)
 }
 
+-- One in-progress stove batch. startedAt is os.time() (wall clock) so
+-- overnight cooking survives leaving the game — the appointment mechanic.
+export type ActiveCook = {
+	recipeId: string,
+	startedAt: number,
+}
+
+export type KitchenState = {
+	cooks: { [string]: ActiveCook }, -- keyed by appliance instanceId
+	stock: { [string]: number }, -- counter servings per recipeId
+}
+
 -- The full persisted player document. Bump `schemaVersion` and add a migration
 -- (see DataService.migrate) whenever this shape changes.
 export type PlayerData = {
@@ -50,11 +62,13 @@ export type PlayerData = {
 	experience: number,
 	reputation: number,
 	cafeStars: number,
+	buzz: number, -- 0..105 café hype: fed customers raise it, walkouts drop it
 	inventory: { [string]: number },
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },
 	recipeMastery: { [string]: RecipeMasteryEntry },
 	staff: { StaffMember },
+	kitchen: KitchenState,
 	settings: PlayerSettings,
 	stats: PlayerStats,
 }
@@ -71,6 +85,8 @@ export type RecipeDefinition = {
 	requiredReputation: number,
 	baseQuality: number,
 	masteryThresholds: { number },
+	cookTime: number, -- seconds on the stove (cook-ahead loop)
+	servings: number, -- counter stock added per collected batch
 }
 
 export type FurnitureDefinition = {
@@ -86,6 +102,7 @@ export type FurnitureDefinition = {
 	seatCount: number,
 	color: Color3,
 	height: number, -- studs, used for the greybox render part
+	cookable: boolean?, -- true = this appliance runs stove batches
 }
 
 export type CustomerDefinition = {

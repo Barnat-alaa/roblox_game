@@ -500,6 +500,14 @@ function CafeService.GetFurnitureFolder(_self: any, player: Player): Folder?
 	return if plot then plot.furnitureFolder else nil
 end
 
+-- The café sign doubles as the Buzz scoreboard (KitchenService drives it).
+function CafeService.SetSignBuzz(_self: any, player: Player, buzz: number)
+	local plot = plotByUser[player.UserId]
+	if plot then
+		plot.ownerLabel.Text = player.DisplayName .. "'s Café\n🔥 Buzz " .. tostring(buzz)
+	end
+end
+
 -- Plot lookup by street index, for SocialService (visits/compliments).
 function CafeService.GetPlotInfo(_self: any, index: number): (CFrame?, number?)
 	local plot = plots[index]

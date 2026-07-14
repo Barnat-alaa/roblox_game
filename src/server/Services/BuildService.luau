@@ -21,6 +21,7 @@ BuildService.Name = "BuildService"
 
 local DataService: any
 local CafeService: any
+local KitchenService: any
 
 local placeLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -214,6 +215,85 @@ local Builders: { [string]: Builder } = {
 			plate.Shape = Enum.PartType.Cylinder
 		end
 	end,
+	oven = function(model, cf, _def)
+		-- Stone bakery oven with a warm glowing mouth.
+		local body = decor(
+			model,
+			"Body",
+			Vector3.new(7.2, 2.8, 3.2),
+			cf * CFrame.new(0, -0.3, 0),
+			Color3.fromRGB(150, 120, 100),
+			Enum.Material.Brick
+		)
+		body.CanCollide = true
+		decor(
+			model,
+			"Arch",
+			Vector3.new(3.4, 1.7, 0.4),
+			cf * CFrame.new(0, 0.35, -1.5),
+			Color3.fromRGB(60, 45, 40)
+		)
+		local glow = decor(
+			model,
+			"Glow",
+			Vector3.new(2.6, 1, 0.25),
+			cf * CFrame.new(0, 0.05, -1.58),
+			Color3.fromRGB(255, 150, 70),
+			Enum.Material.Neon
+		)
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 150, 80)
+		light.Range = 9
+		light.Brightness = 0.8
+		light.Parent = glow
+		decor(
+			model,
+			"Top",
+			Vector3.new(7.4, 0.4, 3.4),
+			cf * CFrame.new(0, 1.3, 0),
+			Color3.fromRGB(96, 70, 52),
+			Enum.Material.Wood
+		)
+		decor(
+			model,
+			"Chimney",
+			Vector3.new(1, 1.8, 1),
+			cf * CFrame.new(2.4, 2.1, 0.7),
+			Color3.fromRGB(122, 98, 84),
+			Enum.Material.Brick
+		)
+	end,
+	prep_station = function(model, cf, _def)
+		local body =
+			decor(model, "Body", Vector3.new(7.2, 2.4, 3), cf * CFrame.new(0, -0.3, 0), WHITE)
+		body.CanCollide = true
+		decor(
+			model,
+			"Top",
+			Vector3.new(7.4, 0.3, 3.2),
+			cf * CFrame.new(0, 1, 0),
+			STEEL,
+			Enum.Material.Metal
+		)
+		decor(
+			model,
+			"Board",
+			Vector3.new(2.2, 0.18, 1.6),
+			cf * CFrame.new(-1.7, 1.25, 0),
+			WOOD,
+			Enum.Material.Wood
+		)
+		local bowl = decor(
+			model,
+			"Bowl",
+			Vector3.new(0.55, 1.5, 1.5),
+			cf * CFrame.new(1.6, 1.35, 0) * CFrame.Angles(0, 0, math.rad(90)),
+			STEEL,
+			Enum.Material.Metal
+		)
+		bowl.Shape = Enum.PartType.Cylinder
+		decor(model, "Accent", Vector3.new(7.24, 0.4, 3.04), cf * CFrame.new(0, 0.3, 0), CLOTH_RED)
+	end,
 	plant_small = function(model, cf, _def)
 		local pot = decor(
 			model,
@@ -378,6 +458,11 @@ local function handleRemove(player: Player, instanceId: unknown)
 	if not placeLimiter:check(player.UserId, os.clock()) then
 		return
 	end
+	-- Can't pocket a stove mid-batch.
+	if KitchenService and KitchenService:IsCooking(player, instanceId :: string) then
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "busy_cooking" })
+		return
+	end
 	local data = DataService:GetProfile(player)
 	if not data then
 		return
@@ -403,6 +488,7 @@ end
 function BuildService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	CafeService = ServiceRegistry.get("CafeService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 end
 
 function BuildService.Start(_self: any)

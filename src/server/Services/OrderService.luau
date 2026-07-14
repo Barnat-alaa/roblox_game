@@ -229,20 +229,25 @@ function OrderService.StaffServe(_self: any, orderId: string): boolean
 	return true
 end
 
--- Server-internal (called by CustomerService when patience runs out).
+-- Server-internal (called by CustomerService when patience runs out, or
+-- silently when counter stock feeds the waiting customer instead).
 -- Never grants anything; a claimed order can no longer be cancelled.
-function OrderService.CancelOrder(_self: any, orderId: string): boolean
+function OrderService.CancelOrder(_self: any, orderId: string, silent: boolean?): boolean
 	local order = activeOrders[orderId]
 	if not order or order.claimed then
 		return false
 	end
 	activeOrders[orderId] = nil
 	local player = Players:GetPlayerByUserId(order.ownerUserId)
-	if player then
+	if player and silent ~= true then
 		Remotes.event("Notify"):FireClient(player, {
 			kind = "order_cancelled",
 			reason = "customer_left",
 		})
+	end
+	if player and silent == true then
+		-- Clear the client's order banner without the sad toast.
+		Remotes.event("Notify"):FireClient(player, { kind = "order_fed_from_stock" })
 	end
 	return true
 end

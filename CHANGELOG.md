@@ -64,3 +64,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 - **Persistence verified end-to-end**: furniture placed in session A loaded
   from DataStore in session B. MVP criterion #12 passed.
 - Max players set to 30 via Creator Dashboard (Access Settings).
+
+### Added — 2026-07-14 — Phase 1: the cook-ahead loop pivot
+- **KitchenService**: stove batches on wall-clock time (overnight cooking
+  works), counter stock, fresh-collect bonus (never spoilage — §35), Buzz
+  0–105 driving customer arrival rate, sign scoreboard.
+- Customers eat from counter stock automatically; waiting order-customers
+  get auto-fed the moment a matching batch is collected.
+- Stone Oven + Prep Station appliances (all 5 recipes now cookable),
+  stove timers + steam visuals, cook/collect prompts + recipe picker,
+  HUD Buzz meter, kitchen toasts.
+- Verified live: batch cost/servings/fresh-bonus math exact, busy/early
+  rejections, 7 customers fed from one batch, Buzz feedback loop spinning.

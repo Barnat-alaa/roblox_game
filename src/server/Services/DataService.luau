@@ -44,6 +44,8 @@ local function defaultProfile(): Types.PlayerData
 		experience = 0,
 		reputation = Economy.startingReputation,
 		cafeStars = 0,
+		buzz = 10,
+		kitchen = { cooks = {}, stock = {} },
 		inventory = { table_round = 2, chair_wood = 4, plant_small = 1 },
 		placedFurniture = {
 			{

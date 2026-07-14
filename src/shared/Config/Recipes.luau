@@ -16,6 +16,8 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		requiredReputation = 0,
 		baseQuality = 1,
 		masteryThresholds = { 5, 15, 40, 100 },
+		cookTime = 30,
+		servings = 12,
 	},
 	cappuccino = {
 		id = "cappuccino",
@@ -29,6 +31,8 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		requiredReputation = 30,
 		baseQuality = 1,
 		masteryThresholds = { 5, 15, 40, 100 },
+		cookTime = 90,
+		servings = 10,
 	},
 	tea = {
 		id = "tea",
@@ -42,6 +46,8 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		requiredReputation = 0,
 		baseQuality = 1,
 		masteryThresholds = { 5, 15, 40, 100 },
+		cookTime = 45,
+		servings = 12,
 	},
 	croissant = {
 		id = "croissant",
@@ -55,6 +61,8 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		requiredReputation = 80,
 		baseQuality = 1,
 		masteryThresholds = { 5, 15, 40, 100 },
+		cookTime = 300,
+		servings = 16,
 	},
 	sandwich = {
 		id = "sandwich",
@@ -63,11 +71,13 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		ingredientCost = 11,
 		basePrice = 28,
 		preparationTime = 7,
-		applianceId = "prep_counter",
+		applianceId = "prep_station",
 		requiredLevel = 2,
 		requiredReputation = 40,
 		baseQuality = 1,
 		masteryThresholds = { 5, 15, 40, 100 },
+		cookTime = 600,
+		servings = 14,
 	},
 }
 
