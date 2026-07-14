@@ -164,6 +164,71 @@ function OrderService.GetActiveOrder(_self: any, orderId: string): Types.Order?
 	return activeOrders[orderId]
 end
 
+-- Oldest unclaimed order for a user (StaffService polls this).
+function OrderService.GetOldestPendingFor(_self: any, userId: number): Types.Order?
+	local best: Types.Order? = nil
+	for _, order in activeOrders do
+		if order.ownerUserId == userId and not order.claimed then
+			if best == nil or order.createdAtClock < (best :: Types.Order).createdAtClock then
+				best = order
+			end
+		end
+	end
+	return best
+end
+
+-- Server-internal: the barista fulfils an order. Mirrors the claim grant path
+-- but with the staff cut and half XP — automation never beats manual play.
+function OrderService.StaffServe(_self: any, orderId: string): boolean
+	local order = activeOrders[orderId]
+	if not order or order.claimed then
+		return false
+	end
+	local player = Players:GetPlayerByUserId(order.ownerUserId)
+	if not player then
+		return false
+	end
+	local data = DataService:GetProfile(player)
+	if not data then
+		return false
+	end
+
+	order.claimed = true
+	order.status = "served"
+	activeOrders[orderId] = nil
+
+	local recipe = Recipes[order.recipeId]
+	local customer = Customers[order.customerId]
+	local tipMult = if customer then customer.tipMultiplier else 1
+	local payout =
+		math.floor(RewardMath.orderPayout(recipe, false) * EconomyConfig.staffPayoutMultiplier)
+	local tip = RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), tipMult)
+
+	EconomyService:AddCoins(player, payout + tip)
+	EconomyService:AddReputation(player, EconomyConfig.reputationPerServe)
+	EconomyService:AddExperience(
+		player,
+		math.floor(EconomyConfig.xpPerServe * EconomyConfig.staffXpMultiplier)
+	)
+
+	data.stats.customersServed += 1
+	DataService:Push(player)
+
+	if CustomerService then
+		CustomerService:OnOrderResolved(player.UserId, payout + tip)
+	end
+	if AnalyticsService then
+		AnalyticsService:Track(player, "staff_served", { recipe = order.recipeId })
+	end
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "served",
+		coins = payout + tip,
+		recipe = order.recipeId,
+		staff = true,
+	})
+	return true
+end
+
 -- Server-internal (called by CustomerService when patience runs out).
 -- Never grants anything; a claimed order can no longer be cancelled.
 function OrderService.CancelOrder(_self: any, orderId: string): boolean

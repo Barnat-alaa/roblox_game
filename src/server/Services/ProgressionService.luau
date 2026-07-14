@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.Shared
 local Progression = require(Shared.Config.Progression)
 local Tutorial = require(Shared.Config.Tutorial)
+local Recipes = require(Shared.Config.Recipes)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Remotes = require(Shared.Network.Remotes)
@@ -31,6 +32,36 @@ end
 
 function ProgressionService.StarsFor(_self: any, reputation: number): number
 	return Progression.starsForReputation(reputation)
+end
+
+-- Unlock every recipe whose level/reputation gates the profile now clears.
+-- Called after XP/reputation changes and once on join (heals older saves).
+function ProgressionService.CheckRecipeUnlocks(_self: any, player: Player)
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+	local changed = false
+	for id, recipe in Recipes do
+		if
+			data.unlockedRecipes[id] ~= true
+			and data.level >= recipe.requiredLevel
+			and data.reputation >= recipe.requiredReputation
+		then
+			data.unlockedRecipes[id] = true
+			changed = true
+			Remotes.event("Notify"):FireClient(player, {
+				kind = "recipe_unlocked",
+				recipe = recipe.displayName,
+			})
+			if AnalyticsService then
+				AnalyticsService:Track(player, "recipe_unlocked", { recipe = id })
+			end
+		end
+	end
+	if changed then
+		DataService:Push(player)
+	end
 end
 
 local function handleTutorialStep(player: Player, stepIndex: unknown)
@@ -82,6 +113,24 @@ end
 
 function ProgressionService.Start(_self: any)
 	Remotes.event("CompleteTutorialStep").OnServerEvent:Connect(handleTutorialStep)
+
+	-- Heal pre-existing saves: unlock anything the profile already qualifies for.
+	local function onJoin(player: Player)
+		task.spawn(function()
+			for _ = 1, 100 do
+				if DataService:IsLoaded(player) then
+					ProgressionService:CheckRecipeUnlocks(player)
+					return
+				end
+				task.wait(0.2)
+			end
+		end)
+	end
+	for _, player in Players:GetPlayers() do
+		onJoin(player)
+	end
+	Players.PlayerAdded:Connect(onJoin)
+
 	Players.PlayerRemoving:Connect(function(player)
 		stepLimiter:clear(player.UserId)
 	end)

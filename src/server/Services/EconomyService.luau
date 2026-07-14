@@ -60,6 +60,7 @@ function EconomyService.AddReputation(_self: any, player: Player, amount: number
 	data.reputation += amount
 	data.cafeStars = ProgressionService:StarsFor(data.reputation)
 	DataService:Push(player)
+	ProgressionService:CheckRecipeUnlocks(player)
 end
 
 function EconomyService.AddExperience(_self: any, player: Player, amount: number)
@@ -73,6 +74,7 @@ function EconomyService.AddExperience(_self: any, player: Player, amount: number
 	data.experience += amount
 	data.level = ProgressionService:LevelFor(data.experience)
 	DataService:Push(player)
+	ProgressionService:CheckRecipeUnlocks(player)
 end
 
 local function handlePurchase(player: Player, catalogId: unknown)

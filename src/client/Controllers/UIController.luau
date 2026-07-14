@@ -314,7 +314,15 @@ function UIController.Start(_self: any)
 		end
 		if msg.kind == "served" then
 			clearOrder()
-			UIController.toast("+" .. tostring(msg.coins) .. " 🪙")
+			if msg.staff then
+				UIController.toast(
+					"👩‍🍳 Mia served for you: +" .. tostring(msg.coins) .. " 🪙"
+				)
+			else
+				UIController.toast("+" .. tostring(msg.coins) .. " 🪙")
+			end
+		elseif msg.kind == "recipe_unlocked" then
+			UIController.toast("📖 New recipe unlocked: " .. tostring(msg.recipe) .. "!")
 		elseif msg.kind == "purchased" then
 			UIController.toast("Bought — open 🔨 Build to place it")
 		elseif msg.kind == "order_cancelled" then

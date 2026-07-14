@@ -55,8 +55,80 @@ local function shortestAngle(a: number, b: number): number
 	return (b - a + math.pi) % (2 * math.pi) - math.pi
 end
 
+local function rotate(step: number)
+	yawIndex = ((yawIndex - 1 + step) % #YAWS) + 1
+	targetYaw = math.rad(YAWS[yawIndex])
+end
+
+local function zoomBy(delta: number)
+	targetZoom = math.clamp(targetZoom + delta, ZOOM_MIN, ZOOM_MAX)
+end
+
+-- On-screen camera buttons: required on touch, harmless on PC (they also
+-- advertise that the camera rotates/zooms at all).
+local function buildTouchControls()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "CameraGui"
+	gui.ResetOnSpawn = false
+	gui.DisplayOrder = 4
+	gui.Parent = player:WaitForChild("PlayerGui")
+
+	local holder = Instance.new("Frame")
+	holder.AnchorPoint = Vector2.new(0, 0.5)
+	holder.Position = UDim2.new(0, 10, 0.5, 0)
+	holder.Size = UDim2.fromOffset(48, 224)
+	holder.BackgroundTransparency = 1
+	holder.Parent = gui
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = holder
+
+	local function button(text: string, order: number, onTap: () -> ()): TextButton
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.fromOffset(48, 48)
+		btn.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
+		btn.BackgroundTransparency = 0.25
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 22
+		btn.TextColor3 = Color3.fromRGB(255, 246, 232)
+		btn.Text = text
+		btn.LayoutOrder = order
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 12)
+		corner.Parent = btn
+		btn.Activated:Connect(onTap)
+		btn.Parent = holder
+		return btn
+	end
+
+	button("⟲", 1, function()
+		rotate(1)
+	end)
+	button("⟳", 2, function()
+		rotate(-1)
+	end)
+	button("＋", 3, function()
+		zoomBy(-10)
+	end)
+	button("－", 4, function()
+		zoomBy(10)
+	end)
+end
+
 function CameraController.Start(_self: any)
 	local camera = workspace.CurrentCamera
+	buildTouchControls()
+
+	-- Two-finger pinch zoom on touch devices.
+	local pinchStartZoom = zoom
+	UserInputService.TouchPinch:Connect(function(_, scale, _, state)
+		if state == Enum.UserInputState.Begin then
+			pinchStartZoom = targetZoom
+		elseif state == Enum.UserInputState.Change then
+			targetZoom = math.clamp(pinchStartZoom / math.max(scale, 0.2), ZOOM_MIN, ZOOM_MAX)
+		end
+	end)
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then

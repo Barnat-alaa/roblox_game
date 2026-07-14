@@ -16,6 +16,11 @@ local Economy = {
 	reputationPerServe = 2,
 	xpPerServe = 10,
 
+	-- Staff automation (MVP: one free barista per café)
+	staffServeAfterSeconds = 30, -- how long an order waits before the barista steps in
+	staffPayoutMultiplier = 0.8, -- the barista keeps a 20% cut of the payout
+	staffXpMultiplier = 0.5, -- automated serves grant half XP (manual play stays king)
+
 	-- Save cadence (seconds) — see DataService
 	autosaveIntervalSeconds = 60,
 
