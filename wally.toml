@@ -12,4 +12,4 @@ license = "MIT"
 [dependencies]
 
 [dev-dependencies]
-# TestEZ = "roblox/testez@0.4.1"   # enable when we wire the Studio test runner (see docs/TEST_PLAN.md)
+TestEZ = "roblox/testez@0.4.1"

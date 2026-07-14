@@ -27,8 +27,14 @@ jobs:
           selene generate-roblox-std || true
           selene .
 
+      - name: Wally (install dev packages)
+        run: wally install
+
       - name: Rojo (build check)
         run: rojo build --output build.rbxlx
+
+      - name: Rojo (test place build check)
+        run: rojo build test.project.json --output test-build.rbxlx
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
