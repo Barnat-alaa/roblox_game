@@ -12,6 +12,7 @@ local Remotes = require(Shared.Network.Remotes)
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local Mastery = require(Shared.Utilities.Mastery)
 
 local UIController = require(script.Parent.UIController)
 local AudioController = require(script.Parent.AudioController)
@@ -112,11 +113,18 @@ local function openPicker(applianceId: string, instanceId: string)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = ui.list
 
+	local masteryMap = (profile and profile.recipeMastery) or {}
 	local order = 0
 	for id, recipe in Recipes do
 		if recipe.applianceId == applianceId and unlocked[id] == true then
 			order += 1
-			local cost = recipe.ingredientCost * Kitchen.batchCostMultiplier
+			local entry = masteryMap[id]
+			local level = (entry and tonumber(entry.masteryLevel)) or 0
+			local cost = Mastery.batchCost(
+				recipe.ingredientCost * Kitchen.batchCostMultiplier,
+				level,
+				Kitchen.masteryCostReductionPerStar
+			)
 			local row = Instance.new("TextButton")
 			row.Size = UDim2.new(1, -6, 0, 52)
 			row.BackgroundColor3 = Color3.fromRGB(255, 250, 240)

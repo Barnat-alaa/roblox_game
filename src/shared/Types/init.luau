@@ -46,6 +46,7 @@ export type PlayerStats = {
 export type ActiveCook = {
 	recipeId: string,
 	startedAt: number,
+	duration: number?, -- effective cook seconds (mastery applied at start)
 }
 
 export type KitchenState = {

@@ -15,6 +15,7 @@ local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
+local Mastery = require(Shared.Utilities.Mastery)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
@@ -78,8 +79,41 @@ local function applianceModel(player: Player, instanceId: string): Model?
 	return nil
 end
 
+-- Mastery entry for a recipe, healing older saves' missing shape.
+local function masteryOf(data: Types.PlayerData, recipeId: string): Types.RecipeMasteryEntry
+	if typeof(data.recipeMastery) ~= "table" then
+		(data :: any).recipeMastery = {}
+	end
+	local entry = data.recipeMastery[recipeId]
+	if typeof(entry) ~= "table" then
+		entry = { timesCooked = 0, masteryLevel = 0 }
+		data.recipeMastery[recipeId] = entry
+	end
+	return entry
+end
+
+function KitchenService.MasteryLevel(_self: any, data: Types.PlayerData, recipeId: string): number
+	return masteryOf(data, recipeId).masteryLevel
+end
+
 function KitchenService.batchCost(_self: any, recipe: Types.RecipeDefinition): number
 	return recipe.ingredientCost * Kitchen.batchCostMultiplier
+end
+
+-- Effective (mastery-adjusted) numbers for a player's recipe.
+function KitchenService.effectiveFor(
+	_self: any,
+	data: Types.PlayerData,
+	recipe: Types.RecipeDefinition
+): (number, number, number) -- cookTime, batchCost, servings
+	local level = masteryOf(data, recipe.id).masteryLevel
+	return Mastery.cookTime(recipe.cookTime, level, Kitchen.masteryTimeReductionPerStar),
+		Mastery.batchCost(
+			recipe.ingredientCost * Kitchen.batchCostMultiplier,
+			level,
+			Kitchen.masteryCostReductionPerStar
+		),
+		Mastery.servings(recipe.servings, level, Kitchen.masteryBonusServingAt)
 end
 
 function KitchenService.servingPayout(_self: any, recipe: Types.RecipeDefinition): number
@@ -347,8 +381,8 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "too_far" })
 		return
 	end
-	local cost = KitchenService:batchCost(recipe)
-	if not EconomyService:TrySpendCoins(player, cost) then
+	local effTime, effCost, _ = KitchenService:effectiveFor(data, recipe)
+	if not EconomyService:TrySpendCoins(player, effCost) then
 		Remotes.event("Notify"):FireClient(player, {
 			kind = "error",
 			reason = "cant_afford_ingredients",
@@ -356,7 +390,11 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		return
 	end
 
-	kitchen.cooks[instanceId] = { recipeId = recipeId :: string, startedAt = os.time() }
+	kitchen.cooks[instanceId] = {
+		recipeId = recipeId :: string,
+		startedAt = os.time(),
+		duration = effTime,
+	}
 	DataService:Push(player)
 	setCookVisuals(player, instanceId :: string, "cooking", recipe.displayName .. " …")
 	Remotes.event("Notify"):FireClient(player, {
@@ -391,25 +429,64 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 		DataService:Push(player)
 		return
 	end
+	local duration = tonumber(cook.duration) or recipe.cookTime
 	local elapsed = os.time() - cook.startedAt
-	if elapsed < recipe.cookTime then
+	if elapsed < duration then
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_ready" })
 		return
 	end
 
-	-- Grant BEFORE clearing nothing else pays this batch (single-shot table key).
+	-- Grant BEFORE clearing so nothing else pays this batch.
 	kitchen.cooks[instanceId] = nil
+	local entry = masteryOf(data, cook.recipeId)
+	local servings =
+		Mastery.servings(recipe.servings, entry.masteryLevel, Kitchen.masteryBonusServingAt)
 	local newStock =
-		math.min(Kitchen.maxStockPerRecipe, (kitchen.stock[cook.recipeId] or 0) + recipe.servings)
+		math.min(Kitchen.maxStockPerRecipe, (kitchen.stock[cook.recipeId] or 0) + servings)
 	kitchen.stock[cook.recipeId] = newStock
 
-	local fresh = elapsed <= recipe.cookTime * Kitchen.freshWindowMultiplier
+	local fresh = elapsed <= duration * Kitchen.freshWindowMultiplier
 	local bonus = 0
 	if fresh then
-		local batchValue = recipe.servings * KitchenService:servingPayout(recipe)
-		bonus = math.floor(batchValue * Kitchen.freshBonusFraction)
+		local batchValue = servings * KitchenService:servingPayout(recipe)
+		bonus = math.floor(
+			batchValue
+				* Kitchen.freshBonusFraction
+				* Mastery.freshMult(
+					entry.masteryLevel,
+					Kitchen.masteryFreshBoostAt,
+					Kitchen.masteryFreshMult
+				)
+		)
 		if bonus > 0 then
 			EconomyService:AddCoins(player, bonus)
+		end
+	end
+
+	-- Mastery: every collected batch teaches the recipe.
+	entry.timesCooked += 1
+	local newLevel = Mastery.levelFor(recipe.masteryThresholds, entry.timesCooked)
+	if newLevel > entry.masteryLevel then
+		entry.masteryLevel = newLevel
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "mastery_up",
+			recipe = recipe.displayName,
+			stars = newLevel,
+		})
+		local starModel = applianceModel(player, instanceId :: string)
+		if starModel then
+			Fx.floatText(
+				starModel:GetPivot().Position + Vector3.new(0, 5.5, 0),
+				"⭐ " .. recipe.displayName .. " " .. string.rep("★", newLevel),
+				Color3.fromRGB(255, 215, 120)
+			)
+		end
+		if AnalyticsService then
+			AnalyticsService:Track(
+				player,
+				"mastery_up",
+				{ recipe = cook.recipeId, stars = newLevel }
+			)
 		end
 	end
 	EconomyService:AddExperience(player, Kitchen.xpPerCollect)
@@ -459,7 +536,8 @@ local function tickTimers()
 			for instanceId, cook in kitchen.cooks do
 				local recipe = Recipes[cook.recipeId]
 				if recipe then
-					local remaining = recipe.cookTime - (os.time() - cook.startedAt)
+					local duration = tonumber(cook.duration) or recipe.cookTime
+					local remaining = duration - (os.time() - cook.startedAt)
 					if remaining > 0 then
 						local mins = math.floor(remaining / 60)
 						local secs = remaining % 60

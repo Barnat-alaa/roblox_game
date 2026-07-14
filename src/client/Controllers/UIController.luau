@@ -38,6 +38,7 @@ UIController.Name = "UIController"
 UIController.onBuildToggle = nil :: (() -> ())?
 
 local profile: any = nil
+local lastLevel: number? = nil
 local currentOrderId: string? = nil
 local profileListeners: { (any) -> () } = {}
 local ui: { [string]: any } = {}
@@ -90,9 +91,53 @@ local function updateStats()
 	ui.buzz.Text = "🔥 " .. tostring(profile.buzz or 0)
 end
 
+-- Full-screen "LEVEL UP" moment (Phase 3): scale in, hold, fade out.
+local function celebrateLevel(level: number)
+	local gui = ui.gui
+	if not gui then
+		return
+	end
+	local TweenService = game:GetService("TweenService")
+	local label = Instance.new("TextLabel")
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromScale(0.5, 0.38)
+	label.Size = UDim2.fromOffset(60, 24)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 215, 120)
+	label.TextStrokeColor3 = Color3.fromRGB(90, 60, 30)
+	label.TextStrokeTransparency = 0.2
+	label.Text = "⭐ LEVEL " .. tostring(level) .. "! ⭐"
+	label.Parent = gui
+
+	TweenService:Create(
+		label,
+		TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		{ Size = UDim2.fromOffset(460, 110) }
+	):Play()
+	task.delay(1.6, function()
+		local fade = TweenService:Create(
+			label,
+			TweenInfo.new(0.6),
+			{ TextTransparency = 1, TextStrokeTransparency = 1 }
+		)
+		fade:Play()
+		fade.Completed:Wait()
+		label:Destroy()
+	end)
+end
+
 local function setProfile(newProfile: any)
 	profile = newProfile
 	updateStats()
+	local level = profile and tonumber(profile.level)
+	if level and lastLevel and level > lastLevel then
+		celebrateLevel(level)
+	end
+	if level then
+		lastLevel = level
+	end
 	for _, cb in profileListeners do
 		task.spawn(cb, profile)
 	end
@@ -206,6 +251,7 @@ function UIController.Start(_self: any)
 	gui.ResetOnSpawn = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = playerGui
+	ui.gui = gui
 
 	-- Stat bar (top-left)
 	local statBar = Instance.new("Frame")
@@ -330,6 +376,13 @@ function UIController.Start(_self: any)
 			end
 		elseif msg.kind == "recipe_unlocked" then
 			UIController.toast("📖 New recipe unlocked: " .. tostring(msg.recipe) .. "!")
+		elseif msg.kind == "mastery_up" then
+			UIController.toast(
+				"⭐ "
+					.. tostring(msg.recipe)
+					.. " mastery: "
+					.. string.rep("★", tonumber(msg.stars) or 1)
+			)
 		elseif msg.kind == "cook_started" then
 			UIController.toast("🍳 " .. tostring(msg.recipe) .. " is cooking…")
 		elseif msg.kind == "cook_collected" then

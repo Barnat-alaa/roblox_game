@@ -89,3 +89,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   customers eat them down.
 - **Charm pass**: striped awnings over every café front + warm interior
   glow at golden hour.
+
+### Added — 2026-07-14 — Phase 3a: progression that grips
+- **Recipe mastery**: every collected batch teaches the recipe; stars at
+  5/15/40/100 cooks grant -5% cook time & batch cost per star, +1 serving
+  at ★★, and a 1.5× fresh bonus at ★★★★ (pure Mastery module, 8-assertion
+  spec). Star-up float text at the stove + toast.
+- **Cookbook**: card list of all recipes — unlocked cards show live
+  mastery-adjusted numbers, stars, and "next ★ at N"; locked cards tease
+  as silhouettes with their unlock level. Gold names when mastered.
+- **9 new original recipes** (14 total) laddered to Lv 9, including the
+  8-hour Overnight Roast Blend (40 servings — start it before bed).
+- **Level-up celebration**: full-screen star moment on level gain.
+- Cook picker rows show mastery-adjusted costs.
