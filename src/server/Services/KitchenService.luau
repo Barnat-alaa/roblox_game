@@ -30,6 +30,7 @@ local DataService: any
 local EconomyService: any
 local CafeService: any
 local AnalyticsService: any
+local GoalService: any
 
 local cookLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -298,6 +299,9 @@ local function grantConsumption(
 	if AnalyticsService then
 		AnalyticsService:Track(player, "stock_consumed", { recipe = recipeId, paid = payout })
 	end
+	if GoalService then
+		GoalService:Bump(player, "serve_customers", 1)
+	end
 	refreshCounterDisplay(player)
 	return payout
 end
@@ -494,6 +498,9 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 	DataService:Push(player)
 	setCookVisuals(player, instanceId :: string, "idle", nil)
 	refreshCounterDisplay(player)
+	if GoalService then
+		GoalService:Bump(player, "collect_batches", 1)
+	end
 
 	-- Juice: the collect moment should feel like a small payday.
 	local model = applianceModel(player, instanceId :: string)
@@ -559,6 +566,7 @@ function KitchenService.Init(_self: any)
 	EconomyService = ServiceRegistry.get("EconomyService")
 	CafeService = ServiceRegistry.get("CafeService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function KitchenService.Start(_self: any)

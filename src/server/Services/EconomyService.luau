@@ -19,6 +19,7 @@ EconomyService.Name = "EconomyService"
 
 local DataService: any
 local ProgressionService: any
+local GoalService: any
 
 local buyLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -47,6 +48,9 @@ function EconomyService.AddCoins(_self: any, player: Player, amount: number)
 	data.coins += amount
 	data.stats.totalCoinsEarned += amount
 	DataService:Push(player)
+	if GoalService then
+		GoalService:Bump(player, "earn_coins", amount)
+	end
 end
 
 function EconomyService.AddReputation(_self: any, player: Player, amount: number)
@@ -109,6 +113,7 @@ end
 function EconomyService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	ProgressionService = ServiceRegistry.get("ProgressionService")
+	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function EconomyService.Start(_self: any)

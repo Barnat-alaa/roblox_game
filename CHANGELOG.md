@@ -102,3 +102,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   8-hour Overnight Roast Blend (40 servings — start it before bed).
 - **Level-up celebration**: full-screen star moment on level gain.
 - Cook picker rows show mastery-adjusted costs.
+
+### Added — 2026-07-15 — Phase 3b: daily goals, streak trophies, full crew
+- **Daily goals** (GoalService): three goals roll each UTC day from a pool
+  (serve customers / collect batches / earn coins / pick up tips / visit a
+  neighbour); each pays coins instantly on completion, all three pay a
+  bonus and advance the streak. Progress reported by Kitchen/Order/Economy/
+  Customer/Social services via GoalService:Bump.
+- **Streak trophy shelf**: milestones at 3/7/14/30 days mint PERMANENT
+  trophies (bronze→diamond) rendered on a shelf in your café + coin bonus.
+  A missed day restarts the counter only — the shelf never empties (§35).
+- **Goals panel** (📋 button): progress bars, streak, trophy count, with
+  goal/streak/trophy toasts.
+- **Staff v2**: full crew of three per café — Mia (barista, rescues overdue
+  orders), Noah (waiter, carries a tray to seated diners), Pia (cleaner,
+  clears the dirty plates diners leave and earns +1 Buzz each).
+- Diners now leave dirty plates behind; the waiter delivery and cleaner
+  loops both use the same waddle-walk + teleport recovery as customers.
+
+Live playtest of 3b happens via the owner's session (test-instance launch
+hit a local Studio start-page quirk); all CI gates green.

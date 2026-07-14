@@ -46,6 +46,8 @@ local function defaultProfile(): Types.PlayerData
 		cafeStars = 0,
 		buzz = 10,
 		kitchen = { cooks = {}, stock = {} },
+		daily = { dateKey = "", goals = {}, streak = 0 },
+		trophies = {},
 		inventory = { table_round = 2, chair_wood = 4, plant_small = 1 },
 		placedFurniture = {
 			{

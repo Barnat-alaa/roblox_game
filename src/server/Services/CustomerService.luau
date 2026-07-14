@@ -30,6 +30,8 @@ local OrderService: any
 local CafeService: any
 local KitchenService: any
 local EconomyService: any
+local StaffService: any
+local GoalService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -529,6 +531,9 @@ local function dropTip(player: Player, seatCf: CFrame, amount: number)
 		EconomyService:AddCoins(player, amount)
 		Fx.coinBurst(tip.Position, 5)
 		Fx.floatText(tip.Position + Vector3.new(0, 1, 0), "+" .. tostring(amount) .. " 🪙")
+		if GoalService then
+			GoalService:Bump(player, "collect_tips", 1)
+		end
 		tip:Destroy()
 	end)
 
@@ -563,6 +568,11 @@ local function eatMeal(
 			local sitPos = Vector3.new(seatCf.Position.X, 2.05, seatCf.Position.Z)
 			cust.root.Anchored = true
 			cust.model:PivotTo(CFrame.lookAt(sitPos, sitPos + seatCf.LookVector))
+
+			-- The waiter runs the plate over when he's free (Phase 3b).
+			if StaffService and StaffService:RequestDelivery(player, sitPos) then
+				task.wait(1.6)
+			end
 
 			-- A little plate of food in their lap-space.
 			local plate = Instance.new("Part")
@@ -609,6 +619,26 @@ local function eatMeal(
 					RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), cust.def.tipMultiplier)
 				if tip > 0 then
 					dropTip(player, seatCf, tip)
+				end
+			end
+
+			-- Diners leave a dirty plate; the cleaner clears it for +Buzz.
+			if StaffService and not cust.leaving then
+				local mess = Instance.new("Part")
+				mess.Name = "DirtyPlate"
+				mess.Shape = Enum.PartType.Cylinder
+				mess.Size = Vector3.new(0.18, 1.3, 1.3)
+				mess.Color = Color3.fromRGB(190, 182, 170)
+				mess.Material = Enum.Material.SmoothPlastic
+				mess.Anchored = true
+				mess.CanCollide = false
+				mess.CFrame = CFrame.new(seatCf.Position + Vector3.new(0, 1.1, 0))
+					* CFrame.Angles(0, 0, math.rad(90))
+				local folder = CafeService:GetFurnitureFolder(player)
+				local plotModel = folder and folder.Parent
+				if plotModel then
+					mess.Parent = plotModel
+					StaffService:NotifyMess(player, mess)
 				end
 			end
 			if cust.root.Parent ~= nil then
@@ -772,6 +802,8 @@ function CustomerService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	EconomyService = ServiceRegistry.get("EconomyService")
+	StaffService = ServiceRegistry.get("StaffService")
+	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function CustomerService.Start(_self: any)

@@ -27,6 +27,7 @@ local CafeService: any
 local CustomerService: any
 local AnalyticsService: any
 local RecipeService: any
+local GoalService: any
 
 local activeOrders: { [string]: Types.Order } = {}
 local nextId = 0
@@ -157,6 +158,9 @@ local function handleClaim(player: Player, orderId: unknown, _manualCook: unknow
 		coins = payout + tip,
 		recipe = order.recipeId,
 	})
+	if GoalService then
+		GoalService:Bump(player, "serve_customers", 1)
+	end
 end
 
 -- Server-internal lookup for sibling services (never exposed to clients).
@@ -226,6 +230,9 @@ function OrderService.StaffServe(_self: any, orderId: string): boolean
 		recipe = order.recipeId,
 		staff = true,
 	})
+	if GoalService then
+		GoalService:Bump(player, "serve_customers", 1)
+	end
 	return true
 end
 
@@ -259,6 +266,7 @@ function OrderService.Init(_self: any)
 	CustomerService = ServiceRegistry.get("CustomerService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 	RecipeService = ServiceRegistry.get("RecipeService")
+	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function OrderService.Start(_self: any)

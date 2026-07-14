@@ -54,6 +54,23 @@ export type KitchenState = {
 	stock: { [string]: number }, -- counter servings per recipeId
 }
 
+export type GoalState = {
+	id: string,
+	text: string,
+	target: number,
+	progress: number,
+	done: boolean,
+}
+
+-- Rotating daily goals + the streak counter. Missing a day restarts the
+-- streak COUNTER but earned trophies are permanent (§35: the shelf waits).
+export type DailyState = {
+	dateKey: string, -- UTC yyyy-mm-dd these goals belong to
+	goals: { GoalState },
+	streak: number,
+	lastAllDoneDate: string?,
+}
+
 -- The full persisted player document. Bump `schemaVersion` and add a migration
 -- (see DataService.migrate) whenever this shape changes.
 export type PlayerData = {
@@ -70,6 +87,8 @@ export type PlayerData = {
 	recipeMastery: { [string]: RecipeMasteryEntry },
 	staff: { StaffMember },
 	kitchen: KitchenState,
+	daily: DailyState,
+	trophies: { [string]: boolean }, -- permanent streak-milestone trophies
 	settings: PlayerSettings,
 	stats: PlayerStats,
 }

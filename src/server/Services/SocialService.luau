@@ -24,6 +24,7 @@ SocialService.Name = "SocialService"
 local CafeService: any
 local EconomyService: any
 local AnalyticsService: any
+local GoalService: any
 
 local COMPLIMENT_REPUTATION = 2
 
@@ -116,6 +117,9 @@ local function handleVisit(player: Player, payload: unknown)
 			AnalyticsService:TrackOnce(player, "first_cafe_visit", {})
 			AnalyticsService:Track(player, "cafe_visit", { plotIndex = plotIndex })
 		end
+		if GoalService then
+			GoalService:Bump(player, "visit_neighbour", 1)
+		end
 		return
 	end
 
@@ -153,6 +157,7 @@ function SocialService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	EconomyService = ServiceRegistry.get("EconomyService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function SocialService.Start(_self: any)
