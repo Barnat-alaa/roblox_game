@@ -57,3 +57,10 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 - Client: HUD (stats, order, serve, shop, toasts), grid-based BuildController with live preview, learn-by-doing TutorialController, placeholder controllers.
 - Tests: TestEZ specs for economy payout, grid placement, and progression.
 - Documentation set (design, architecture, security, tests, release, economy, analytics, licences).
+
+### Published — 2026-07-14 — Social Cafe DEV is live (private)
+- Experience published: universe 10501568035, place 85898641225605, Access: Private.
+- Studio API Services enabled → real DataStore (`DEV_PlayerProfiles_v1`).
+- **Persistence verified end-to-end**: furniture placed in session A loaded
+  from DataStore in session B. MVP criterion #12 passed.
+- Max players set to 30 via Creator Dashboard (Access Settings).
