@@ -407,7 +407,7 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		cookTime = recipe.cookTime,
 	})
 	if AnalyticsService then
-		AnalyticsService:Track(player, "batch_started", { recipe = recipeId, cost = cost })
+		AnalyticsService:Track(player, "batch_started", { recipe = recipeId, cost = effCost })
 	end
 end
 
