@@ -31,8 +31,15 @@ player state · request frequency · replay/duplicate. Reusable helpers:
 - Rate limits are per-remote; consider a global per-player budget under load.
 - `RequestProfile` (RemoteFunction) has no rate limit — cheap lookup, but add
   one if invoke-flooding shows up in logs.
-- Zero-gap duplicate `ClaimOrder` race untested behaviourally (code path is
-  guarded: claim marked before grant; sequential re-claims observed to pay 0).
+
+## Behaviourally verified — 2026-07-14 live session
+- **Zero-gap duplicate `ClaimOrder`**: three simultaneous claims of the same
+  order paid exactly once (claim marked before grant holds under the race).
+- **Manual-cook forgery**: claim sent `manualCook=false` after a server-judged
+  brew — payout matched the manual rate exactly (8 vs auto 7 for tea),
+  proving the bonus flows only from `RecipeService.ConsumeManualCook`.
+- **Brew timing**: server derived the bar position from its own clock and
+  accepted an honestly-timed stop (`cook_result.success == true`).
 
 ## Monetisation (when added)
 `ProcessReceipt` must be **idempotent** — grant each `PurchaseId` exactly once,

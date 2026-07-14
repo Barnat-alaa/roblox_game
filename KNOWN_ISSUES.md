@@ -31,12 +31,10 @@ Tracked shortcomings of the current build. Each has an owner-facing note and a p
   `CompleteTutorialStep`. Day-5.
 - No audio, no lighting/atmosphere pass yet (greybox).
 
-## Security (to retest)
-- **Zero-gap duplicate-claim race**: two `ClaimOrder` fires in the same frame have
-  not been behaviourally tested (Studio session ended mid-test). The code path is
-  guarded — `order.claimed = true` and removal from `activeOrders` happen *before*
-  any grant — and a sequential re-claim was observed to pay nothing.
-  **Plan:** rerun the zero-gap test during the Day-6 security review.
+## Security
+- ~~Zero-gap duplicate-claim race~~ **RESOLVED 2026-07-14**: three simultaneous
+  claims of one order paid exactly once (live behavioural test). Manual-cook
+  forgery also verified impossible — see docs/SECURITY.md.
 
 ## Tooling
 - Toolchain verified working: rokit 1.2.0, rojo 7.4.4, stylua 2.0.2, selene 0.27.1.

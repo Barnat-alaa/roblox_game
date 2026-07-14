@@ -45,7 +45,11 @@ local function buildUi()
 	panel.Name = "BrewPanel"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -170)
-	panel.Size = UDim2.fromOffset(420, 120)
+	-- Scale width with a cap so the panel fits phone viewports (~375px).
+	panel.Size = UDim2.new(0.94, 0, 0, 120)
+	local sizeCap = Instance.new("UISizeConstraint")
+	sizeCap.MaxSize = Vector2.new(420, 120)
+	sizeCap.Parent = panel
 	panel.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
 	panel.BackgroundTransparency = 0.05
 	panel.Visible = false
