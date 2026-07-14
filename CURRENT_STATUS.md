@@ -1,53 +1,52 @@
 # Current status
 
-_Last updated: 2026-07-14 — Day 3 complete in code; brew minigame awaiting live playtest._
+_Last updated: 2026-07-14 (evening) — Days 1–5 shipped; Day 6 in progress._
 
-## What was completed
+## Shipped and pushed (CI green on every commit)
 
-- **Day 1 verified live** (2026-07-13): 21/21 unit specs in Studio, clean boot,
-  e2e serve loop through real remotes, duplicate claim pays nothing, client
-  boot-path bug found and fixed. Pushed; CI green.
-- **Day 3 part 1 — visible customer NPCs** (verified live in play mode):
-  street spawn → walk in → order bubble → serve reaction (😊 +N 🪙) → walk out
-  → next customer cycles in. Patience timeout (120s) cancels the order
-  server-side and the NPC leaves angry. Stuck-NPC teleport recovery.
-- **Day 3 part 2 — manual brew minigame** (code complete, gates green):
-  ProximityPrompt on your own coffee machine → oscillating timing bar →
-  Space/tap to stop in the green zone. Server-authoritative: RecipeService
-  starts its own clock on StartCooking and re-derives the bar position on
-  FinishCooking from shared Config/Cooking constants; a hit arms a ONE-SHOT
-  manual bonus consumed at claim. The client's `manualCook` argument is now
-  ignored entirely.
-- SocialCafe.rbxlx rebuilt from the repo — reopening it loads everything.
+- **Day 1** — scaffold verified live: 21/21 specs in Studio, clean boot, e2e
+  serve loop, duplicate claim pays nothing, client boot bug fixed.
+- **Day 3** — visible customer NPCs (verified live: walk in → order bubble →
+  serve reaction → walk out → next customer; patience timeout cancels the
+  order server-side). Manual brew minigame with server-judged timing.
+- **Day 5** — golden-hour lighting, plaza (fountain/benches/board — screenshot
+  verified), café visits + whitelisted compliments, persistent 6-step
+  tutorial (strict ordering verified live: serving before brewing does NOT
+  skip the brew step; step 1 auto-completed through the real controller).
+- **Day 6 (so far)** — real TestEZ runner (`rojo build test.project.json`,
+  RunTests bootstrap, wally dev-deps, CI builds both places). Security audit
+  of all 9 remotes documented in docs/SECURITY.md; RemoveFurniture rate
+  limit added. NPC pathing fix: customers order at a service window in
+  front of the plot, so walks never collide with placed furniture.
 
-## What was tested
+## Verified live this session
 
-- All CI gates: StyLua ✓ · Selene 0 errors ✓ · Rojo build ✓ (21/21 specs from Day 1 unaffected).
-- NPC lifecycle end-to-end in play mode, including the accidental-but-real
-  patience-expiry test (order cancelled, banner cleared, NPC left).
-- Serve economics: payouts match config exactly (espresso 8, tea 7 — the
-  "7,7" mystery was random recipe selection, not a bug).
+- Fresh-session boot: zero errors, all 12 services + 6 controllers.
+- Tutorial: step 1 fired through TutorialController → ProgressionService;
+  strict order held with 3 serves banked before the brew step.
+- Order economics: serve paid +7/+8 matching config exactly (tips observed).
+- Patience-cancel path ran in production repeatedly (order ids advanced
+  past 9 while unattended — cancellation cycling works).
+- Owner playtest happened in parallel (real serves from the HUD ✔).
 
-## What failed / is not done
+## Not yet verified / remaining Day 6
 
-- **Brew minigame not yet exercised in a live playtest** (Studio was closed
-  mid-session for the language switch). Next session: verify prompt →
-  bar → server verdict → bonus payout, plus the forged-claim negative test.
-- Croissant/sandwich recipes reference `oven`/`prep_counter` appliances that
-  have no interaction yet (machine-only brewing for now) — fine for MVP.
-- Days 5–7 pending: onboarding, neighbourhood pass, mobile, publish.
+- Brew payout bonus assertion + zero-gap duplicate-claim race (needs one
+  clean scripted pass in Studio).
+- Mobile/touch pass with the device simulator; two-client visit +
+  compliment test (Studio multi-client mode — needs a human click).
+- Save persistence — **blocked on publishing the place** (see below).
 
 ## What YOU need to do next
 
-1. Reopen `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` in Studio.
-2. Publish it: **Alt+P** → name `Social Cafe DEV` → Create, then
-   Game Settings → Security → **Enable Studio Access to API Services** → Save.
-3. Press Play and try the loop yourself: walk to the coffee machine, press
-   **E** when a customer orders, stop the bar in the green, then **Serve ☕**.
-   You should see a bigger payout than an unbrewed serve.
+1. **Publish** (unblocks persistence testing): open the place in Studio →
+   Alt+P → name `Social Cafe DEV` → Create → Game Settings → Security →
+   **Enable Studio Access to API Services** → Save → tell Claude "published".
+2. Optional but recommended: install the **Rojo plugin** (Toolbox → Plugins →
+   search "Rojo" by evaera) and click **Connect** so code syncs into Studio
+   automatically.
 
 ## Exact command to continue
 
-Open a Claude Code session in `C:\Users\barna\Desktop\roblox` and say
-"continue" — next up is the live brew verification, then Day 5 (onboarding +
-neighbourhood + lighting).
+Open Claude Code in `C:\Users\barna\Desktop\roblox` and say "continue".
+Claude can reopen Studio itself (shell-launches the .rbxlx) when needed.

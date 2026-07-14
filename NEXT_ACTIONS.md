@@ -1,31 +1,33 @@
 # Next actions
 
-Ordered. Items marked **[you]** need your account/machine; the rest Claude does via MCP/repo.
+Ordered. Items marked **[you]** need your account/machine; the rest Claude does.
 
-## 1. Reopen the place in Studio **[you]** — needed to resume live work
-1. Double-click `C:\Users\barna\Desktop\roblox\SocialCafe.rbxlx` (rebuilt today from the repo — includes the client boot fix).
-2. Wait for Studio to load, keep it open.
-→ **Send me:** "Studio open" (I'll reconnect via MCP and verify).
+## 1. Publish the Dev experience **[you]** — the only real blocker left
+Persistence (MVP criterion #12: "return without losing progress") cannot be
+tested until this is done:
+1. Open `SocialCafe.rbxlx` in Studio (or ask Claude to open it).
+2. **Alt+P** (File → Publish to Roblox) → new experience → name `Social Cafe DEV` → **Create** (stays private by default).
+3. **Home → Game Settings → Security → Enable Studio Access to API Services → Save**.
+→ **Send:** "published". Claude then verifies PlaceId ≠ 0 and runs the
+   save → rejoin → data-persists smoke test.
 
-## 2. Publish the Dev experience **[you]** — needed for real persistence
-1. In Studio: **File → Publish to Roblox** → create a **new experience** named `Social Cafe DEV`, private.
-2. **Home → Game Settings → Security → Enable Studio Access to API Services** → Save.
-3. This makes DataStore work so saves survive rejoining.
-→ **Send me:** a screenshot of Game Settings → Security, or just "published + API on".
+## 2. Install the Rojo plugin **[you, optional, 2 min]**
+Toolbox → Plugins tab → search **Rojo** (by evaera) → install → Plugins
+ribbon → Rojo → **Connect** while Claude runs `rojo serve`. Eliminates all
+manual Studio syncing.
 
-## 3. Day 3 build (Claude, via MCP + repo — no account needed)
-- Visible walking customer NPC: spawn at street → walk to counter/seat → order bubble → wait → react → leave.
-- Manual coffee-brew timing minigame at the machine (`StartCooking` remote is already reserved; `manualCook=true` bonus path exists in RewardMath).
-- Stuck-NPC recovery (teleport/reset).
+## 3. Day 6 remainder (Claude, next Studio session)
+- Scripted brew-bonus assertion + zero-gap duplicate-claim test.
+- Device-simulator mobile pass (touch targets, safe areas, layout).
+- Audio feedback pass (original/licensed only).
+- Two-client test **[you: click Test → Start (2 players) when asked]** —
+  verifies visits, compliments, and two cafés operating at once.
 
-## 4. First playtest checklist (unchanged — re-verify after Day 3)
-- [ ] Spawn on a plot; street of 6 greybox cafés visible.
-- [ ] HUD shows coins 150 / reputation 0 / level 1.
-- [ ] Order banner + **Serve** within ~8 s; serve pays and toasts.
-- [ ] **Build** → place/rotate with green/red preview; **Shop** → buy → place.
-- [ ] Rejoin restores data (only after step 2 publishes the place).
+## 4. Day 7 — publish the MVP to testers
+- Content maturity questionnaire, icon + thumbnail, private access for
+  testers, full RELEASE_CHECKLIST pass, KNOWN_ISSUES triage.
 
-## Backlog (tracked as tasks in-session)
-- Day 5: onboarding flow, plaza/lighting pass, café-visit interaction.
-- Day 6: mobile pass, security review (incl. zero-gap duplicate-claim race test), TestEZ runner wiring, 2-client test, analytics events.
-- Day 7: private publication, content maturity, icon/thumbnail, tester access, smoke test.
+## Backlog after MVP week
+- ProfileStore swap for session locking (Week 6 hardening).
+- Staff automation (Week 3), more recipes/furniture (Week 5), monetisation
+  after the loop is fun (Week 6).

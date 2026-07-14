@@ -167,6 +167,9 @@ local function handleRemove(player: Player, instanceId: unknown)
 	if typeof(instanceId) ~= "string" then
 		return
 	end
+	if not placeLimiter:check(player.UserId, os.clock()) then
+		return
+	end
 	local data = DataService:GetProfile(player)
 	if not data then
 		return
