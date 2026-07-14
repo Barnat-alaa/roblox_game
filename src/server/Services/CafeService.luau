@@ -458,8 +458,12 @@ end
 local function teleportOnto(plot: Plot, character: Model)
 	local hrp = character:WaitForChild("HumanoidRootPart", 5)
 	if hrp and hrp:IsA("BasePart") then
+		-- Arrive on the street IN FRONT of your own café, facing it —
+		-- the "this is my restaurant" moment (owner request).
 		local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-		hrp.CFrame = plot.origin * CFrame.new(width / 2, 5, 6)
+		local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
+		local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
+		hrp.CFrame = CFrame.lookAt(standAt, lookAt)
 	end
 end
 
