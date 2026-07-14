@@ -20,9 +20,9 @@ local yawIndex = 1
 local currentYaw = math.rad(YAWS[yawIndex])
 local targetYaw = currentYaw
 
-local zoom = 55
+local zoom = 40
 local targetZoom = zoom
-local ZOOM_MIN, ZOOM_MAX = 26, 95
+local ZOOM_MIN, ZOOM_MAX = 24, 95
 
 local focus = Vector3.new(24, 2, 24)
 
@@ -45,7 +45,7 @@ local function updateWallFades(cameraPos: Vector3)
 				local toCam = cameraPos - child.Position
 				toCam = Vector3.new(toCam.X, 0, toCam.Z)
 				local facing = toCam.Magnitude > 0.01 and toCam.Unit:Dot(normal) > 0.35
-				child.LocalTransparencyModifier = if facing then 0.92 else 0
+				child.LocalTransparencyModifier = if facing then 0.98 else 0
 			end
 		end
 	end
