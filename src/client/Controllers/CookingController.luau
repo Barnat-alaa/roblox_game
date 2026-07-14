@@ -15,6 +15,7 @@ local Remotes = require(Shared.Network.Remotes)
 local Cooking = require(Shared.Config.Cooking)
 
 local UIController = require(script.Parent.UIController)
+local AudioController = require(script.Parent.AudioController)
 
 local player = Players.LocalPlayer
 
@@ -143,6 +144,7 @@ local function beginBrew()
 	end
 	brewing = true
 	Remotes.event("StartCooking"):FireServer(currentOrder.orderId)
+	AudioController.play("brew")
 	startClock = os.clock()
 	ui.panel.Visible = true
 	stopRender()

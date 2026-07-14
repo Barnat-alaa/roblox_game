@@ -40,8 +40,11 @@ local function updateWallFades(cameraPos: Vector3)
 	end
 	for _, plot in plots:GetChildren() do
 		for _, child in plot:GetChildren() do
-			local normal = WALL_NORMALS[child.Name]
-			if normal and child:IsA("BasePart") then
+			local localNormal = WALL_NORMALS[child.Name]
+			if localNormal and child:IsA("BasePart") then
+				-- Row-1 plots are rotated 180°, so resolve the outward normal
+				-- in the wall's own space instead of assuming world axes.
+				local normal = child.CFrame:VectorToWorldSpace(localNormal)
 				local toCam = cameraPos - child.Position
 				toCam = Vector3.new(toCam.X, 0, toCam.Z)
 				local facing = toCam.Magnitude > 0.01 and toCam.Unit:Dot(normal) > 0.35
@@ -119,6 +122,22 @@ end
 function CameraController.Start(_self: any)
 	local camera = workspace.CurrentCamera
 	buildTouchControls()
+
+	-- Start the camera on the FRONT side of your own café (row-1 plots face +Z).
+	task.spawn(function()
+		for _ = 1, 60 do
+			local origin = player:GetAttribute("PlotOrigin")
+			if typeof(origin) == "CFrame" then
+				if origin.LookVector.Z > 0.5 then
+					yawIndex = 3 -- 45°: the front-left view for rotated plots
+					targetYaw = math.rad(YAWS[yawIndex])
+					currentYaw = targetYaw
+				end
+				return
+			end
+			task.wait(0.5)
+		end
+	end)
 
 	-- Two-finger pinch zoom on touch devices.
 	local pinchStartZoom = zoom

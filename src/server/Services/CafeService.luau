@@ -9,6 +9,7 @@ local Lighting = game:GetService("Lighting")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
+local World = require(Shared.Config.World)
 local Log = require(Shared.Utilities.Log)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -19,8 +20,23 @@ CafeService.Name = "CafeService"
 local DataService: any
 local BuildService: any
 
-local NUM_PLOTS = 6
+local NUM_PLOTS = World.plotCount
+local PLOTS_PER_ROW = World.plotsPerRow
 local PLOT_SPACING = Grid.PLOT_WIDTH * Grid.CELL_SIZE + 12
+
+-- Two rows of cafés face each other across a boulevard. Row 0 fronts -Z;
+-- row 1 is rotated 180° so its fronts face +Z toward the same street. All
+-- plot internals are origin-relative, so rotation Just Works everywhere.
+local function plotOriginFor(index: number): CFrame
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local row = if index <= PLOTS_PER_ROW then 0 else 1
+	local col = (index - 1) % PLOTS_PER_ROW
+	if row == 0 then
+		return CFrame.new(col * PLOT_SPACING, 0, 0)
+	end
+	return CFrame.new(col * PLOT_SPACING + width, 0, -World.boulevardWidth)
+		* CFrame.Angles(0, math.rad(180), 0)
+end
 
 type Plot = {
 	index: number,
@@ -29,6 +45,7 @@ type Plot = {
 	furnitureFolder: Folder,
 	ownerLabel: TextLabel,
 	ownerUserId: number?,
+	shutter: Model?,
 }
 
 local plots: { Plot } = {}
@@ -56,7 +73,7 @@ end
 local function buildPlot(index: number, parent: Instance): Plot
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
-	local origin = CFrame.new((index - 1) * PLOT_SPACING, 0, 0)
+	local origin = plotOriginFor(index)
 
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
@@ -215,35 +232,37 @@ local function buildStreetDecor(parent: Instance)
 	folder.Name = "StreetDecor"
 	folder.Parent = parent
 
-	for i = 0, NUM_PLOTS do
+	for i = 0, PLOTS_PER_ROW do
 		local x = i * PLOT_SPACING - 6
-		local pole = makePart(
-			"LampPole",
-			Vector3.new(0.6, 7, 0.6),
-			CFrame.new(x, 3, -18),
-			Color3.fromRGB(70, 60, 55),
-			folder,
-			Enum.Material.Metal
-		)
-		local head = makePart(
-			"LampHead",
-			Vector3.new(1.4, 1.4, 1.4),
-			CFrame.new(x, 7, -18),
-			Color3.fromRGB(255, 214, 150),
-			folder,
-			Enum.Material.Neon
-		)
-		head.Shape = Enum.PartType.Ball
-		local light = Instance.new("PointLight")
-		light.Color = Color3.fromRGB(255, 205, 140)
-		light.Range = 22
-		light.Brightness = 1.1
-		light.Parent = head
-		pole.Name = "LampPole_" .. i
+		for _, lampZ in { -18, -(World.boulevardWidth - 18) } do
+			local pole = makePart(
+				"LampPole",
+				Vector3.new(0.6, 7, 0.6),
+				CFrame.new(x, 3, lampZ),
+				Color3.fromRGB(70, 60, 55),
+				folder,
+				Enum.Material.Metal
+			)
+			local head = makePart(
+				"LampHead",
+				Vector3.new(1.4, 1.4, 1.4),
+				CFrame.new(x, 7, lampZ),
+				Color3.fromRGB(255, 214, 150),
+				folder,
+				Enum.Material.Neon
+			)
+			head.Shape = Enum.PartType.Ball
+			local light = Instance.new("PointLight")
+			light.Color = Color3.fromRGB(255, 205, 140)
+			light.Range = 22
+			light.Brightness = 1.1
+			light.Parent = head
+			pole.Name = "LampPole_" .. i
+		end
 	end
 
 	for i = 1, 4 do
-		local x = (i - 0.5) * (NUM_PLOTS * PLOT_SPACING) / 4 - 12
+		local x = (i - 0.5) * (PLOTS_PER_ROW * PLOT_SPACING) / 4 - 12
 		local z = -44
 		makePart(
 			"Trunk",
@@ -273,13 +292,14 @@ local function buildPlaza(parent: Instance)
 	folder.Parent = parent
 
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local midX = ((NUM_PLOTS - 1) * PLOT_SPACING + width) / 2
-	local centre = Vector3.new(midX, 0, -32)
+	local midX = ((PLOTS_PER_ROW - 1) * PLOT_SPACING + width) / 2
+	local plazaZ = -World.boulevardWidth / 2
+	local centre = Vector3.new(midX, 0, plazaZ)
 
 	local disc = makePart(
 		"PlazaFloor",
 		Vector3.new(0.5, 30, 30),
-		CFrame.new(midX, -0.25, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame.new(midX, -0.25, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(205, 185, 160),
 		folder,
 		Enum.Material.Cobblestone
@@ -289,7 +309,7 @@ local function buildPlaza(parent: Instance)
 	local base = makePart(
 		"FountainBase",
 		Vector3.new(1.2, 10, 10),
-		CFrame.new(midX, 0.6, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame.new(midX, 0.6, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(180, 170, 155),
 		folder,
 		Enum.Material.Slate
@@ -298,7 +318,7 @@ local function buildPlaza(parent: Instance)
 	local water = makePart(
 		"FountainWater",
 		Vector3.new(0.4, 8.6, 8.6),
-		CFrame.new(midX, 1.1, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame.new(midX, 1.1, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(120, 175, 200),
 		folder,
 		Enum.Material.Glass
@@ -308,7 +328,7 @@ local function buildPlaza(parent: Instance)
 	local column = makePart(
 		"FountainColumn",
 		Vector3.new(1.6, 3, 1.6),
-		CFrame.new(midX, 2.4, -32),
+		CFrame.new(midX, 2.4, plazaZ),
 		Color3.fromRGB(180, 170, 155),
 		folder,
 		Enum.Material.Slate
@@ -317,7 +337,7 @@ local function buildPlaza(parent: Instance)
 	local bowl = makePart(
 		"FountainBowl",
 		Vector3.new(0.6, 4, 4),
-		CFrame.new(midX, 4, -32) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame.new(midX, 4, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
 		Color3.fromRGB(180, 170, 155),
 		folder,
 		Enum.Material.Slate
@@ -364,7 +384,7 @@ local function buildPlaza(parent: Instance)
 	local board = makePart(
 		"NeighbourhoodBoard",
 		Vector3.new(8, 4, 0.4),
-		CFrame.new(midX, 3.4, -46) * CFrame.Angles(0, math.rad(180), 0),
+		CFrame.new(midX, 3.4, plazaZ - 16) * CFrame.Angles(0, math.rad(180), 0),
 		Color3.fromRGB(120, 90, 70),
 		folder,
 		Enum.Material.Wood
@@ -372,7 +392,7 @@ local function buildPlaza(parent: Instance)
 	makePart(
 		"BoardLegL",
 		Vector3.new(0.5, 3.4, 0.5),
-		CFrame.new(midX - 3.5, 1.7, -46),
+		CFrame.new(midX - 3.5, 1.7, plazaZ - 16),
 		Color3.fromRGB(100, 75, 58),
 		folder,
 		Enum.Material.Wood
@@ -380,7 +400,7 @@ local function buildPlaza(parent: Instance)
 	makePart(
 		"BoardLegR",
 		Vector3.new(0.5, 3.4, 0.5),
-		CFrame.new(midX + 3.5, 1.7, -46),
+		CFrame.new(midX + 3.5, 1.7, plazaZ - 16),
 		Color3.fromRGB(100, 75, 58),
 		folder,
 		Enum.Material.Wood
@@ -402,6 +422,72 @@ local function buildPlaza(parent: Instance)
 
 	-- Clients read this to detect "player reached the plaza" (tutorial).
 	workspace:SetAttribute("PlazaCenter", centre)
+end
+
+-- Unowned cafés read as CLOSED: wooden shutters across the open front and a
+-- dark interior. Claiming a plot visibly "opens" the café — lobbies feel
+-- alive with real neighbours instead of identical empty boxes.
+local function buildShutter(plot: Plot): Model
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local shutter = Instance.new("Model")
+	shutter.Name = "ClosedShutter"
+
+	makePart(
+		"ShutterPanel",
+		Vector3.new(width - 1, 5.4, 0.6),
+		plot.origin * CFrame.new(width / 2, 2.7, 0.4),
+		Color3.fromRGB(139, 112, 82),
+		shutter,
+		Enum.Material.WoodPlanks
+	)
+	for i = 0, 5 do
+		makePart(
+			"ShutterSlat",
+			Vector3.new(width - 1, 0.18, 0.68),
+			plot.origin * CFrame.new(width / 2, 0.9 + i * 0.9, 0.4),
+			Color3.fromRGB(112, 88, 62),
+			shutter,
+			Enum.Material.Wood
+		)
+	end
+	local board = makePart(
+		"ClosedBoard",
+		Vector3.new(6, 2.2, 0.3),
+		plot.origin * CFrame.new(width / 2, 4, -0.1),
+		Color3.fromRGB(96, 70, 52),
+		shutter,
+		Enum.Material.Wood
+	)
+	local gui = Instance.new("SurfaceGui")
+	gui.Face = Enum.NormalId.Front
+	gui.CanvasSize = Vector2.new(400, 160)
+	gui.Parent = board
+	local text = Instance.new("TextLabel")
+	text.Size = UDim2.fromScale(1, 1)
+	text.BackgroundTransparency = 1
+	text.Font = Enum.Font.GothamBold
+	text.TextScaled = true
+	text.TextColor3 = Color3.fromRGB(255, 236, 190)
+	text.Text = "CLOSED\nOpening soon…"
+	text.Parent = gui
+
+	shutter.Parent = plot.model
+	return shutter
+end
+
+local function setPlotClosed(plot: Plot)
+	plot.ownerLabel.Text = "Opening soon…"
+	if plot.shutter == nil then
+		plot.shutter = buildShutter(plot)
+	end
+end
+
+local function setPlotOpen(plot: Plot, player: Player)
+	plot.ownerLabel.Text = player.DisplayName .. "'s Café"
+	if plot.shutter then
+		plot.shutter:Destroy()
+		plot.shutter = nil
+	end
 end
 
 function CafeService.GetPlotOrigin(_self: any, player: Player): CFrame?
@@ -444,7 +530,7 @@ local function assignPlot(player: Player): Plot?
 	for _, plot in plots do
 		if plot.ownerUserId == nil then
 			plot.ownerUserId = player.UserId
-			plot.ownerLabel.Text = player.DisplayName .. "'s Café"
+			setPlotOpen(plot, player)
 			plotByUser[player.UserId] = plot
 			-- Clients read these to find their own plot (placement, appliances).
 			player:SetAttribute("PlotOrigin", plot.origin)
@@ -498,9 +584,9 @@ local function onPlayerRemoving(player: Player)
 	local plot = plotByUser[player.UserId]
 	if plot then
 		plot.ownerUserId = nil
-		plot.ownerLabel.Text = "Empty Café"
 		plot.furnitureFolder:ClearAllChildren()
 		plot.model:SetAttribute("ownerUserId", nil)
+		setPlotClosed(plot)
 		plotByUser[player.UserId] = nil
 	end
 end
@@ -517,14 +603,21 @@ function CafeService.Start(_self: any)
 
 	for i = 1, NUM_PLOTS do
 		plots[i] = buildPlot(i, plotsFolder)
+		setPlotClosed(plots[i]) -- every café starts shuttered until claimed
 	end
 
-	-- Shared street ground so nobody falls into the void.
+	-- Shared street ground so nobody falls into the void: spans both rows
+	-- and the boulevard between them.
+	local depthSpan = World.boulevardWidth + 2 * Grid.PLOT_DEPTH * Grid.CELL_SIZE + 80
 	local ground = Instance.new("Part")
 	ground.Name = "StreetGround"
 	ground.Anchored = true
-	ground.Size = Vector3.new(NUM_PLOTS * PLOT_SPACING + 80, 1, 220)
-	ground.CFrame = CFrame.new((NUM_PLOTS * PLOT_SPACING) / 2 - PLOT_SPACING / 2, -1, 60)
+	ground.Size = Vector3.new(PLOTS_PER_ROW * PLOT_SPACING + 80, 1, depthSpan)
+	ground.CFrame = CFrame.new(
+		(PLOTS_PER_ROW * PLOT_SPACING) / 2 - PLOT_SPACING / 2,
+		-1,
+		-World.boulevardWidth / 2
+	)
 	ground.Color = Color3.fromRGB(158, 158, 148)
 	ground.Material = Enum.Material.Concrete
 	ground.Parent = workspace

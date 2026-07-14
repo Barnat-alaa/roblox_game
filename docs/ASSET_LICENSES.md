@@ -5,12 +5,20 @@ source and licence **before** it ships. Code dependencies live in
 [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
 ## Current assets
-The MVP is **100% code-generated greybox** — plain `Part` primitives and engine
-default fonts/UI. No imported art, textures, models, or audio yet.
+All 3D/UI art is **code-generated greybox** (see docs/ART_DIRECTION.md) — no
+imported visual assets. Icon and thumbnail are staged screenshots of our own
+game. Audio comes exclusively from Roblox's licensed partner catalogs:
 
-| Asset ID | Name | Type | Creator | Source file | Licence | Roblox asset id | Poly | Approved for prod |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| _(none yet)_ | | | | | | | | |
+| Asset ID | Name | Type | Creator | Source | Licence | Roblox asset id | Approved for prod |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| audio_bell | Desk Bell Counter Service 1 | Audio SFX | ProSoundEffects | Creator Store | Roblox licensed SFX partner catalog (on-platform use) | 9125485591 | ✅ |
+| audio_serve | Desk Bell Counter Service 2 | Audio SFX | ProSoundEffects | Creator Store | Roblox licensed SFX partner catalog | 9125485659 | ✅ |
+| audio_brew | Blender Water 1 | Audio SFX | ProSoundEffects | Creator Store | Roblox licensed SFX partner catalog | 9113456593 | ✅ |
+| audio_music | Cozy Cafe Focus Piano | Audio music | DistrokidOfficial | Creator Store | Roblox licensed-music program (on-platform use) | 97316511727172 | ✅ |
+
+Audio rule: only Roblox partner catalogs (ProSoundEffects, APM,
+DistrokidOfficial, Monstercat…) or original/commissioned audio. Community
+re-uploads of stock sounds are provenance risks — never ship them.
 
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
