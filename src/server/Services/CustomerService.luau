@@ -157,7 +157,9 @@ end
 local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 	local streetPos = (origin * CFrame.new(width / 2 + rng:NextNumber(-8, 8), 2, -12)).Position
-	local servicePos = (origin * CFrame.new(width / 2, 2, 10)).Position
+	-- Order at the service window IN FRONT of the plot (z = -3): the walk path
+	-- never crosses placed furniture, so NPCs can't get blocked by the layout.
+	local servicePos = (origin * CFrame.new(width / 2, 2, -3)).Position
 
 	cust.model:PivotTo(
 		CFrame.lookAt(streetPos, Vector3.new(servicePos.X, streetPos.Y, servicePos.Z))
