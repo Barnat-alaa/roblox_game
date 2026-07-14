@@ -20,6 +20,7 @@ local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
+local Fx = require(script.Parent.Parent.Fx)
 
 local KitchenService = {}
 KitchenService.Name = "KitchenService"
@@ -153,6 +154,76 @@ local function setCookVisuals(player: Player, instanceId: string, state: string,
 	end
 end
 
+-- ————— counter food display: stock made visible —————
+
+local FOOD_COLORS: { [string]: Color3 } = {
+	Coffee = Color3.fromRGB(120, 82, 55),
+	Tea = Color3.fromRGB(140, 180, 110),
+	Pastry = Color3.fromRGB(230, 180, 100),
+	Sandwich = Color3.fromRGB(215, 160, 90),
+}
+
+-- Rebuild the little food stacks on the player's first counter so counter
+-- stock is something you can SEE filling up and emptying.
+local function refreshCounterDisplay(player: Player)
+	local data = DataService:GetProfile(player)
+	local folder = CafeService:GetFurnitureFolder(player)
+	if not data or not folder then
+		return
+	end
+	local counter: Model? = nil
+	for _, child in folder:GetChildren() do
+		if child:IsA("Model") and child.Name == "counter" then
+			counter = child
+			break
+		end
+	end
+	if not counter then
+		return
+	end
+	local top = counter:FindFirstChild("Top") :: BasePart?
+	if not top then
+		return
+	end
+
+	local display = counter:FindFirstChild("StockDisplay")
+	if display then
+		display:Destroy()
+	end
+	display = Instance.new("Folder")
+	display.Name = "StockDisplay"
+	display.Parent = counter
+
+	local kitchen = kitchenOf(data)
+	local slot = 0
+	for recipeId, count in kitchen.stock do
+		local recipe = Recipes[recipeId]
+		if recipe and count > 0 then
+			local stacks = math.clamp(math.ceil(count / 6), 1, 3)
+			for _ = 1, stacks do
+				slot += 1
+				if slot > 6 then
+					break
+				end
+				local x = -4.2 + ((slot - 1) % 6) * 1.7
+				local food = Instance.new("Part")
+				food.Name = "Food_" .. recipeId
+				food.Shape = Enum.PartType.Cylinder
+				food.Size = Vector3.new(0.55, 1.1, 1.1)
+				food.Color = FOOD_COLORS[recipe.category] or Color3.fromRGB(200, 160, 110)
+				food.Material = Enum.Material.SmoothPlastic
+				food.Anchored = true
+				food.CanCollide = false
+				food.CanQuery = false
+				food.CFrame = top.CFrame
+					* CFrame.new(x, 0.5, 0.6)
+					* CFrame.Angles(0, 0, math.rad(90))
+				food.Parent = display
+			end
+		end
+	end
+end
+
 -- ————— Buzz —————
 
 function KitchenService.AddBuzz(_self: any, player: Player, delta: number)
@@ -193,6 +264,7 @@ local function grantConsumption(
 	if AnalyticsService then
 		AnalyticsService:Track(player, "stock_consumed", { recipe = recipeId, paid = payout })
 	end
+	refreshCounterDisplay(player)
 	return payout
 end
 
@@ -344,6 +416,22 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 	data.stats.recipesCooked += 1
 	DataService:Push(player)
 	setCookVisuals(player, instanceId :: string, "idle", nil)
+	refreshCounterDisplay(player)
+
+	-- Juice: the collect moment should feel like a small payday.
+	local model = applianceModel(player, instanceId :: string)
+	if model then
+		local pivot = model:GetPivot()
+		Fx.coinBurst(pivot.Position + Vector3.new(0, 3, 0), if bonus > 0 then 8 else 5)
+		Fx.floatText(
+			pivot.Position + Vector3.new(0, 4, 0),
+			"+"
+				.. tostring(recipe.servings)
+				.. " 🍽️"
+				.. (if bonus > 0 then "  ✨+" .. tostring(bonus) else ""),
+			Color3.fromRGB(170, 235, 150)
+		)
+	end
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "cook_collected",
 		recipe = recipe.displayName,

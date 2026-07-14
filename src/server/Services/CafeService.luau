@@ -167,6 +167,37 @@ local function buildPlot(index: number, parent: Instance): Plot
 	label.Text = "Empty Café"
 	label.Parent = gui
 
+	-- Striped awning over the open front (Phase 2 charm pass).
+	for i = 0, 7 do
+		local slat = makePart(
+			"AwningSlat",
+			Vector3.new(width / 8, 0.25, 3.4),
+			origin
+				* CFrame.new(width / 16 + i * (width / 8), wallH - 0.7, -0.9)
+				* CFrame.Angles(math.rad(-12), 0, 0),
+			if i % 2 == 0 then Color3.fromRGB(196, 60, 50) else Color3.fromRGB(245, 242, 235),
+			model,
+			Enum.Material.Fabric
+		)
+		slat.CanCollide = false
+	end
+
+	-- Warm interior glow so open cafés shine at golden hour.
+	local glowAnchor = makePart(
+		"InteriorGlow",
+		Vector3.new(0.4, 0.4, 0.4),
+		origin * CFrame.new(width / 2, wallH - 1.6, depth / 2),
+		Color3.fromRGB(255, 220, 170),
+		model
+	)
+	glowAnchor.Transparency = 1
+	glowAnchor.CanCollide = false
+	local interiorLight = Instance.new("PointLight")
+	interiorLight.Color = Color3.fromRGB(255, 214, 160)
+	interiorLight.Range = 20
+	interiorLight.Brightness = 0.65
+	interiorLight.Parent = glowAnchor
+
 	-- Doormat pad at the café front; the client attaches a "Visit Café" prompt.
 	local pad = makePart(
 		"VisitPad",

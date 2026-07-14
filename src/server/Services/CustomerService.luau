@@ -13,11 +13,14 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.Shared
 local Customers = require(Shared.Config.Customers)
 local Recipes = require(Shared.Config.Recipes)
+local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
 local Grid = require(Shared.Utilities.Grid)
+local RewardMath = require(Shared.Utilities.RewardMath)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
+local Fx = require(script.Parent.Parent.Fx)
 
 local CustomerService = {}
 CustomerService.Name = "CustomerService"
@@ -26,6 +29,7 @@ local DataService: any
 local OrderService: any
 local CafeService: any
 local KitchenService: any
+local EconomyService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -389,19 +393,25 @@ local function slotPosition(origin: CFrame, slot: number): Vector3
 end
 
 -- Walk with a deadline; teleport to the goal on timeout (MVP stuck recovery).
+-- Includes the chibi waddle: hip bounce while moving (Phase 2 life pass).
 local function walkTo(cust: ActiveCustomer, target: Vector3)
 	local deadline = os.clock() + WALK_TIMEOUT
+	local t0 = os.clock()
 	while not cust.leaving and cust.root.Parent ~= nil do
 		local flat = (cust.root.Position - target) * Vector3.new(1, 0, 1)
 		if flat.Magnitude < 1.5 then
-			return
+			break
 		end
 		if os.clock() > deadline then
 			cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
-			return
+			break
 		end
 		cust.humanoid:MoveTo(target)
-		task.wait(0.4)
+		cust.humanoid.HipHeight = 1 + 0.14 * math.abs(math.sin((os.clock() - t0) * 9))
+		task.wait(0.1)
+	end
+	if not cust.leaving and cust.root.Parent ~= nil then
+		cust.humanoid.HipHeight = 1
 	end
 end
 
@@ -416,6 +426,209 @@ local function removeFromQueue(cust: ActiveCustomer)
 	if q and i then
 		table.remove(q, i)
 	end
+end
+
+-- ————— seated dining (Phase 2) —————
+
+local FOOD_COLORS: { [string]: Color3 } = {
+	Coffee = Color3.fromRGB(120, 82, 55),
+	Tea = Color3.fromRGB(140, 180, 110),
+	Pastry = Color3.fromRGB(230, 180, 100),
+	Sandwich = Color3.fromRGB(215, 160, 90),
+}
+
+-- instanceId → true, per user, for chairs currently holding a diner.
+local occupiedSeats: { [number]: { [string]: boolean } } = {}
+
+-- Pick a free placed chair; returns its world CFrame + instanceId.
+local function claimSeat(player: Player): (CFrame?, string?)
+	local data = DataService:GetProfile(player)
+	local origin = CafeService:GetPlotOrigin(player)
+	if not data or not origin then
+		return nil, nil
+	end
+	local taken = occupiedSeats[player.UserId]
+	if not taken then
+		taken = {}
+		occupiedSeats[player.UserId] = taken
+	end
+	for _, placed in data.placedFurniture do
+		local def = Furniture[placed.catalogId]
+		if def and def.seatCount > 0 and not taken[placed.instanceId] then
+			taken[placed.instanceId] = true
+			local cf = Grid.cellToWorld(
+				origin,
+				placed.gridX,
+				placed.gridY,
+				def.width,
+				def.depth,
+				placed.rotation,
+				def.height
+			)
+			return cf, placed.instanceId
+		end
+	end
+	return nil, nil
+end
+
+local function releaseSeat(player: Player, seatId: string?)
+	local taken = occupiedSeats[player.UserId]
+	if taken and seatId then
+		taken[seatId] = nil
+	end
+end
+
+-- Drop a collectible tip at the seat: the owner taps it for coins + a burst.
+local function dropTip(player: Player, seatCf: CFrame, amount: number)
+	local folder = CafeService:GetFurnitureFolder(player)
+	local plotModel = folder and folder.Parent
+	if not plotModel then
+		return
+	end
+	local tip = Instance.new("Part")
+	tip.Name = "Tip"
+	tip.Shape = Enum.PartType.Cylinder
+	tip.Size = Vector3.new(0.25, 1.1, 1.1)
+	tip.Color = Color3.fromRGB(240, 195, 80)
+	tip.Material = Enum.Material.Metal
+	tip.Anchored = true
+	tip.CanCollide = false
+	tip.CFrame = CFrame.new(seatCf.Position + Vector3.new(0, 1.4, 0))
+		* CFrame.Angles(0, 0, math.rad(90))
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(2.6, 0.9)
+	gui.StudsOffset = Vector3.new(0, 1.2, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 70
+	gui.Parent = tip
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.TextColor3 = Color3.fromRGB(255, 224, 130)
+	label.TextStrokeTransparency = 0.3
+	label.Text = "🪙 Tip!"
+	label.Parent = gui
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Take tip"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = tip
+
+	local claimed = false
+	prompt.Triggered:Connect(function(who)
+		-- Only the café owner pockets tips left in their café.
+		if claimed or who ~= player then
+			return
+		end
+		claimed = true
+		EconomyService:AddCoins(player, amount)
+		Fx.coinBurst(tip.Position, 5)
+		Fx.floatText(tip.Position + Vector3.new(0, 1, 0), "+" .. tostring(amount) .. " 🪙")
+		tip:Destroy()
+	end)
+
+	tip.Parent = plotModel
+	task.delay(120, function()
+		if tip.Parent ~= nil then
+			tip:Destroy()
+		end
+	end)
+end
+
+-- The full dining moment: leave the queue (line advances!), take a chair if
+-- one is free, eat visibly, maybe leave a tip, then head out happy.
+local function eatMeal(
+	player: Player,
+	cust: ActiveCustomer,
+	streetPos: Vector3,
+	recipeId: string,
+	announcedPay: number?
+)
+	removeFromQueue(cust)
+	local recipe = Recipes[recipeId]
+	if announcedPay ~= nil then
+		cust.bubble.Text = "🍽️ " .. (if recipe then recipe.displayName else recipeId)
+	end
+
+	local seatCf, seatId = claimSeat(player)
+	if seatCf and not cust.leaving and cust.root.Parent ~= nil then
+		walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
+		if not cust.leaving and cust.root.Parent ~= nil then
+			-- Sit: lower onto the seat, face the chair's way, and lock in.
+			local sitPos = Vector3.new(seatCf.Position.X, 2.05, seatCf.Position.Z)
+			cust.root.Anchored = true
+			cust.model:PivotTo(CFrame.lookAt(sitPos, sitPos + seatCf.LookVector))
+
+			-- A little plate of food in their lap-space.
+			local plate = Instance.new("Part")
+			plate.Shape = Enum.PartType.Cylinder
+			plate.Size = Vector3.new(0.2, 1.4, 1.4)
+			plate.Color = Color3.fromRGB(245, 242, 235)
+			plate.Anchored = true
+			plate.CanCollide = false
+			plate.CanQuery = false
+			plate.CFrame = cust.model:GetPivot()
+				* CFrame.new(0, -0.2, -1.3)
+				* CFrame.Angles(0, 0, math.rad(90))
+			plate.Parent = cust.model
+			local food = Instance.new("Part")
+			food.Shape = Enum.PartType.Ball
+			food.Size = Vector3.new(0.8, 0.6, 0.8)
+			food.Color = FOOD_COLORS[if recipe then recipe.category else ""]
+				or Color3.fromRGB(200, 160, 110)
+			food.Anchored = true
+			food.CanCollide = false
+			food.CanQuery = false
+			food.CFrame = plate.CFrame * CFrame.new(0, 0, 0.5)
+			food.Parent = cust.model
+
+			-- Eat with a happy bob.
+			local basePivot = cust.model:GetPivot()
+			for i = 1, 12 do
+				if cust.leaving or cust.root.Parent == nil then
+					break
+				end
+				cust.model:PivotTo(basePivot * CFrame.new(0, (i % 2) * 0.12, 0))
+				if i == 6 then
+					cust.bubble.Text = "😋"
+				end
+				task.wait(0.55)
+			end
+
+			plate:Destroy()
+			food:Destroy()
+
+			-- Tips are the seated-dining exclusive: reward for having chairs.
+			if recipe and not cust.leaving then
+				local tip =
+					RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), cust.def.tipMultiplier)
+				if tip > 0 then
+					dropTip(player, seatCf, tip)
+				end
+			end
+			if cust.root.Parent ~= nil then
+				cust.root.Anchored = false
+			end
+		end
+	else
+		-- No chair free: a quick standing bite at the window.
+		task.wait(2.2)
+	end
+	releaseSeat(player, seatId)
+
+	if cust.root.Parent ~= nil then
+		cust.bubble.Text = if announcedPay ~= nil
+			then "😊 +" .. tostring(announcedPay) .. " 🪙"
+			else "😊"
+		task.wait(1)
+		walkTo(cust, streetPos)
+	end
+	cust.model:Destroy()
 end
 
 -- Leave the line (already removed or removing now), walk out, despawn.
@@ -480,12 +693,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	-- back to a manual order (serve/brew), which still pays the full rate.
 	local consumedId, paid = KitchenService:TryConsume(player)
 	if consumedId ~= nil then
-		local dish = Recipes[consumedId]
-		cust.bubble.Text = "🍽️ " .. (if dish then dish.displayName else tostring(consumedId))
-		task.wait(1.6)
-		cust.bubble.Text = "😊 +" .. tostring(paid) .. " 🪙"
-		task.wait(1.2)
-		depart(cust, streetPos)
+		eatMeal(player, cust, streetPos, consumedId, paid)
 		return
 	end
 
@@ -504,6 +712,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 
 	local deadline = os.clock() + PATIENCE_SECONDS
 	local nextStockCheck = 0
+	local fedPay: number? = nil
 	while os.clock() < deadline and cust.orderId ~= nil and not cust.leaving do
 		-- A batch may land while they wait — feed them straight from it.
 		if os.clock() >= nextStockCheck then
@@ -513,7 +722,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 				OrderService:CancelOrder(cust.orderId, true)
 				cust.orderId = nil
 				cust.served = true
-				cust.bubble.Text = "😊 +" .. tostring(paidNow) .. " 🪙"
+				fedPay = paidNow
 			end
 		end
 		task.wait(0.25)
@@ -533,7 +742,12 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		cust.bubble.Text = "😠 Too slow…"
 		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 	end
-	task.wait(1.4) -- let the reaction (happy or angry) read before walking off
+	if cust.served and not cust.leaving then
+		-- Fed from stock while waiting, or hand-served: sit down and dine.
+		eatMeal(player, cust, streetPos, recipeId :: string, fedPay)
+		return
+	end
+	task.wait(1.4) -- let the angry reaction read before walking off
 
 	depart(cust, streetPos)
 end
@@ -557,6 +771,7 @@ function CustomerService.Init(_self: any)
 	OrderService = ServiceRegistry.get("OrderService")
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
+	EconomyService = ServiceRegistry.get("EconomyService")
 end
 
 function CustomerService.Start(_self: any)

@@ -76,3 +76,16 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   HUD Buzz meter, kitchen toasts.
 - Verified live: batch cost/servings/fresh-bonus math exact, busy/early
   rejections, 7 customers fed from one batch, Buzz feedback loop spinning.
+
+### Added — 2026-07-14 — Phase 2: the alive café
+- **Seated dining**: fed customers leave the queue (line advances), walk to a
+  free placed chair, sit facing it, eat from a plate of food with a happy
+  bob, then head out — verified sitting exactly on the chair's grid cell.
+- **Collectible tips**: seated diners can leave a tip coin (owner-only
+  ProximityPrompt, server-validated) — the reward for owning chairs.
+- **Juice**: coin bursts + floating text on batch collect and tip pickup;
+  chibi waddle (hip-bounce) while NPCs walk.
+- **Visible stock**: food stacks render on the counter as batches land and
+  customers eat them down.
+- **Charm pass**: striped awnings over every café front + warm interior
+  glow at golden hour.
