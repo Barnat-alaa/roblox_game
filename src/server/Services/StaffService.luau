@@ -553,6 +553,21 @@ function StaffService.Start(_self: any)
 		end
 		messQueues[player.UserId] = nil
 	end)
+
+	-- Crews spawned before the async asset load finishes are procedural; drop
+	-- them once the library is ready so the next tick rebuilds with real rigs.
+	if AssetLibraryService then
+		AssetLibraryService:OnReady(function()
+			for userId, crew in crewByUser do
+				for _, npc in { crew.barista, crew.waiter, crew.cleaner } do
+					if npc then
+						npc.model:Destroy()
+					end
+				end
+				crewByUser[userId] = nil
+			end
+		end)
+	end
 end
 
 return StaffService

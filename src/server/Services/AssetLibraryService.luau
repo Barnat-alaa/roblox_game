@@ -8,8 +8,9 @@
 --   3. Normalise: unwrap the LoadAsset container to the real Model, scale
 --      furniture/props to their grid footprint, prep rigs for our walk system.
 --   4. Cache the template in ServerStorage; Get* returns a fresh clone or nil.
--- Loading runs in the background so boot is never blocked; until a template is
--- ready, Get* returns nil and the caller renders the procedural fallback.
+-- Loading runs in the background so boot is never blocked. Renders that happen
+-- before a template is ready use the procedural fallback, then OnReady fires so
+-- BuildService/StaffService can re-render with the real models once loaded.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
@@ -26,6 +27,8 @@ local templates: { [string]: Model } = {}
 local customerRigKeys: { string } = {}
 local rng = Random.new()
 local cacheFolder: Folder
+local isReady = false
+local readyCallbacks: { () -> () } = {}
 
 -- ————— sanitise: strip everything that could run or clutter —————
 
@@ -44,6 +47,18 @@ local function sanitise(root: Instance)
 			d:Destroy()
 		end
 	end
+end
+
+local function loadAndSanitise(assetId: number): Model?
+	local ok, result = pcall(function()
+		return InsertService:LoadAsset(assetId)
+	end)
+	if not ok or not result then
+		Log.warn("AssetLibrary: load failed", assetId, result)
+		return nil
+	end
+	sanitise(result)
+	return result
 end
 
 -- LoadAsset returns a container Model holding the asset's top-level instances.
@@ -84,7 +99,15 @@ local function ensurePrimary(model: Model): BasePart?
 	return biggest
 end
 
-local function anchorAll(model: Model)
+-- ————— build templates per kind —————
+
+-- Furniture/props: one anchored, scaled, floor-friendly template.
+local function buildStaticTemplate(assetId: number, fitX: number, fitZ: number): Model?
+	local container = loadAndSanitise(assetId)
+	if not container then
+		return nil
+	end
+	local model = unwrap(container)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
@@ -92,29 +115,6 @@ local function anchorAll(model: Model)
 			d.CanQuery = false
 		end
 	end
-end
-
--- ————— load helpers per kind —————
-
-local function loadRaw(assetId: number): Model?
-	local ok, result = pcall(function()
-		return InsertService:LoadAsset(assetId)
-	end)
-	if not ok or not result then
-		Log.warn("AssetLibrary: load failed", assetId, result)
-		return nil
-	end
-	sanitise(result)
-	return unwrap(result)
-end
-
--- Furniture/props: one anchored, scaled, floor-friendly template.
-local function buildStaticTemplate(assetId: number, fitX: number, fitZ: number): Model?
-	local model = loadRaw(assetId)
-	if not model then
-		return nil
-	end
-	anchorAll(model)
 	if not ensurePrimary(model) then
 		model:Destroy()
 		return nil
@@ -131,22 +131,53 @@ local function buildStaticTemplate(assetId: number, fitX: number, fitZ: number):
 	return model
 end
 
--- Rigs: keep Humanoid + HumanoidRootPart + Head, ready for MoveTo. Limbs go
--- non-collide (queues never jostle); the root carries floor contact.
+-- Rigs: keep Humanoid + HumanoidRootPart + Head, ready for MoveTo. The rig can
+-- sit one level below the LoadAsset container (a Model wrapping the character),
+-- so locate the Humanoid recursively and adopt its parent as the template.
 local function buildRigTemplate(assetId: number): Model?
-	local model = loadRaw(assetId)
-	if not model then
+	local container = loadAndSanitise(assetId)
+	if not container then
 		return nil
 	end
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local head = model:FindFirstChild("Head") :: BasePart?
-	if not humanoid or not root or not head then
-		Log.warn("AssetLibrary: rig missing Humanoid/root/head", assetId)
-		model:Destroy()
+	local humanoid = container:FindFirstChildWhichIsA("Humanoid", true)
+	local rig = if humanoid then humanoid.Parent :: Instance else nil
+	if not humanoid or not rig or not rig:IsA("Model") then
+		Log.warn("AssetLibrary: rig has no Humanoid", assetId)
+		container:Destroy()
 		return nil
 	end
-	for _, d in model:GetDescendants() do
+	local head = rig:FindFirstChild("Head") :: BasePart?
+	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		-- Old R6 rigs ship without a HumanoidRootPart; synthesise one bound to
+		-- the Torso so our MoveTo/anchor logic has a primary part to drive.
+		local torso = rig:FindFirstChild("Torso") or rig:FindFirstChild("UpperTorso")
+		if torso and torso:IsA("BasePart") then
+			local hrp = Instance.new("Part")
+			hrp.Name = "HumanoidRootPart"
+			hrp.Size = Vector3.new(2, 2, 1)
+			hrp.Transparency = 1
+			hrp.CanCollide = false
+			hrp.CFrame = torso.CFrame
+			hrp.Parent = rig
+			local joint = Instance.new("Motor6D")
+			joint.Name = "RootJoint"
+			joint.Part0 = hrp
+			joint.Part1 = torso
+			joint.Parent = hrp
+			root = hrp
+		end
+	end
+	if not root or not head then
+		Log.warn("AssetLibrary: rig missing root/head", assetId)
+		container:Destroy()
+		return nil
+	end
+	if rig ~= container then
+		rig.Parent = nil
+		container:Destroy()
+	end
+	for _, d in rig:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Massless = d ~= root
 			if d ~= root then
@@ -159,8 +190,8 @@ local function buildRigTemplate(assetId: number): Model?
 	humanoid.RequiresNeck = false
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	model.PrimaryPart = root
-	return model
+	rig.PrimaryPart = root
+	return rig
 end
 
 local function cache(key: string, template: Model?)
@@ -197,6 +228,20 @@ function AssetLibraryService.GetCustomerRig(_self: any): Model?
 	return cloneOf(customerRigKeys[rng:NextInteger(1, #customerRigKeys)])
 end
 
+function AssetLibraryService.IsReady(_self: any): boolean
+	return isReady
+end
+
+-- Run fn once templates are loaded (immediately if that already happened).
+-- Lets join-time renderers redraw with the real models after the async load.
+function AssetLibraryService.OnReady(_self: any, fn: () -> ())
+	if isReady then
+		task.spawn(fn)
+	else
+		table.insert(readyCallbacks, fn)
+	end
+end
+
 function AssetLibraryService.Init(_self: any)
 	cacheFolder = Instance.new("Folder")
 	cacheFolder.Name = "AssetTemplates"
@@ -204,7 +249,6 @@ function AssetLibraryService.Init(_self: any)
 end
 
 function AssetLibraryService.Start(_self: any)
-	-- Load everything in the background; templates populate as they arrive.
 	task.spawn(function()
 		local loaded, failed = 0, 0
 		local function tally(ok: boolean)
@@ -216,9 +260,8 @@ function AssetLibraryService.Start(_self: any)
 		end
 
 		for catalogId, entry in AssetManifest.furniture do
-			local key = "furniture:" .. catalogId
 			local t = buildStaticTemplate(entry.assetId, entry.fitX, entry.fitZ)
-			cache(key, t)
+			cache("furniture:" .. catalogId, t)
 			tally(t ~= nil)
 		end
 		for category, entry in AssetManifest.props do
@@ -240,9 +283,15 @@ function AssetLibraryService.Start(_self: any)
 			end
 			tally(t ~= nil)
 		end
+
+		isReady = true
 		Log.info(
 			string.format("AssetLibrary ready: %d templates loaded, %d fell back", loaded, failed)
 		)
+		for _, cb in readyCallbacks do
+			task.spawn(cb)
+		end
+		table.clear(readyCallbacks)
 	end)
 end
 

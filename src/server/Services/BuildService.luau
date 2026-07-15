@@ -516,6 +516,16 @@ function BuildService.Start(_self: any)
 	Players.PlayerRemoving:Connect(function(player)
 		placeLimiter:clear(player.UserId)
 	end)
+
+	-- Furniture placed on join renders before the async asset load finishes;
+	-- redraw everyone's café with the real models once the library is ready.
+	if AssetLibraryService then
+		AssetLibraryService:OnReady(function()
+			for _, player in Players:GetPlayers() do
+				BuildService:RenderProfile(player)
+			end
+		end)
+	end
 end
 
 return BuildService
