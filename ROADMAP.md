@@ -31,8 +31,11 @@ Store models chosen by the owner — **docs/ASSET_SHOPPING_LIST.md**._
 This ordering supersedes the phase order below until the 5 steps ship.
 Old Phase 4 content = step S5. Parity codes (A4, D2…) refer to the parity doc.
 
-### S1 — LOOK like a café: the Creator Store asset pipeline
+### S1 — LOOK like a café: the Creator Store asset pipeline ✅ DONE (2026-07-15)
 _Parity: D1, C4 · replaces procedural greybox with owner-picked models_
+_Live-verified: 15/15 assets load; real machine/counter/oven/chair at correct
+dimensions, clothed animated customer rigs, barista/waiter/cleaner rigs, food
+props. Polish pass (dimensions, walk animations, pathfinding) also shipped._
 - Claude: `Config/AssetManifest.luau` + `AssetLibraryService` — loads bought
   assets by ID at boot (InsertService), **strips all scripts** (security),
   auto-scales to grid footprints, caches templates, and **falls back to the
@@ -45,8 +48,12 @@ _Parity: D1, C4 · replaces procedural greybox with owner-picked models_
 - Every asset logged in docs/ASSET_LICENSES.md. Exit: before/after screenshot
   where a stranger says "café" in 1 second. **Then publish to cloud (HANDOFF §6.2).**
 
-### S2 — Customers you can FEEL
-_Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying"_
+### S2 — Customers you can FEEL + a café that reads as a building
+_Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying" + facade_
+- **[DONE early, in the S1 polish pass]** Natural NPC movement: real R6/R15
+  **walk/idle animations** (NpcAnimator) and **PathfindingService routing
+  around collidable furniture** (customers no longer slide or clip through
+  tables). Object **dimensions** corrected (proportion-preserving scaling).
 - Patience meter + **mood faces** over every customer (😊 → 😐 → 😠), hearts
   burst on fresh/mastered dishes, angry storm-out with a visible **Buzz −3**
   floater when stock runs dry or waits run long.
@@ -54,22 +61,32 @@ _Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying"_
 - **Regulars**: named repeat customers with a favourite dish and a greeting
   bubble ("Zoe's back — she loves Croissants!"); serving the favourite pays
   a loyalty bonus. Mobile-size touch targets, sound stingers on reactions.
+- **Café facade + front door** (owner feedback): a proper front wall with a
+  **door that opens as a customer enters and closes behind them** (tween +
+  chime), so the café reads as a building, not an open box. Customers path to
+  the door, through it, to the counter/seat.
 - Exit: 2 minutes of watching the room tells a story with zero UI reading.
 
-### S3 — PREPARATION is the game (menu, rituals, appliances)
-_Parity: A4, A8, A9, A11, E5 · the owner's "prepare the café + menu"_
+### S3 — THE MENU: exact Café World parity (market + cookbook + prep)
+_Parity: A4, A8, A9, A11, E5, D2-partial · the owner's "exact same menu as the
+original" — full spec in **docs/MENU_SPEC.md**_
+- **Tabbed Market** (replaces the flat Shop): Appliances · Counters · Tables &
+  Chairs · Decorations · Floors · Wallpaper · Doors & Windows · Outdoor ·
+  Expansions — Café-World-style item cards (icon, price, level lock, buy).
+- **Cookbook parity**: full per-dish field set (level, cost, servings, price/
+  serving, total, cook time 5 min→2 days, café points, appliance, mastery ★,
+  source); grow to ~40–60 **original** dishes across families; extend the
+  level ladder; recipe **sources** (level / mastery / goal-reward).
+- **Appliance families**: buy **Drink Bar** + **Pastry Station** (each unlocks
+  its recipe family); the cook picker filters to the appliance you walked up to.
+- **Cook flow**: appliance-filtered picker with the full dish card, **today's
+  menu / daily special**, **daily first-cook bonus**, and a 2–3-tap prep
+  gesture — the manual ritual, no energy system ever.
 - **Tutorial rewrite** to the real loop: place stove → cook → collect →
-  counter feeds customers (kills the stale "press E" step the screenshot
-  still shows — HANDOFF debt item #1).
-- **Menu Board** (bought model): pick *today's menu* — which cooked dishes
-  your café serves — plus a **daily special** (+coin bonus on that dish);
-  a **daily cooking bonus** on the first cook of the day.
-- **Prep gestures**: 2–3 quick taps (chop/stir) to start a cook — the manual
-  ritual Café World had; stays snappy, no energy system ever.
-- **Appliance families**: Drink Bar and Pastry Display (bought models) gate
-  the drinks/pastry recipe families like Café World's special appliances,
-  via 2–3-step goal chains ("install the Drink Bar → master Iced Tea").
-- Exit: a new player understands cook-ahead in 60 seconds; menu choice matters.
+  counter feeds customers (kills the stale "press E" step in the screenshot).
+- **Toolbar**: Cook · Market · Build · Decorate · Goals · Social · Settings.
+- Exit: the Market and Cookbook feel like Café World's menus; a new player
+  understands cook-ahead in 60 seconds; menu choice matters.
 
 ### S4 — Make it YOURS: floors, walls, doors, LAND
 _Parity: D2, D3, D4, D5, D6, D7 · the owner's "customise like Café World"_
