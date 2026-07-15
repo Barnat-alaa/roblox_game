@@ -31,6 +31,7 @@ local EconomyService: any
 local CafeService: any
 local AnalyticsService: any
 local GoalService: any
+local AssetLibraryService: any
 
 local cookLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -198,6 +199,38 @@ local FOOD_COLORS: { [string]: Color3 } = {
 	Sandwich = Color3.fromRGB(215, 160, 90),
 }
 
+-- One serving marker on the counter: a real food prop when its category has a
+-- loaded Creator Store model, else the original coloured cylinder.
+local function placeFoodMarker(display: Folder, slotCf: CFrame, recipe: Types.RecipeDefinition)
+	local prop: Model? = if AssetLibraryService
+		then AssetLibraryService:GetProp(recipe.category)
+		else nil
+	if prop then
+		prop.Name = "Food_" .. recipe.id
+		for _, d in prop:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+				d.CanCollide = false
+				d.CanQuery = false
+			end
+		end
+		prop:PivotTo(slotCf)
+		prop.Parent = display
+		return
+	end
+	local food = Instance.new("Part")
+	food.Name = "Food_" .. recipe.id
+	food.Shape = Enum.PartType.Cylinder
+	food.Size = Vector3.new(0.55, 1.1, 1.1)
+	food.Color = FOOD_COLORS[recipe.category] or Color3.fromRGB(200, 160, 110)
+	food.Material = Enum.Material.SmoothPlastic
+	food.Anchored = true
+	food.CanCollide = false
+	food.CanQuery = false
+	food.CFrame = slotCf * CFrame.Angles(0, 0, math.rad(90))
+	food.Parent = display
+end
+
 -- Rebuild the little food stacks on the player's first counter so counter
 -- stock is something you can SEE filling up and emptying.
 local function refreshCounterDisplay(player: Player)
@@ -216,16 +249,22 @@ local function refreshCounterDisplay(player: Player)
 	if not counter then
 		return
 	end
-	local top = counter:FindFirstChild("Top") :: BasePart?
-	if not top then
-		return
+	-- The procedural counter has a "Top" part; a bought counter model does not,
+	-- so fall back to the top surface of its bounding box.
+	local topCf: CFrame
+	local topPart = counter:FindFirstChild("Top") :: BasePart?
+	if topPart then
+		topCf = topPart.CFrame
+	else
+		local pivot, size = counter:GetBoundingBox()
+		topCf = pivot * CFrame.new(0, size.Y / 2, 0)
 	end
 
-	local display = counter:FindFirstChild("StockDisplay")
-	if display then
-		display:Destroy()
+	local existing = counter:FindFirstChild("StockDisplay")
+	if existing then
+		existing:Destroy()
 	end
-	display = Instance.new("Folder")
+	local display = Instance.new("Folder")
 	display.Name = "StockDisplay"
 	display.Parent = counter
 
@@ -241,19 +280,8 @@ local function refreshCounterDisplay(player: Player)
 					break
 				end
 				local x = -4.2 + ((slot - 1) % 6) * 1.7
-				local food = Instance.new("Part")
-				food.Name = "Food_" .. recipeId
-				food.Shape = Enum.PartType.Cylinder
-				food.Size = Vector3.new(0.55, 1.1, 1.1)
-				food.Color = FOOD_COLORS[recipe.category] or Color3.fromRGB(200, 160, 110)
-				food.Material = Enum.Material.SmoothPlastic
-				food.Anchored = true
-				food.CanCollide = false
-				food.CanQuery = false
-				food.CFrame = top.CFrame
-					* CFrame.new(x, 0.5, 0.6)
-					* CFrame.Angles(0, 0, math.rad(90))
-				food.Parent = display
+				local slotCf = topCf * CFrame.new(x, 0.5, 0.4)
+				placeFoodMarker(display, slotCf, recipe)
 			end
 		end
 	end
@@ -567,6 +595,7 @@ function KitchenService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 	GoalService = ServiceRegistry.get("GoalService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function KitchenService.Start(_self: any)

@@ -5,6 +5,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-15 — Step S1: Creator Store asset pipeline (make it LOOK like a café)
+- **AssetLibraryService + Config/AssetManifest**: loads owner-picked Creator
+  Store models at boot, **strips every script** (BaseScript/ModuleScript/
+  Remote/Bindable/Tool/Sound), rescales to grid footprints, caches templates
+  in ServerStorage, and serves clones. Loads in the background; any asset that
+  fails vetting or load simply falls back to the existing procedural greybox —
+  the game never breaks.
+- **Furniture** now renders real models when available (espresso machine, pizza
+  oven scaled to footprint, counter+register, wooden chair) via BuildService,
+  procedural builders retained as fallback.
+- **Customers** wear real clothed R6/R15 rigs (4 appearance donors) with our
+  name tag + order bubble + walk/queue/seat logic on top; waddle now bobs
+  around each rig's own hip height. Procedural chibi kept as fallback.
+- **Staff** (Mia/Noah/Pia) use real barista/waiter/cleaner rigs; fallback intact.
+- **Food props**: counters and diner plates show real croissant/cake/sandwich/
+  cup meshes by recipe category (coloured cylinders as fallback).
+- 15 assets adopted, 7 rejected during live Studio vetting (IP-named, ripped,
+  unauthorised, or duplicate/ragdoll rigs) — all logged in docs/ASSET_LICENSES.md.
+  Parity map updated (D1, C4 advanced). Gates green; live playtest this session.
+
 ### Changed — 2026-07-15 — Café World parity roadmap + Creator Store policy
 - **docs/CAFE_WORLD_PARITY.md (new)**: complete feature map of the original
   Facebook game (Café World by Zynga) — 49 features across cooking, service/

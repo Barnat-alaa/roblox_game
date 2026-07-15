@@ -23,6 +23,13 @@ Legend: ✅ have · 🟡 partial · ❌ missing · 🚫 rejected by design (ethi
 rails / Roblox-native reasons) · **[S1..S5]** = step in the 2026-07-15
 session roadmap (ROADMAP.md).
 
+> **Progress — S1 shipped 2026-07-15:** the Creator Store asset pipeline is
+> live (`AssetLibraryService` + `AssetManifest`): real espresso machine, oven,
+> counter, chair, food/drink props, four clothed customer rigs, and barista/
+> waiter/cleaner rigs — all script-stripped, grid-scaled, procedural fallback
+> intact. This moves **D1** and **C4** forward (see rows). Everything still
+> ❌ below stays on S2–S5. Next up: **S2 — customer feelings**.
+
 ## A. Cooking (the core)
 
 | # | Café World feature | Ours | Notes / plan |
@@ -65,14 +72,14 @@ session roadmap (ROADMAP.md).
 | C1 | Hire **friends** as waiters/chefs (avatar cameo) | 🚫→🟡 | Roblox-native twist later (Phase 4+): friend cameo NPCs when you're neighbours; core staff stays NPC |
 | C2 | NPC helper (sous-chef Remmy) | ✅ | Mia barista rescue |
 | C3 | Waiter + cleaner staff | ✅ | Noah + Pia (Phase 3b) |
-| C4 | Staff outfits per café theme | ❌ **[S1]** | Bought uniform looks from asset pass; theme variants Phase 6 cosmetics |
+| C4 | Staff outfits per café theme | 🟡 **[S1→]** | Real barista/waiter/cleaner rigs adopted (Mia/Noah/Pia). Per-theme uniform variants stay Phase 6 cosmetics |
 | C5 | Wages balancing automation | ❌ | Deliberate debt — when economy matures |
 
 ## D. Customisation & decoration (decor-as-status)
 
 | # | Café World feature | Ours | Notes / plan |
 |---|---|---|---|
-| D1 | Hundreds of decor items (tables, chairs, plants, art, lamps…) | 🟡 **[S1]** | 9 items today → 25+ via Creator Store asset pass (docs/ASSET_SHOPPING_LIST.md) |
+| D1 | Hundreds of decor items (tables, chairs, plants, art, lamps…) | 🟡 **[S1→]** | Asset pipeline live; real machine/oven/counter/chair + food props adopted. Breadth (plants/art/lamps, 25+ items) continues in the S4 Decorate tab |
 | D2 | **Floors & wallpaper** you buy and apply | ❌ **[S4]** | Owner's #3 complaint — floor/wall styles per café, applied from a Decorate tab |
 | D3 | Doors & windows swappable | ❌ **[S4]** | Style variants |
 | D4 | Exterior decoration (façade, awning, outside seating) | 🟡 **[S4]** | Awnings exist; make colour/style pickable; outdoor bistro set |

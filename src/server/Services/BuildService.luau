@@ -22,6 +22,7 @@ BuildService.Name = "BuildService"
 local DataService: any
 local CafeService: any
 local KitchenService: any
+local AssetLibraryService: any
 
 local placeLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -361,6 +362,23 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		def.height
 	)
 
+	-- Prefer a vetted Creator Store model (Step S1). cf is the footprint centre
+	-- at height/2, so the cell floor sits at cf.Y - def.height/2; drop for the
+	-- procedural builder, then the greybox box, whenever the template is absent.
+	local template: Model? = if AssetLibraryService
+		then AssetLibraryService:GetFurniture(placed.catalogId)
+		else nil
+	if template then
+		template.Name = placed.catalogId
+		template:SetAttribute("instanceId", placed.instanceId)
+		local _, size = template:GetBoundingBox()
+		local floorY = cf.Y - def.height / 2
+		local pos = Vector3.new(cf.Position.X, floorY + size.Y / 2, cf.Position.Z)
+		template:PivotTo(CFrame.new(pos) * CFrame.Angles(0, math.rad(90 * placed.rotation), 0))
+		template.Parent = folder
+		return
+	end
+
 	local model = Instance.new("Model")
 	model.Name = placed.catalogId
 	model:SetAttribute("instanceId", placed.instanceId)
@@ -489,6 +507,7 @@ function BuildService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function BuildService.Start(_self: any)

@@ -32,6 +32,7 @@ local KitchenService: any
 local EconomyService: any
 local StaffService: any
 local GoalService: any
+local AssetLibraryService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -134,6 +135,7 @@ type ActiveCustomer = {
 	root: BasePart,
 	bubble: TextLabel,
 	def: Types.CustomerDefinition,
+	baseHip: number, -- resting HipHeight (differs per rig); waddle bobs around it
 	spawnClock: number,
 	orderId: string?,
 	served: boolean,
@@ -188,6 +190,52 @@ local function cosmetic(
 	weld.Part1 = part
 	weld.Parent = weldTo
 	return part
+end
+
+-- Order bubble (returned label) + floating first name, parented to any head.
+-- Shared by the procedural chibi and the Creator Store rigs.
+local function attachBubbles(head: BasePart): TextLabel
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Bubble"
+	gui.Size = UDim2.fromScale(6, 1.6)
+	gui.StudsOffset = Vector3.new(0, 2.1, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 120
+	gui.Parent = head
+
+	local label = Instance.new("TextLabel")
+	label.Name = "BubbleLabel"
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
+	label.BackgroundTransparency = 0.25
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.TextColor3 = Color3.fromRGB(255, 248, 235)
+	label.TextStrokeTransparency = 0.3
+	label.Text = ""
+	local labelCorner = Instance.new("UICorner")
+	labelCorner.CornerRadius = UDim.new(0, 12)
+	labelCorner.Parent = label
+	label.Parent = gui
+
+	local nameGui = Instance.new("BillboardGui")
+	nameGui.Name = "NameTag"
+	nameGui.Size = UDim2.fromScale(4, 0.9)
+	nameGui.StudsOffset = Vector3.new(0, 3.2, 0)
+	nameGui.AlwaysOnTop = true
+	nameGui.MaxDistance = 90
+	nameGui.Parent = head
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.fromScale(1, 1)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.TextScaled = true
+	nameLabel.Font = Enum.Font.GothamMedium
+	nameLabel.TextColor3 = Color3.fromRGB(255, 236, 190)
+	nameLabel.TextStrokeTransparency = 0.2
+	nameLabel.Text = NAMES[rng:NextInteger(1, #NAMES)]
+	nameLabel.Parent = nameGui
+
+	return label
 end
 
 -- Chibi block-person with one of eight procedural styles.
@@ -343,49 +391,36 @@ local function buildNpcModel(
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	humanoid.Parent = model
 
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "Bubble"
-	gui.Size = UDim2.fromScale(6, 1.6)
-	gui.StudsOffset = Vector3.new(0, 2.1, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 120
-	gui.Parent = head
-
-	local label = Instance.new("TextLabel")
-	label.Name = "BubbleLabel"
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
-	label.BackgroundTransparency = 0.25
-	label.TextScaled = true
-	label.Font = Enum.Font.GothamBold
-	label.TextColor3 = Color3.fromRGB(255, 248, 235)
-	label.TextStrokeTransparency = 0.3
-	label.Text = ""
-	local labelCorner = Instance.new("UICorner")
-	labelCorner.CornerRadius = UDim.new(0, 12)
-	labelCorner.Parent = label
-	label.Parent = gui
-
-	-- Floating first name above the bubble.
-	local nameGui = Instance.new("BillboardGui")
-	nameGui.Name = "NameTag"
-	nameGui.Size = UDim2.fromScale(4, 0.9)
-	nameGui.StudsOffset = Vector3.new(0, 3.2, 0)
-	nameGui.AlwaysOnTop = true
-	nameGui.MaxDistance = 90
-	nameGui.Parent = head
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.fromScale(1, 1)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.TextScaled = true
-	nameLabel.Font = Enum.Font.GothamMedium
-	nameLabel.TextColor3 = Color3.fromRGB(255, 236, 190)
-	nameLabel.TextStrokeTransparency = 0.2
-	nameLabel.Text = NAMES[rng:NextInteger(1, #NAMES)]
-	nameLabel.Parent = nameGui
+	local label = attachBubbles(head)
 
 	model.PrimaryPart = root
 	return model, humanoid, root, label
+end
+
+-- Try a vetted Creator Store rig (real clothed customer); fall back to the
+-- procedural chibi. Either way we attach our own order bubble + name tag and
+-- return the same tuple the rest of the lifecycle expects.
+local function spawnCustomerModel(
+	def: Types.CustomerDefinition
+): (Model, Humanoid, BasePart, TextLabel)
+	local rig: Model? = if AssetLibraryService then AssetLibraryService:GetCustomerRig() else nil
+	if rig then
+		local humanoid = rig:FindFirstChildOfClass("Humanoid")
+		local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local head = rig:FindFirstChild("Head") :: BasePart?
+		if humanoid and root and head then
+			rig.Name = "Customer_" .. def.id
+			humanoid.WalkSpeed = WALK_SPEED
+			humanoid.BreakJointsOnDeath = false
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+			local label = attachBubbles(head)
+			rig.PrimaryPart = root
+			return rig, humanoid, root, label
+		end
+		rig:Destroy()
+	end
+	local style = STYLES[rng:NextInteger(1, #STYLES)]
+	return buildNpcModel(def, style)
 end
 
 -- Line slot 1 is the service window; the rest trail toward the street.
@@ -409,11 +444,11 @@ local function walkTo(cust: ActiveCustomer, target: Vector3)
 			break
 		end
 		cust.humanoid:MoveTo(target)
-		cust.humanoid.HipHeight = 1 + 0.14 * math.abs(math.sin((os.clock() - t0) * 9))
+		cust.humanoid.HipHeight = cust.baseHip + 0.14 * math.abs(math.sin((os.clock() - t0) * 9))
 		task.wait(0.1)
 	end
 	if not cust.leaving and cust.root.Parent ~= nil then
-		cust.humanoid.HipHeight = 1
+		cust.humanoid.HipHeight = cust.baseHip
 	end
 end
 
@@ -586,16 +621,34 @@ local function eatMeal(
 				* CFrame.new(0, -0.2, -1.3)
 				* CFrame.Angles(0, 0, math.rad(90))
 			plate.Parent = cust.model
-			local food = Instance.new("Part")
-			food.Shape = Enum.PartType.Ball
-			food.Size = Vector3.new(0.8, 0.6, 0.8)
-			food.Color = FOOD_COLORS[if recipe then recipe.category else ""]
-				or Color3.fromRGB(200, 160, 110)
-			food.Anchored = true
-			food.CanCollide = false
-			food.CanQuery = false
-			food.CFrame = plate.CFrame * CFrame.new(0, 0, 0.5)
-			food.Parent = cust.model
+			local food: Instance
+			local foodProp: Model? = if AssetLibraryService and recipe
+				then AssetLibraryService:GetProp(recipe.category)
+				else nil
+			if foodProp then
+				for _, d in foodProp:GetDescendants() do
+					if d:IsA("BasePart") then
+						d.Anchored = true
+						d.CanCollide = false
+						d.CanQuery = false
+					end
+				end
+				foodProp:PivotTo(plate.CFrame * CFrame.new(0, 0.3, 0.4))
+				foodProp.Parent = cust.model
+				food = foodProp
+			else
+				local ball = Instance.new("Part")
+				ball.Shape = Enum.PartType.Ball
+				ball.Size = Vector3.new(0.8, 0.6, 0.8)
+				ball.Color = FOOD_COLORS[if recipe then recipe.category else ""]
+					or Color3.fromRGB(200, 160, 110)
+				ball.Anchored = true
+				ball.CanCollide = false
+				ball.CanQuery = false
+				ball.CFrame = plate.CFrame * CFrame.new(0, 0, 0.5)
+				ball.Parent = cust.model
+				food = ball
+			end
 
 			-- Eat with a happy bob.
 			local basePivot = cust.model:GetPivot()
@@ -804,6 +857,7 @@ function CustomerService.Init(_self: any)
 	EconomyService = ServiceRegistry.get("EconomyService")
 	StaffService = ServiceRegistry.get("StaffService")
 	GoalService = ServiceRegistry.get("GoalService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function CustomerService.Start(_self: any)
@@ -832,8 +886,7 @@ function CustomerService.Start(_self: any)
 								* (buzz / Kitchen.buzzMax)
 						nextSpawnAt[player.UserId] = os.clock() + interval
 						local def = pickCustomer()
-						local style = STYLES[rng:NextInteger(1, #STYLES)]
-						local model, humanoid, root, bubble = buildNpcModel(def, style)
+						local model, humanoid, root, bubble = spawnCustomerModel(def)
 						local cust: ActiveCustomer = {
 							userId = player.UserId,
 							model = model,
@@ -841,6 +894,7 @@ function CustomerService.Start(_self: any)
 							root = root,
 							bubble = bubble,
 							def = def,
+							baseHip = humanoid.HipHeight,
 							spawnClock = os.clock(),
 							orderId = nil,
 							served = false,

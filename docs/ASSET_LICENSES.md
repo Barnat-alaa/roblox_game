@@ -20,6 +20,40 @@ Audio rule: only Roblox partner catalogs (ProSoundEffects, APM,
 DistrokidOfficial, Monstercat…) or original/commissioned audio. Community
 re-uploads of stock sounds are provenance risks — never ship them.
 
+## Creator Store models (Step S1 — adopted 2026-07-15)
+
+Owner-selected via docs/ASSET_SHOPPING_LIST.md, loaded through
+`AssetLibraryService` which **strips every script** (BaseScript/ModuleScript/
+Remote/Bindable/Tool/Sound) before use, rescales to the grid footprint, and
+keeps the procedural greybox as fallback. All are free Creator Store assets
+licensed for on-platform use; IDs pinned in `src/shared/Config/AssetManifest.luau`.
+
+| Our key | Asset ID | Name | Creator | Notes |
+| --- | --- | --- | --- | --- |
+| furniture:coffee_machine | 122811151607354 | Coffee Machine Espresso | Crazer1Shifteru1Soni | 45 parts, fits 1×1 cell |
+| furniture:oven | 2866867999 | Ze pizza oven | Frenzzyy | 358 parts — heavy; scaled to 2×1 footprint (revisit for mobile) |
+| furniture:counter | 8509855137 | Counter and Cash Register | oceanicwavss | register included; fits 3×1 |
+| furniture:chair_wood | 14269301866 | Realistic Chair | Chuba7 | single mesh, clean |
+| prop:Coffee | 5371778048 | Coffee Cup | Think_yDev | counter + diner plate |
+| prop:Tea | 6169001071 | Cup of Tea | Jellywelly666 | counter + diner plate |
+| prop:Pastry | 9500111031 | [PBR] Croissant | ordinarytyson | counter + diner plate |
+| prop:Sandwich | 2528907852 | Sandwich on plate | magaia10 | counter + diner plate |
+| customerRig | 7315192066 | Walking and talking NPC | Victional101 | R6 appearance donor |
+| customerRig | 7907970704 | Walking NPC | ARISTOKRAT1CHE | R15 appearance donor |
+| customerRig | 8243272714 | Mom's NPC | RAMAS_RMZ | R6 appearance donor |
+| customerRig | 75156750439794 | NPC Civilian | BlazePixelAce3480 | R6 appearance donor |
+| staff:Barista | 139800912587260 | Barista Coffee Shop | Xx_PhoenixVenomTiger | Mia |
+| staff:Waiter | 154539270 | Waiter | SweII | Noah (held tools stripped) |
+| staff:Cleaner | 108490018615318 | Chef NPC | TurboTigerByte2002 | Pia (uniformed staff look) |
+
+**Rejected during vetting (2026-07-15), do NOT adopt:**
+- `8678272489` "Miraculous Ladybug Table" — IP-named (copyrighted franchise).
+- `17056776920` "Wooden Chair (Doors)" — asset from the game *Doors*.
+- `13032279413` "Mug" & `111478068926774` "Kitchen Counter/Prep Table" —
+  return "User is not authorized" (not freely licensed to us).
+- `10141391344`, `90025178048963`, `76971459946852` — duplicate base rig /
+  ragdoll-death or AI-bot scripts; redundant with the four kept rigs.
+
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
 - No reusing another work's textures, music, SFX, logos, character designs, UI

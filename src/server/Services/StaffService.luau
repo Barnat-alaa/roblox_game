@@ -24,6 +24,7 @@ local DataService: any
 local OrderService: any
 local CafeService: any
 local KitchenService: any
+local AssetLibraryService: any
 
 local CHECK_INTERVAL = 5
 local STAFF_WALK_SPEED = 11
@@ -83,6 +84,66 @@ type StaffLook = {
 -- Build a chibi staff member. Walkers get a humanoid rig (unanchored root);
 -- the barista stays a cheap anchored statue.
 local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
+	-- Prefer a vetted Creator Store rig (Step S1); fall back to the procedural
+	-- chibi staff below when no template is loaded.
+	local rig: Model? = if AssetLibraryService then AssetLibraryService:GetStaff(look.role) else nil
+	if rig then
+		local humanoid = rig:FindFirstChildOfClass("Humanoid")
+		local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local head = rig:FindFirstChild("Head") :: BasePart?
+		if humanoid and root and head then
+			rig.Name = look.role
+			humanoid.WalkSpeed = STAFF_WALK_SPEED
+			humanoid.BreakJointsOnDeath = false
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+			local _, size = rig:GetBoundingBox()
+			rig:PivotTo(base * CFrame.new(0, size.Y / 2, 0))
+			rig.PrimaryPart = root
+
+			local gui = Instance.new("BillboardGui")
+			gui.Name = "Bubble"
+			gui.Size = UDim2.fromScale(5, 1.4)
+			gui.StudsOffset = Vector3.new(0, 2, 0)
+			gui.AlwaysOnTop = true
+			gui.MaxDistance = 100
+			gui.Parent = head
+			local label = Instance.new("TextLabel")
+			label.Name = "BubbleLabel"
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
+			label.BackgroundTransparency = 0.25
+			label.TextScaled = true
+			label.Font = Enum.Font.GothamBold
+			label.TextColor3 = Color3.fromRGB(255, 248, 235)
+			label.Text = look.displayName
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 12)
+			corner.Parent = label
+			label.Parent = gui
+
+			local staffFolder = workspace:FindFirstChild("Staff")
+			if not staffFolder then
+				staffFolder = Instance.new("Folder")
+				staffFolder.Name = "Staff"
+				staffFolder.Parent = workspace
+			end
+			rig.Parent = staffFolder
+			pcall(function()
+				root:SetNetworkOwner(nil)
+			end)
+
+			return {
+				model = rig,
+				bubble = label,
+				humanoid = humanoid,
+				root = root,
+				home = base * CFrame.new(0, 2, 0),
+				busy = false,
+			}
+		end
+		rig:Destroy()
+	end
+
 	local model = Instance.new("Model")
 	model.Name = look.role
 
@@ -444,6 +505,7 @@ function StaffService.Init(_self: any)
 	OrderService = ServiceRegistry.get("OrderService")
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function StaffService.Start(_self: any)
