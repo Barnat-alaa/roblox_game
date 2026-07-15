@@ -16,6 +16,7 @@ local EconomyConfig = require(Shared.Config.Economy)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local Fx = require(script.Parent.Parent.Fx)
+local NpcAnimator = require(script.Parent.Parent.NpcAnimator)
 
 local StaffService = {}
 StaffService.Name = "StaffService"
@@ -131,6 +132,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 			pcall(function()
 				root:SetNetworkOwner(nil)
 			end)
+			NpcAnimator.setup(humanoid)
 
 			return {
 				model = rig,

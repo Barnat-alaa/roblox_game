@@ -4,11 +4,14 @@
 -- front customer places an order (OrderService still owns rewards), and the
 -- whole line steps forward on every serve/cancel. Each customer rolls one of
 -- eight original procedural styles (skin/shirt/pants/hair/accessory) plus a
--- floating first name. Navigation stays straight-line MoveTo with teleport
--- recovery — the queue lives in front of the plot, clear of all furniture.
+-- floating first name. Real Creator Store rigs are dressed with the same
+-- bubble/name tag when available (else the chibi fallback). Navigation uses a
+-- PathfindingService route around collidable furniture, with straight-line
+-- MoveTo + teleport recovery as the fallback.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
 
 local Shared = ReplicatedStorage.Shared
 local Customers = require(Shared.Config.Customers)
@@ -21,6 +24,7 @@ local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local Fx = require(script.Parent.Parent.Fx)
+local NpcAnimator = require(script.Parent.Parent.NpcAnimator)
 
 local CustomerService = {}
 CustomerService.Name = "CustomerService"
@@ -429,23 +433,58 @@ local function slotPosition(origin: CFrame, slot: number): Vector3
 	return (origin * CFrame.new(width / 2, 2, -3 - (slot - 1) * QUEUE_SPACING)).Position
 end
 
--- Walk with a deadline; teleport to the goal on timeout (MVP stuck recovery).
--- Includes the chibi waddle: hip bounce while moving (Phase 2 life pass).
-local function walkTo(cust: ActiveCustomer, target: Vector3)
-	local deadline = os.clock() + WALK_TIMEOUT
-	local t0 = os.clock()
+-- Move toward one point with a deadline + the chibi waddle (harmless on real
+-- rigs, which are animated instead). Returns true on arrival, false on timeout.
+local function moveToward(
+	cust: ActiveCustomer,
+	point: Vector3,
+	deadline: number,
+	t0: number
+): boolean
 	while not cust.leaving and cust.root.Parent ~= nil do
-		local flat = (cust.root.Position - target) * Vector3.new(1, 0, 1)
-		if flat.Magnitude < 1.5 then
-			break
+		local flat = (cust.root.Position - point) * Vector3.new(1, 0, 1)
+		if flat.Magnitude < 2 then
+			return true
 		end
 		if os.clock() > deadline then
-			cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
-			break
+			return false
 		end
-		cust.humanoid:MoveTo(target)
+		cust.humanoid:MoveTo(point)
 		cust.humanoid.HipHeight = cust.baseHip + 0.14 * math.abs(math.sin((os.clock() - t0) * 9))
 		task.wait(0.1)
+	end
+	return false
+end
+
+-- Walk to a target, routing AROUND collidable furniture with a navmesh path
+-- (so customers stop clipping through tables). Falls back to a straight line
+-- if the path fails, and teleport-recovers on a stuck waypoint.
+local function walkTo(cust: ActiveCustomer, target: Vector3)
+	local t0 = os.clock()
+	local path = PathfindingService:CreatePath({
+		AgentRadius = 1.8,
+		AgentHeight = 5,
+		AgentCanJump = false,
+		WaypointSpacing = 4,
+	})
+	local ok = pcall(function()
+		path:ComputeAsync(cust.root.Position, target)
+	end)
+	if ok and path.Status == Enum.PathStatus.Success then
+		local waypoints = path:GetWaypoints()
+		for i = 2, #waypoints do -- [1] is the current position
+			if cust.leaving or cust.root.Parent == nil then
+				break
+			end
+			if not moveToward(cust, waypoints[i].Position, os.clock() + 4, t0) then
+				cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
+				break
+			end
+		end
+	else
+		if not moveToward(cust, target, os.clock() + WALK_TIMEOUT, t0) then
+			cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
+		end
 	end
 	if not cust.leaving and cust.root.Parent ~= nil then
 		cust.humanoid.HipHeight = cust.baseHip
@@ -732,6 +771,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	pcall(function()
 		cust.root:SetNetworkOwner(nil)
 	end)
+	NpcAnimator.setup(cust.humanoid)
 	cust.bubble.Text = "…"
 
 	-- Queue phase: walk to my slot; step forward whenever the line advances.

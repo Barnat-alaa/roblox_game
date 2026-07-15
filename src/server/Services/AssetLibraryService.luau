@@ -101,8 +101,9 @@ end
 
 -- ————— build templates per kind —————
 
--- Furniture/props: one anchored, scaled, floor-friendly template.
-local function buildStaticTemplate(assetId: number, fitX: number, fitZ: number): Model?
+-- Props: one anchored, scaled, floor-friendly template. Scaled so the longest
+-- horizontal axis matches `fit` (small tabletop items).
+local function buildPropTemplate(assetId: number, fit: number): Model?
 	local container = loadAndSanitise(assetId)
 	if not container then
 		return nil
@@ -120,13 +121,60 @@ local function buildStaticTemplate(assetId: number, fitX: number, fitZ: number):
 		return nil
 	end
 	local _, size = model:GetBoundingBox()
-	if size.X > 0.01 and size.Z > 0.01 then
-		local scale = math.min(fitX / size.X, fitZ / size.Z)
-		if scale > 0 and scale ~= 1 and scale == scale then
+	local longest = math.max(size.X, size.Z, 0.01)
+	local scale = fit / longest
+	if scale > 0 and scale ~= 1 and scale == scale then
+		pcall(function()
+			-- Multiply the model's CURRENT scale: imported (e.g. Sketchfab)
+			-- models can carry a non-1 baked scale, and ScaleTo is absolute.
+			model:ScaleTo(model:GetScale() * scale)
+		end)
+	end
+	return model
+end
+
+-- Furniture: scale by TARGET HEIGHT to keep real-world proportions (fit-to-
+-- footprint squashed tall/long pieces), then clamp the horizontal span so it
+-- still fits the grid cells, and rotate so the long axis lands on +X.
+local function buildFurnitureTemplate(
+	assetId: number,
+	height: number,
+	maxSpan: number,
+	yaw: number?
+): Model?
+	local container = loadAndSanitise(assetId)
+	if not container then
+		return nil
+	end
+	local model = unwrap(container)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		end
+	end
+	if not ensurePrimary(model) then
+		model:Destroy()
+		return nil
+	end
+	local _, size = model:GetBoundingBox()
+	if size.Y > 0.01 then
+		local scale = height / size.Y
+		local span = math.max(size.X, size.Z) * scale
+		if span > maxSpan then
+			scale = maxSpan / math.max(size.X, size.Z)
+		end
+		if scale > 0 and scale == scale then
 			pcall(function()
-				model:ScaleTo(scale)
+				-- Multiply the current scale (imported models can carry a
+				-- non-1 baked scale; ScaleTo is absolute, not relative).
+				model:ScaleTo(model:GetScale() * scale)
 			end)
 		end
+	end
+	if yaw and yaw ~= 0 then
+		model:PivotTo(model:GetPivot() * CFrame.Angles(0, math.rad(yaw), 0))
 	end
 	return model
 end
@@ -260,12 +308,12 @@ function AssetLibraryService.Start(_self: any)
 		end
 
 		for catalogId, entry in AssetManifest.furniture do
-			local t = buildStaticTemplate(entry.assetId, entry.fitX, entry.fitZ)
+			local t = buildFurnitureTemplate(entry.assetId, entry.height, entry.maxSpan, entry.yaw)
 			cache("furniture:" .. catalogId, t)
 			tally(t ~= nil)
 		end
 		for category, entry in AssetManifest.props do
-			local t = buildStaticTemplate(entry.assetId, entry.fit, entry.fit)
+			local t = buildPropTemplate(entry.assetId, entry.fit)
 			cache("prop:" .. category, t)
 			tally(t ~= nil)
 		end

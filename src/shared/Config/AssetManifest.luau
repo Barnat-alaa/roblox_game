@@ -9,8 +9,11 @@
 export type FurnitureAsset = {
 	assetId: number,
 	name: string,
-	fitX: number, -- target footprint width in studs (uniform scale fits this)
-	fitZ: number, -- target footprint depth in studs
+	-- Scale by TARGET HEIGHT (studs) to preserve real-world proportions, then
+	-- clamp the horizontal span so nothing overflows its grid footprint.
+	height: number,
+	maxSpan: number, -- max horizontal studs after scaling (grid footprint cap)
+	yaw: number?, -- degrees to rotate so the model's long axis aligns to +X
 }
 
 export type PropAsset = {
@@ -21,31 +24,34 @@ export type PropAsset = {
 
 local AssetManifest = {
 	-- Furniture: replaces the matching catalogId's procedural builder when the
-	-- template loads. Keys MUST match Config/Furniture catalog ids.
+	-- template loads. Keys MUST match Config/Furniture catalog ids. Heights are
+	-- chosen so pieces read at a consistent human scale (a seated customer is
+	-- ~5 studs; chair seat ~1.6, counter ~3.8, oven a taller hero piece).
 	furniture = {
 		coffee_machine = {
 			assetId = 122811151607354,
 			name = "Coffee Machine Espresso (Crazer1Shifteru1Soni)",
-			fitX = 3.6,
-			fitZ = 3.6,
+			height = 3.6,
+			maxSpan = 4.6,
 		},
 		oven = {
 			assetId = 2866867999,
 			name = "Ze pizza oven (Frenzzyy)",
-			fitX = 7.6,
-			fitZ = 3.8,
+			height = 5.2,
+			maxSpan = 8,
 		},
 		counter = {
 			assetId = 8509855137,
 			name = "Counter and Cash Register (oceanicwavss)",
-			fitX = 11.6,
-			fitZ = 3.6,
+			height = 3.8,
+			maxSpan = 12,
+			yaw = 90, -- native long axis is on Z; rotate it onto the 3-cell X span
 		},
 		chair_wood = {
 			assetId = 14269301866,
 			name = "Realistic Chair (Chuba7)",
-			fitX = 2.6,
-			fitZ = 2.6,
+			height = 3.3,
+			maxSpan = 3.4,
 		},
 	} :: { [string]: FurnitureAsset },
 

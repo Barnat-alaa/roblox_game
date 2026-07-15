@@ -371,6 +371,15 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 	if template then
 		template.Name = placed.catalogId
 		template:SetAttribute("instanceId", placed.instanceId)
+		-- Solid, walk-blocking pieces become navmesh obstacles so customers
+		-- path AROUND them; seats/decor stay passable so diners can reach chairs.
+		if def.blocksWalk then
+			for _, d in template:GetDescendants() do
+				if d:IsA("BasePart") then
+					d.CanCollide = true
+				end
+			end
+		end
 		local _, size = template:GetBoundingBox()
 		local floorY = cf.Y - def.height / 2
 		local pos = Vector3.new(cf.Position.X, floorY + size.Y / 2, cf.Position.Z)

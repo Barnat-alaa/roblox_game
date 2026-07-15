@@ -5,6 +5,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-15 — S1 polish from playtest feedback (dimensions, walk, pathing)
+- **Object dimensions**: switched furniture scaling from fit-to-footprint (which
+  squashed long/tall pieces — the counter shrank to 23% and chairs to ~16%) to
+  **target-height scaling with a footprint clamp + yaw fix**. Also multiply by
+  the model's current scale (`ScaleTo(GetScale() * s)`) — imported Sketchfab
+  models (e.g. the chair) carry a non-1 baked scale that made absolute ScaleTo
+  shrink them. Verified live: counter 2.1×3.8×9.4, coffee 4.6×3.6×4.2, chair
+  1.75×3.3×1.83 (was 0.4×0.7×0.4).
+- **Natural NPC movement**: new `NpcAnimator` plays Roblox's default R6/R15
+  walk+idle animations on real rigs (they had no Animator and slid); procedural
+  chibis keep the hip waddle. Verified: customers now have a playing anim track.
+- **No more walking through furniture**: customers navigate with
+  **PathfindingService** (route around obstacles) instead of straight-line
+  MoveTo, and walk-blocking furniture is now collidable so the navmesh sees it.
+  Straight-line + teleport recovery kept as fallback. Verified: path test
+  returns Success (12 waypoints); furniture 35–45 collidable parts.
+- Waiter rig (154539270) now loads too via the HRP synthesis — **15/15 asset
+  templates, 0 fallbacks**.
+
 ### Added — 2026-07-15 — Step S1: Creator Store asset pipeline (make it LOOK like a café)
 - **AssetLibraryService + Config/AssetManifest**: loads owner-picked Creator
   Store models at boot, **strips every script** (BaseScript/ModuleScript/
