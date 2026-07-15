@@ -57,7 +57,27 @@ Players should think *"this reminds me of the classic café sims"* — never
 ## Rules
 
 1. Reference images are **analysed, never traced or extracted**.
-2. Every asset in this game is procedural greybox (this pass) or original
-   Blender/Figma work (later) — logged in ASSET_LICENSES.md.
+2. Every asset in this game is procedural greybox, original Blender/Figma
+   work, or a **vetted Creator Store model** (see addendum below) — logged
+   in ASSET_LICENSES.md.
 3. Discontinued games are still copyrighted; DMCA risk is an existential
    threat at launch. When in doubt, redesign further away.
+
+## Addendum 2026-07-15 — curated Creator Store models allowed
+
+Owner decision: the café must visually read as a café *now*; procedural
+greybox stays as the **fallback layer**, and props/furniture/NPC rigs may
+come from the **Roblox Creator Store** (properly licensed for on-platform
+use). This does NOT weaken the anti-copying rules — it adds sourcing:
+
+- Selection is owner-driven from `docs/ASSET_SHOPPING_LIST.md`; integration
+  is pipeline-driven (`AssetLibraryService`): **all scripts stripped**,
+  rescaled to grid footprints, procedural fallback kept forever.
+- One cohesive family: low-poly / flat-shaded, chunky silhouettes, palette
+  above still governs (recolour parts when needed). No photoreal mixing.
+- Still forbidden even if found on the Store: anything imitating an existing
+  game's characters/logos/assets (incl. Café World), community re-uploads of
+  stock art, unlicensed brand props.
+- Every adopted asset: 1 row in ASSET_LICENSES.md (ID, creator, licence,
+  date, poly/mobile note) **before** it ships to the cloud place.
+- UI stays 100% original (no Store image packs — provenance risk).

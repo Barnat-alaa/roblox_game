@@ -18,6 +18,84 @@ spoilage punishment, no fake urgency — *fresh bonuses* instead of rot.
 
 ---
 
+## ⭐ SESSION ROADMAP — 2026-07-15 — "Café World parity push" (5 steps)
+
+_Owner feedback (screenshot review): the game doesn't LOOK like a café yet,
+customers have no feelings, no floor/wall/land customisation, preparation
+is invisible (the HUD still teaches the old press-E loop), and the roadmap
+must be driven by the original Facebook game's full feature list. That list
+now exists — **docs/CAFE_WORLD_PARITY.md** (49 features mapped ✅🟡❌🚫,
+every gap assigned to a step below). Graphics come from curated Creator
+Store models chosen by the owner — **docs/ASSET_SHOPPING_LIST.md**._
+
+This ordering supersedes the phase order below until the 5 steps ship.
+Old Phase 4 content = step S5. Parity codes (A4, D2…) refer to the parity doc.
+
+### S1 — LOOK like a café: the Creator Store asset pipeline
+_Parity: D1, C4 · replaces procedural greybox with owner-picked models_
+- Claude: `Config/AssetManifest.luau` + `AssetLibraryService` — loads bought
+  assets by ID at boot (InsertService), **strips all scripts** (security),
+  auto-scales to grid footprints, caches templates, and **falls back to the
+  procedural model** whenever an asset is missing → the game never breaks.
+- Claude: BuildService/shop consume library models; CustomerService dresses
+  customers from bought **rigged NPC packs** (8–12 looks); staff (Mia/Noah/
+  Pia) get real barista/waiter looks; counters display bought food props.
+- Owner: shopping trip — Priority 1 of docs/ASSET_SHOPPING_LIST.md (11 items,
+  exact search terms + French click paths inside; paste links in chat).
+- Every asset logged in docs/ASSET_LICENSES.md. Exit: before/after screenshot
+  where a stranger says "café" in 1 second. **Then publish to cloud (HANDOFF §6.2).**
+
+### S2 — Customers you can FEEL
+_Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying"_
+- Patience meter + **mood faces** over every customer (😊 → 😐 → 😠), hearts
+  burst on fresh/mastered dishes, angry storm-out with a visible **Buzz −3**
+  floater when stock runs dry or waits run long.
+- Tips scale with mood at serve time (satisfaction you can price).
+- **Regulars**: named repeat customers with a favourite dish and a greeting
+  bubble ("Zoe's back — she loves Croissants!"); serving the favourite pays
+  a loyalty bonus. Mobile-size touch targets, sound stingers on reactions.
+- Exit: 2 minutes of watching the room tells a story with zero UI reading.
+
+### S3 — PREPARATION is the game (menu, rituals, appliances)
+_Parity: A4, A8, A9, A11, E5 · the owner's "prepare the café + menu"_
+- **Tutorial rewrite** to the real loop: place stove → cook → collect →
+  counter feeds customers (kills the stale "press E" step the screenshot
+  still shows — HANDOFF debt item #1).
+- **Menu Board** (bought model): pick *today's menu* — which cooked dishes
+  your café serves — plus a **daily special** (+coin bonus on that dish);
+  a **daily cooking bonus** on the first cook of the day.
+- **Prep gestures**: 2–3 quick taps (chop/stir) to start a cook — the manual
+  ritual Café World had; stays snappy, no energy system ever.
+- **Appliance families**: Drink Bar and Pastry Display (bought models) gate
+  the drinks/pastry recipe families like Café World's special appliances,
+  via 2–3-step goal chains ("install the Drink Bar → master Iced Tea").
+- Exit: a new player understands cook-ahead in 60 seconds; menu choice matters.
+
+### S4 — Make it YOURS: floors, walls, doors, LAND
+_Parity: D2, D3, D4, D5, D6, D7 · the owner's "customise like Café World"_
+- **Decorate tab** in the shop: floor styles + wall palettes (original
+  generated textures — checker, wood, tile), door & window styles (bought
+  models), awning colours. Applied per café, persisted, visible to visitors.
+- **Café expansion tiers**: grow the interior grid (e.g. 8×8 → 10×12 →
+  12×16) for coins + level, Café-World-style pricing curve — visibly bigger
+  room, more furniture cap.
+- **Item storage**: stored/owned decor inventory so re-planning never loses
+  purchases; décor score shown on the café sign (status!).
+- Exit: two neighbouring cafés look meaningfully different at a glance.
+
+### S5 — The SOCIAL café (old Phase 4, upgraded)
+_Parity: F2, F3, F4, F5, F6, F8, F11, B9, D8_
+- Daily visit coins per neighbour café; **stir-the-pot help** (+cook progress
+  for them, coins for you, 1×/café/day); **daily gift crate** (ingredients,
+  predefined, no trading); **visitor tip jar** at your café; **eat-mission
+  daily goals** ("taste a dish at 2 neighbours").
+- **Street Buzz leaderboard** on the plaza board; café **name signs** from a
+  curated word list; photo spot. Two-client + mobile passes ride this step
+  (HANDOFF §6.3/6.4).
+- Exit: a second player materially improves your session, and you theirs.
+
+---
+
 ## Phase 1 — THE LOOP PIVOT: cook-ahead kitchens (Week 2) ⭐ the big one
 
 The classic magic wasn't serve-on-demand — it was **preparation**: start

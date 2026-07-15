@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — 2026-07-15 — Café World parity roadmap + Creator Store policy
+- **docs/CAFE_WORLD_PARITY.md (new)**: complete feature map of the original
+  Facebook game (Café World by Zynga) — 49 features across cooking, service/
+  Buzz, staff, customisation, economy and social, each marked have/partial/
+  missing/rejected and assigned to a roadmap step. Owner's top request.
+- **docs/ASSET_SHOPPING_LIST.md (new)**: curated Creator Store shopping list
+  (3 priorities, EN search terms, French Studio click paths, vetting
+  checklist) + the AssetLibrary pipeline contract (manifest → InsertService
+  load → script-strip → grid rescale → procedural fallback).
+- **ROADMAP.md**: new 5-step session roadmap "Café World parity push"
+  (S1 look-like-a-café asset pipeline → S2 customer feelings → S3
+  preparation/menu/appliances → S4 floors/walls/expansion → S5 social café);
+  supersedes phase order until shipped. HANDOFF §6 repointed.
+- **docs/ART_DIRECTION.md**: 2026-07-15 addendum — vetted Creator Store
+  models allowed (scripts stripped, licences logged, procedural fallback,
+  cohesive low-poly family); UI stays original.
+
 ### Added — 2026-07-14 — Day 5: a neighbourhood worth visiting
 - **Golden-hour lighting pass**: warm Mediterranean evening (Atmosphere, bloom,
   sun rays, colour-shifted ambient), lamp posts with warm point lights, trees.

@@ -133,6 +133,15 @@ race verified closed, TestEZ runner place, spawn-in-front-of-your-café.
 
 ## 6. WHAT STILL NEEDS TO BE DONE
 
+> **2026-07-15 priority change (owner review):** the build order is now the
+> **5-step session roadmap** at the top of ROADMAP.md (S1 asset/graphics
+> pipeline → S2 customer feelings → S3 preparation/menu → S4 customisation/
+> expansion → S5 social city), built from the full original-game feature map
+> in `docs/CAFE_WORLD_PARITY.md` with graphics from
+> `docs/ASSET_SHOPPING_LIST.md`. The "Immediate" items below ride along
+> (publish after S1; two-client + mobile passes ride S5/S2). Creator Store
+> assets are now allowed under the ART_DIRECTION 2026-07-15 addendum.
+
 ### Immediate (blocking release-quality confidence)
 1. **Owner playtest of Phase 3b** (goals tick + pay, crew of three visible,
    Noah delivers tray, Pia clears plates for +Buzz) — my test instance hit
