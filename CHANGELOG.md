@@ -23,7 +23,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   cup meshes by recipe category (coloured cylinders as fallback).
 - 15 assets adopted, 7 rejected during live Studio vetting (IP-named, ripped,
   unauthorised, or duplicate/ragdoll rigs) — all logged in docs/ASSET_LICENSES.md.
-  Parity map updated (D1, C4 advanced). Gates green; live playtest this session.
+  Parity map updated (D1, C4 advanced).
+- **Live-verified in Studio** (playtest): real furniture renders (coffee machine
+  45 parts/2 meshes, counter+register 35 parts), barista (Mia) + cleaner (Pia)
+  as real rigs, four clothed customer rigs walking/queuing. Waiter (Noah)
+  real-rig loading fixed by construction (HRP synthesis, gate-clean); its live
+  confirmation is pending a clean Studio session — the start-page quirk (§5.3)
+  blocked further playtests this session (even a `-task EditFile` CLI launch
+  landed on Studio's home page). Owner: open the place from Studio's **Recent**
+  list, press Play, confirm all three staff are real rigs.
 
 ### Changed — 2026-07-15 — Café World parity roadmap + Creator Store policy
 - **docs/CAFE_WORLD_PARITY.md (new)**: complete feature map of the original
