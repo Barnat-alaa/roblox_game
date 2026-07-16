@@ -22,7 +22,9 @@ local World = {
 	interiorDepthTiers = { 24, 28, 32 },
 
 	gardenMinDepth = 40, -- studs of private garden that remain even at max tier
-	wallHeight = 9, -- studs; too tall to jump — the DOOR is the way in and out
+	-- Tall enough that even jumping FROM FURNITURE (counter 3.8 + jump 7.2)
+	-- can't clear it — the DOOR is the only way in and out (owner request).
+	wallHeight = 14,
 	doorWidth = 6, -- front door gap (wide enough for NPC pathfinding)
 	doorHeight = 7,
 	gateWidth = 4, -- garden gate gap in the back wall

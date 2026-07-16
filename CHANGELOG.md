@@ -5,6 +5,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-16 — S2 third pass: work your own café + walk-verified rigs + taller walls
+- **The owner can WORK the café** (the gameplay transformation): `E` on the
+  ordering customer to **take the order** and serve it from stock (+2 Buzz
+  "personal service"), `E` on a dirty plate to **clean the table** (+1 Buzz,
+  races Pia — first one wins), tips collectible as before. All prompts are
+  owner-validated server-side and reuse the existing grant paths (no dupes).
+- **Rig walk policy**: AssetLibraryService now REJECTS any rig without a
+  native HumanoidRootPart and a real Motor6D skeleton (the HRP-synthesis path
+  is removed — it produced the sliding waiter). The broken waiter kit
+  (154539270) is permanently rejected; **Noah and Pia now use walk-verified
+  customer rig bases with role-coloured uniform aprons** (waiter navy,
+  cleaner green) until dedicated rigs are shopped (list #63/#64).
+- **Cleaner idle sweeping**: between wash-up jobs Pia walks to a spot and
+  sweeps — every employee visibly does their job (docs/NPC_BEHAVIOR.md is the
+  new per-NPC behaviour contract).
+- **Walls raised 9 → 14 studs**: you can no longer hop out of the café even
+  jumping from a countertop; the awning now hangs at door height instead of
+  tracking the wall top.
+- docs: NPC_BEHAVIOR.md (exact tasks/state machine per NPC + player actions),
+  ASSET_SHOPPING_LIST.md "Priorité 4" (36 dressing objects: restaurant,
+  garden, neighbourhood + walking-rig rules), parity map C6 row + progress.
+
 ### Added — 2026-07-16 — S2 service theater: defined staff roles + the full plate lifecycle
 - **Every employee now has ONE defined job** (Café World parity C2/C3):
   **Mia · Barista** prepares drinks at the coffee machine, the new **Sam ·

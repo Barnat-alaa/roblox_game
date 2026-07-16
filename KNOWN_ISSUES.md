@@ -21,6 +21,10 @@ shows its home page, use the Recent list):
 6. Placement preview turns RED past the back wall (garden = S4 land purchase);
    the garden gate + fenced garden are behind the café.
 7. Cooking at a front stove still works (rect-distance check regression watch).
+8. (Third pass) `E` on the ordering customer serves them from stock (+2 🔥);
+   `E` on a dirty plate cleans it (+1 🔥); Noah & Pia walk on customer-rig
+   bodies with navy/green aprons — NO sliding or teleporting; walls too tall
+   to escape even jumping from the counter; Pia sweeps between jobs.
 If anything is off, screenshot + tell Claude; fixes come before S2 moods work.
 
 ## Data / persistence

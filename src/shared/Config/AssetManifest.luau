@@ -73,13 +73,18 @@ local AssetManifest = {
 		{ assetId = 75156750439794, name = "NPC Civilian (BlazePixelAce3480)" },
 	},
 
-	-- Staff rigs, keyed by our crew role. The chef rig belongs to the COOK
-	-- (S2 role split); Pia the cleaner keeps the procedural look until the
-	-- owner shops a rig for her (docs/ASSET_SHOPPING_LIST.md).
+	-- Staff rigs, keyed by our crew role. POLICY (owner, 2026-07-16): staff use
+	-- only rigs proven to WALK correctly — the modern bases the customers use.
+	-- The old "waiter" kit (154539270) slid/teleported and is permanently
+	-- rejected. Waiter/Cleaner borrow customer bases and get a role-coloured
+	-- uniform apron on top (StaffService); shop dedicated rigs later via
+	-- docs/ASSET_SHOPPING_LIST.md. Any rig that fails the walk-capability gate
+	-- in AssetLibraryService falls back to the procedural chibi.
 	staff = {
 		Barista = { assetId = 139800912587260, name = "Barista Coffee Shop (Xx_PhoenixVenomTiger)" },
-		Waiter = { assetId = 154539270, name = "Waiter (SweII)" },
 		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
+		Waiter = { assetId = 7907970704, name = "Walking NPC base (ARISTOKRAT1CHE)" },
+		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },
 	},
 }
 

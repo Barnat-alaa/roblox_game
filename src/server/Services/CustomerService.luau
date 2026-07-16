@@ -19,6 +19,7 @@ local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
 local Grid = require(Shared.Utilities.Grid)
 local RewardMath = require(Shared.Utilities.RewardMath)
+local Remotes = require(Shared.Network.Remotes)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -642,6 +643,33 @@ local function eatMeal(
 				end
 				if plate then
 					plate.Name = "DirtyPlate"
+					-- Owner participation: clean the table yourself for the
+					-- same +1 Buzz Pia would earn — first one there wins.
+					local dishPart = plate.PrimaryPart
+					if dishPart then
+						local cleanPrompt = Instance.new("ProximityPrompt")
+						cleanPrompt.Name = "CleanUp"
+						cleanPrompt.ObjectText = "Dirty plate"
+						cleanPrompt.ActionText = "Clean up"
+						cleanPrompt.HoldDuration = 0.25
+						cleanPrompt.MaxActivationDistance = 10
+						cleanPrompt.RequiresLineOfSight = false
+						cleanPrompt.Parent = dishPart
+						local cleaned = false
+						cleanPrompt.Triggered:Connect(function(who)
+							if cleaned or who ~= player or plate.Parent == nil then
+								return
+							end
+							cleaned = true
+							KitchenService:AddBuzz(player, 1)
+							Fx.floatText(
+								plate:GetPivot().Position + Vector3.new(0, 1.2, 0),
+								"+1 🔥",
+								Color3.fromRGB(255, 180, 120)
+							)
+							plate:Destroy()
+						end)
+					end
 					if StaffService then
 						StaffService:NotifyMess(player, plate)
 					else
@@ -772,9 +800,46 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	local deadline = os.clock() + PATIENCE_SECONDS
 	local nextStockCheck = 0
 	local fedPay: number? = nil
+	local servingLock = false
+
+	-- Owner participation (S2 gameplay): walk up and TAKE THE ORDER yourself.
+	-- Serving personally from stock pays a Buzz bonus over waiting for the
+	-- 2s auto-serve — working your own café should feel better than idling.
+	local takePrompt = Instance.new("ProximityPrompt")
+	takePrompt.Name = "TakeOrder"
+	takePrompt.ObjectText = "Order"
+	takePrompt.ActionText = "Serve " .. recipe.displayName
+	takePrompt.HoldDuration = 0.25
+	takePrompt.MaxActivationDistance = 12
+	takePrompt.RequiresLineOfSight = false
+	takePrompt.Parent = cust.root
+	takePrompt.Triggered:Connect(function(who)
+		-- Only the café owner serves their own customers.
+		if who ~= player or servingLock or cust.orderId == nil or cust.leaving then
+			return
+		end
+		servingLock = true
+		local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string)
+		if ate and cust.orderId ~= nil then
+			OrderService:CancelOrder(cust.orderId, true)
+			cust.orderId = nil
+			cust.served = true
+			fedPay = paidNow
+			KitchenService:AddBuzz(player, 2)
+			Fx.floatText(
+				cust.root.Position + Vector3.new(0, 4, 0),
+				"Personal service! +2 🔥",
+				Color3.fromRGB(255, 200, 120)
+			)
+		else
+			Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_in_stock" })
+		end
+		servingLock = false
+	end)
+
 	while os.clock() < deadline and cust.orderId ~= nil and not cust.leaving do
 		-- A batch may land while they wait — feed them straight from it.
-		if os.clock() >= nextStockCheck then
+		if os.clock() >= nextStockCheck and not servingLock then
 			nextStockCheck = os.clock() + 2
 			local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string)
 			if ate and cust.orderId ~= nil then
@@ -786,6 +851,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		end
 		task.wait(0.25)
 	end
+	takePrompt:Destroy()
 
 	if cust.leaving then
 		if cust.orderId ~= nil then

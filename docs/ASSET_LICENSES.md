@@ -42,9 +42,15 @@ licensed for on-platform use; IDs pinned in `src/shared/Config/AssetManifest.lua
 | customerRig | 7907970704 | Walking NPC | ARISTOKRAT1CHE | R15 appearance donor |
 | customerRig | 8243272714 | Mom's NPC | RAMAS_RMZ | R6 appearance donor |
 | customerRig | 75156750439794 | NPC Civilian | BlazePixelAce3480 | R6 appearance donor |
-| staff:Barista | 139800912587260 | Barista Coffee Shop | Xx_PhoenixVenomTiger | Mia |
-| staff:Waiter | 154539270 | Waiter | SweII | Noah (held tools stripped) |
-| staff:Cook | 108490018615318 | Chef NPC | TurboTigerByte2002 | Sam · Cook (S2 role split; Pia the cleaner is procedural until a rig is shopped) |
+| staff:Barista | 139800912587260 | Barista Coffee Shop | Xx_PhoenixVenomTiger | Mia (auto-rejected at load if it fails the walk-joint gate) |
+| staff:Cook | 108490018615318 | Chef NPC | TurboTigerByte2002 | Sam · Cook |
+| staff:Waiter | 7907970704 | Walking NPC | ARISTOKRAT1CHE | Noah — customer base + navy uniform apron (walk-verified rig policy) |
+| staff:Cleaner | 8243272714 | Mom's NPC | RAMAS_RMZ | Pia — customer base + green uniform apron; shop a dedicated maid rig (shopping list #63) |
+
+**Rejected 2026-07-16 (rig policy — cannot walk):**
+- `154539270` "Waiter" (SweII) — no native HumanoidRootPart/walk joints; slid
+  and teleported in play. AssetLibraryService now auto-rejects any such rig
+  (native HRP + ≥4 Motor6D joints required).
 
 **Rejected during vetting (2026-07-15), do NOT adopt:**
 - `8678272489` "Miraculous Ladybug Table" — IP-named (copyrighted franchise).

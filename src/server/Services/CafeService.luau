@@ -486,13 +486,14 @@ local function buildPlot(index: number, parent: Instance): Plot
 	label.Text = "Empty Café"
 	label.Parent = gui
 
-	-- Striped awning over the front (Phase 2 charm pass).
+	-- Striped awning over the door line (fixed height — walls are much taller
+	-- now, so it hangs at human scale instead of tracking the wall top).
 	for i = 0, 7 do
 		local slat = makePart(
 			"AwningSlat",
 			Vector3.new(width / 8, 0.25, 3.4),
 			origin
-				* CFrame.new(width / 16 + i * (width / 8), WALL_H - 0.7, -0.9)
+				* CFrame.new(width / 16 + i * (width / 8), DOOR_H + 1.5, -0.9)
 				* CFrame.Angles(math.rad(-12), 0, 0),
 			if i % 2 == 0 then Color3.fromRGB(196, 60, 50) else Color3.fromRGB(245, 242, 235),
 			model,

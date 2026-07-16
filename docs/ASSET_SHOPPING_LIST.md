@@ -95,6 +95,69 @@ Remplace nos modèles procéduraux actuels (les IDs `→` sont nos IDs internes)
 | 23 | portes/fenêtres | Styles de portes + fenêtres | 2–3 chacun | `wooden shop door` · `window frame low poly` | Customisation (S4) |
 | 24 | *(plus tard)* | Chariot à glaces | 1 | `ice cream cart low poly` | Famille Glaces (post-S5) |
 
+## PRIORITÉ 4 — HABILLAGE (demandé le 2026-07-16): restaurant, jardin, quartier
+
+Le resto, le jardin privé et la rue manquent de contenu graphique. Même
+procédure: cherche en anglais, clique **Obtenir**, **colle-moi les liens**
+avec le nom cible — je m'occupe de l'intégration (nettoyage scripts, échelle,
+catalogue). Style: toujours **low poly / cartoon**, si possible du même créateur.
+
+### 4a — Intérieur du restaurant
+
+| # | Objet | Qté | Termes de recherche (EN) |
+|---|---|---|---|
+| 30 | Tableaux / cadres muraux | 1 pack | `wall art frames pack` · `paintings low poly` |
+| 31 | Ardoise menu murale | 1 | `menu chalkboard wall` · `cafe menu board` |
+| 32 | Suspensions / plafonniers | 2–3 | `pendant lamp low poly` · `hanging ceiling light` |
+| 33 | Étagère murale + déco | 1–2 | `wall shelf decor` · `shelf with plants` |
+| 34 | Horloge murale | 1 | `wall clock low poly` |
+| 35 | Rideaux | 1 | `window curtains low poly` |
+| 36 | Banquette / booth | 1 | `booth seat diner` · `restaurant booth low poly` |
+| 37 | Tabourets de bar | 1 set | `bar stool low poly` |
+| 38 | Portemanteau | 1 | `coat rack stand` |
+| 39 | Pack plantes intérieures | 1 pack | `indoor plants pack low poly` |
+| 40 | Vitrine à gâteaux (mieux) | 1 | `cake display case glass` |
+
+### 4b — Jardin privé (derrière le café)
+
+| # | Objet | Qté | Termes de recherche (EN) |
+|---|---|---|---|
+| 41 | Pack de fleurs | 1 pack | `flowers pack low poly` · `flower bed garden` |
+| 42 | Haies / buissons | 1 pack | `hedge bush low poly` · `garden bushes pack` |
+| 43 | Banc de jardin | 1 | `garden bench low poly` |
+| 44 | Petite fontaine de jardin | 1 | `garden fountain small` |
+| 45 | Balançoire | 1 | `garden swing low poly` · `wooden swing` |
+| 46 | Arche fleurie | 1 | `garden arch flowers` · `rose arch` |
+| 47 | Lanternes de jardin | 2–3 | `garden lantern post` |
+| 48 | Potager / jardinière | 1–2 | `vegetable garden planter` · `raised garden bed` |
+| 49 | Bain d'oiseaux | 1 | `bird bath low poly` |
+| 50 | Dalles de pas japonais | 1 set | `stepping stones garden` |
+| 51 | Pack d'arbres | 1 pack | `trees pack low poly` · `stylized tree set` |
+
+### 4c — Le quartier (rue + place)
+
+| # | Objet | Qté | Termes de recherche (EN) |
+|---|---|---|---|
+| 52 | Lampadaires (mieux que les nôtres) | 1 style | `street lamp low poly` · `vintage lamp post` |
+| 53 | Bancs publics | 1 style | `park bench low poly` |
+| 54 | Poubelles de rue | 1 | `trash can street low poly` |
+| 55 | Boîte aux lettres | 1 | `mailbox low poly` |
+| 56 | Vélo (décor) | 1 | `bicycle low poly` |
+| 57 | Stand de fleurs | 1 | `flower stand market` · `flower shop stall` |
+| 58 | Chariot de nourriture | 1 | `food cart low poly` · `street food stand` |
+| 59 | Panneaux de rue | 1 pack | `street sign low poly` |
+| 60 | Fontaine de place (upgrade) | 1 | `fountain plaza low poly` |
+| 61 | Arrêt de bus (décor) | 1 | `bus stop low poly` |
+| 62 | Borne d'incendie | 1 | `fire hydrant low poly` |
+
+### 4d — PNJ (règle: uniquement des rigs qui MARCHENT correctement)
+
+| # | Cible | Qté | Termes de recherche (EN) | Exigences |
+|---|---|---|---|---|
+| 63 | **Rig femme de ménage pour Pia** (prioritaire) | 1 | `maid npc rigged` · `cleaner character roblox` · `janitor npc` | **R6/R15 avec HumanoidRootPart + Motor6D** — teste: insère-le, il doit contenir "HumanoidRootPart"; sinon je le rejette automatiquement |
+| 64 | Rig serveur dédié pour Noah | 1 | `waiter npc rigged r15` · `butler character rigged` | idem |
+| 65 | Plus de looks clients | 4–6 | `npc pack rigged r15` · `citizens pack characters` | idem — la variété des clients |
+
 ## Ce qu'on n'achète PAS (et pourquoi)
 
 - **Textures sols/murs (images)**: provenance douteuse sur le Store; je les

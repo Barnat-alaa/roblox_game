@@ -196,28 +196,24 @@ local function buildRigTemplate(assetId: number): Model?
 	end
 	local head = rig:FindFirstChild("Head") :: BasePart?
 	local root = rig:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then
-		-- Old R6 rigs ship without a HumanoidRootPart; synthesise one bound to
-		-- the Torso so our MoveTo/anchor logic has a primary part to drive.
-		local torso = rig:FindFirstChild("Torso") or rig:FindFirstChild("UpperTorso")
-		if torso and torso:IsA("BasePart") then
-			local hrp = Instance.new("Part")
-			hrp.Name = "HumanoidRootPart"
-			hrp.Size = Vector3.new(2, 2, 1)
-			hrp.Transparency = 1
-			hrp.CanCollide = false
-			hrp.CFrame = torso.CFrame
-			hrp.Parent = rig
-			local joint = Instance.new("Motor6D")
-			joint.Name = "RootJoint"
-			joint.Part0 = hrp
-			joint.Part1 = torso
-			joint.Parent = hrp
-			root = hrp
+	if not root or not head then
+		-- No native HumanoidRootPart = an old kit that cannot actually walk
+		-- (synthesising one produced the sliding/teleporting waiter — owner
+		-- rejected). Only real, complete rigs pass.
+		Log.warn("AssetLibrary: rig missing root/head — rejected", assetId)
+		container:Destroy()
+		return nil
+	end
+	-- Walk-capability gate: a rig with fewer Motor6D joints than a minimal R6
+	-- skeleton was weld-assembled (a statue) and would slide instead of walk.
+	local motors = 0
+	for _, d in rig:GetDescendants() do
+		if d:IsA("Motor6D") then
+			motors += 1
 		end
 	end
-	if not root or not head then
-		Log.warn("AssetLibrary: rig missing root/head", assetId)
+	if motors < 4 then
+		Log.warn("AssetLibrary: rig has no walk joints — rejected", assetId)
 		container:Destroy()
 		return nil
 	end

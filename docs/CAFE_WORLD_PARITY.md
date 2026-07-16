@@ -35,7 +35,14 @@ session roadmap (ROADMAP.md).
 > defined staff roles (Barista Mia = drinks · Cook Sam = food · Waiter Noah =
 > carries plates · Cleaner Pia = washes up), dish-icon bubbles on order and on
 > "ready!", the waiter walks the plate to the table, the emptied plate stays
-> until it's collected and washed. Rows B2–B4, C2–C3 updated below. Still open
+> until it's collected and washed. Rows B2–B4, C2–C3 updated below.
+>
+> **S2 third pass (2026-07-16): the owner WORKS the café** — take a customer's
+> order with `E` (+2 Buzz personal service), clean tables with `E` (+1 Buzz),
+> collect tips — staff remain the automation layer (full spec per NPC in
+> `docs/NPC_BEHAVIOR.md`). Rig policy: only verified-walking rigs (Motor6D
+> gate in AssetLibraryService); the broken waiter kit is permanently rejected.
+> Walls raised to 14 studs (can't hop out even from countertops). Still open
 > in S2: mood faces/patience meters, storm-outs, regulars.
 
 ## A. Cooking (the core)
@@ -82,6 +89,7 @@ session roadmap (ROADMAP.md).
 | C3 | Waiter + cleaner staff | ✅ | **Noah · Waiter** carries plates kitchen→table; **Pia · Cleaner** collects empty plates and washes them |
 | C4 | Staff outfits per café theme | 🟡 **[S1→]** | Real barista/waiter/cleaner rigs adopted (Mia/Noah/Pia). Per-theme uniform variants stay Phase 6 cosmetics |
 | C5 | Wages balancing automation | ❌ | Deliberate debt — when economy matures |
+| C6 | Player performs the service personally (the original's click-to-run-your-café feel) | ✅ | S2: owner takes orders (`E`, +2 Buzz), cleans tables (`E`, +1 Buzz), collects tips, cooks/brews — staff are the automation net (docs/NPC_BEHAVIOR.md) |
 
 ## D. Customisation & decoration (decor-as-status)
 

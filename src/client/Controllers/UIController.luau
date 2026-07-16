@@ -31,6 +31,7 @@ local FRIENDLY_ERROR = {
 	cant_afford_ingredients = "Not enough coins for ingredients.",
 	busy_cooking = "It's mid-batch — collect the food first.",
 	wrong_appliance = "That recipe needs a different appliance.",
+	not_in_stock = "Not on the counter — cook a batch of it first!",
 }
 
 local UIController = {}

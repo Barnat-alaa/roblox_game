@@ -59,6 +59,7 @@ type Crew = {
 
 local crewByUser: { [number]: Crew } = {}
 local messQueues: { [number]: { Model } } = {}
+local rng = Random.new()
 
 local function crewList(crew: Crew): { StaffNpc }
 	local list = {}
@@ -119,6 +120,27 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 			local _, size = rig:GetBoundingBox()
 			rig:PivotTo(base * CFrame.new(0, size.Y / 2, 0))
 			rig.PrimaryPart = root
+
+			-- Role uniform: a coloured apron so staff on customer rig bases
+			-- read as STAFF at a glance (waiter navy, cleaner green, …).
+			local torso = rig:FindFirstChild("Torso") or rig:FindFirstChild("UpperTorso")
+			if torso and torso:IsA("BasePart") then
+				local apron = Instance.new("Part")
+				apron.Name = "UniformApron"
+				apron.Size = Vector3.new(torso.Size.X * 1.04, torso.Size.Y * 0.85, 0.16)
+				apron.Color = look.shirt
+				apron.Material = Enum.Material.Fabric
+				apron.CanCollide = false
+				apron.CanQuery = false
+				apron.Massless = true
+				apron.CFrame = torso.CFrame
+					* CFrame.new(0, -torso.Size.Y * 0.08, -(torso.Size.Z / 2 + 0.1))
+				apron.Parent = rig
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = torso
+				weld.Part1 = apron
+				weld.Parent = torso
+			end
 
 			local gui = Instance.new("BillboardGui")
 			gui.Name = "Bubble"
@@ -669,8 +691,37 @@ function StaffService.Start(_self: any)
 							end
 						end
 					end
-					-- Cleaner: work the mess queue.
+					-- Cleaner: work the mess queue, or sweep somewhere between
+					-- jobs so she reads as WORKING, not idling (owner request:
+					-- every employee visibly does their job).
 					runCleaner(player)
+					local crew = crewOf(player.UserId)
+					local cleaner = crew.cleaner
+					local queue = messQueues[player.UserId]
+					if
+						cleaner
+						and not cleaner.busy
+						and (queue == nil or #queue == 0)
+						and rng:NextNumber() < 0.3
+					then
+						local origin = CafeService:GetPlotOrigin(player)
+						if origin and claimStaff(cleaner, 0.1) then
+							task.spawn(function()
+								local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+								local spot = (origin * CFrame.new(
+									rng:NextNumber(width * 0.15, width * 0.85),
+									2,
+									rng:NextNumber(4, 22)
+								)).Position
+								staffWalk(cleaner, spot)
+								cleaner.bubble.Text = "🧹"
+								task.wait(1.4)
+								staffWalk(cleaner, cleaner.home.Position)
+								cleaner.bubble.Text = cleaner.displayName
+								cleaner.busy = false
+							end)
+						end
+					end
 				end
 			end
 		end
