@@ -73,11 +73,13 @@ local AssetManifest = {
 		{ assetId = 75156750439794, name = "NPC Civilian (BlazePixelAce3480)" },
 	},
 
-	-- Staff rigs, keyed by our crew role.
+	-- Staff rigs, keyed by our crew role. The chef rig belongs to the COOK
+	-- (S2 role split); Pia the cleaner keeps the procedural look until the
+	-- owner shops a rig for her (docs/ASSET_SHOPPING_LIST.md).
 	staff = {
 		Barista = { assetId = 139800912587260, name = "Barista Coffee Shop (Xx_PhoenixVenomTiger)" },
 		Waiter = { assetId = 154539270, name = "Waiter (SweII)" },
-		Cleaner = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
+		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
 	},
 }
 

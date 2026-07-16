@@ -3,6 +3,7 @@
 -- red = blocked). The server re-validates every placement — this is only UX.
 -- Tap/click the floor to place; Rotate button or R key to rotate.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -39,23 +40,54 @@ local function getOrigin(): CFrame?
 	return if typeof(o) == "CFrame" then o else nil
 end
 
-local function raycastCell(screenPos: Vector2): (number?, number?)
+-- Your own café's interior floor — the ONLY thing placement clicks may hit.
+-- Walls/door/awning would otherwise swallow rays (they're click-transparent
+-- visually when faded, but not to a raycast), landing furniture cells away
+-- from the click (owner bug 2026-07-16).
+local function ownPlotFloor(): BasePart?
+	local plotsFolder = workspace:FindFirstChild("Plots")
+	if not plotsFolder then
+		return nil
+	end
+	for _, plot in plotsFolder:GetChildren() do
+		if plot:GetAttribute("ownerUserId") == player.UserId then
+			local shell = plot:FindFirstChild("Shell")
+			local floor = shell and shell:FindFirstChild("Floor")
+			if floor and floor:IsA("BasePart") then
+				return floor
+			end
+		end
+	end
+	return nil
+end
+
+-- Expects VIEWPORT coordinates (GetMouseLocation space). InputObject.Position
+-- is GUI space — convert with toViewport before calling. Feeding GUI coords
+-- straight in was the "furniture lands away from my click" offset
+-- (KNOWN_ISSUES "screen→grid raycast" — now resolved).
+local function raycastCell(viewportPos: Vector2): (number?, number?)
 	local origin = getOrigin()
 	local camera = workspace.CurrentCamera
 	if not origin or not camera then
 		return nil, nil
 	end
-	local ray = camera:ViewportPointToRay(screenPos.X, screenPos.Y)
+	local ray = camera:ViewportPointToRay(viewportPos.X, viewportPos.Y)
 	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local exclude: { Instance } = {}
-	if player.Character then
-		table.insert(exclude, player.Character)
+	local floor = ownPlotFloor()
+	if floor then
+		params.FilterType = Enum.RaycastFilterType.Include
+		params.FilterDescendantsInstances = { floor }
+	else
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local exclude: { Instance } = {}
+		if player.Character then
+			table.insert(exclude, player.Character)
+		end
+		if previewPart then
+			table.insert(exclude, previewPart)
+		end
+		params.FilterDescendantsInstances = exclude
 	end
-	if previewPart then
-		table.insert(exclude, previewPart)
-	end
-	params.FilterDescendantsInstances = exclude
 	local result = workspace:Raycast(ray.Origin, ray.Direction * 600, params)
 	if not result then
 		return nil, nil
@@ -258,7 +290,9 @@ function BuildController.Start(_self: any)
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
-			tryPlace(Vector2.new(input.Position.X, input.Position.Y))
+			-- InputObject.Position is GUI space; raycastCell wants viewport space.
+			local inset = GuiService:GetGuiInset()
+			tryPlace(Vector2.new(input.Position.X + inset.X, input.Position.Y + inset.Y))
 		elseif input.KeyCode == Enum.KeyCode.R then
 			rotation = (rotation + 1) % 4
 		end

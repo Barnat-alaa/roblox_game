@@ -469,6 +469,36 @@ local function handlePlace(player: Player, payload: unknown)
 		return
 	end
 
+	-- Seats auto-face the nearest adjacent table (owner request: a chair must
+	-- never point away from its table). 1x1 footprints only, so overriding the
+	-- rotation can never invalidate the placement we just validated.
+	if def.seatCount > 0 and def.width == 1 and def.depth == 1 then
+		local bestDist = math.huge
+		local facing: number? = nil
+		for _, other in data.placedFurniture do
+			local otherDef = Furniture[other.catalogId]
+			if otherDef and string.find(other.catalogId, "table") ~= nil then
+				local w, d = Grid.footprintSize(otherDef.width, otherDef.depth, other.rotation)
+				local tx = other.gridX + w / 2
+				local ty = other.gridY + d / 2
+				local dx = tx - (gridX + 0.5)
+				local dy = ty - (gridY + 0.5)
+				local dist = math.max(math.abs(dx), math.abs(dy))
+				if dist <= 2.5 and dist < bestDist then
+					bestDist = dist
+					-- Chair look direction by rotation r (plot-local):
+					-- r0 → -Z, r1 → -X, r2 → +Z, r3 → +X.
+					facing = if math.abs(dx) >= math.abs(dy)
+						then (if dx > 0 then 3 else 1)
+						else (if dy > 0 then 2 else 0)
+				end
+			end
+		end
+		if facing ~= nil and def.rotatable then
+			rotation = facing
+		end
+	end
+
 	data.inventory[catalogId] -= 1
 	local placed: Types.PlacedFurniture = {
 		instanceId = newInstanceId(),

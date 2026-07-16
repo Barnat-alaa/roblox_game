@@ -5,6 +5,36 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-16 — S2 service theater: defined staff roles + the full plate lifecycle
+- **Every employee now has ONE defined job** (Café World parity C2/C3):
+  **Mia · Barista** prepares drinks at the coffee machine, the new **Sam ·
+  Cook** (the owner's chef rig, reassigned from cleaner) prepares food at the
+  oven/prep station — both walk to their appliance and flash a bubble with the
+  **dish icon** when it's ready; **Noah · Waiter** walks over, picks the plate
+  up and carries it to the table (`StaffService.DeliverMeal` orchestration);
+  **Pia · Cleaner** collects the emptied plate and carries it off to wash
+  (+1 Buzz). Every stage degrades gracefully when staff are busy/missing, and
+  the whole flow is post-payment theater — it can never touch the economy.
+- **Visible meals**: the plate + real food prop sit ON the table in front of
+  the diner (PlateFactory); after eating, food disappears and the EMPTY plate
+  stays until washed. Customer want-bubbles show the dish icon + name
+  (Config/Recipes gains per-recipe emoji icons).
+- **Fixed — walls invisible from outside**: the camera now x-rays only the
+  café your character is standing in; every other café keeps its full facade.
+- **Fixed — furniture landing away from the click**: placement raycasts now
+  hit ONLY your interior floor (walls/door/awning used to swallow clicks) and
+  the GUI-inset coordinate mismatch on the click path is corrected
+  (KNOWN_ISSUES "screen→grid raycast" resolved).
+- **Chairs auto-face the nearest table** on placement (server-side, 1×1 seats).
+- **Fixed — seated customers' legs kept moving**: NpcAnimator gains a seated
+  mode (anchored roots never fire Running(0), so the walk cycle kept playing).
+- **Fixed — the waiter teleported instead of walking**: all staff now use the
+  same PathfindingService navigation as customers (shared NpcNav module);
+  straight-line + teleport stays as the last-resort recovery only.
+- NOT live-verified (Studio MCP still down; the adversarial review workflow
+  also could not run — session limit); manual code-trace done, gates green —
+  owner playtest checklist updated in KNOWN_ISSUES.md.
+
 ### Added — 2026-07-16 — S2 architecture: facade + auto-door, 3x interiors, private gardens
 - **Every café is now a real building** (CafeService rework): a front facade
   with two windows and a centred **door that swings open automatically** for

@@ -5,8 +5,11 @@
 -- so you look INTO rooms, the way the classic café sims framed them.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+
+local Grid = require(ReplicatedStorage:WaitForChild("Shared").Utilities.Grid)
 
 local player = Players.LocalPlayer
 
@@ -33,7 +36,7 @@ local WALL_NORMALS: { [string]: Vector3 } = {
 	WallBack = Vector3.new(0, 0, 1),
 }
 
-local function fadeWallsIn(container: Instance, cameraPos: Vector3)
+local function fadeWallsIn(container: Instance, cameraPos: Vector3, enabled: boolean)
 	for _, child in container:GetChildren() do
 		local localNormal = WALL_NORMALS[child.Name]
 		if localNormal and child:IsA("BasePart") then
@@ -43,12 +46,14 @@ local function fadeWallsIn(container: Instance, cameraPos: Vector3)
 			local toCam = cameraPos - child.Position
 			toCam = Vector3.new(toCam.X, 0, toCam.Z)
 			local facing = toCam.Magnitude > 0.01 and toCam.Unit:Dot(normal) > 0.35
-			child.LocalTransparencyModifier = if facing then 0.98 else 0
+			child.LocalTransparencyModifier = if enabled and facing then 0.98 else 0
 		end
 	end
 end
 
--- Fade any wall whose outward face points at the camera (you see through it).
+-- X-ray ONLY the café your character is standing in: camera-facing walls of
+-- that plot fade so you see the room; every other café keeps its full facade
+-- (from the street a café must LOOK like a building — owner bug 2026-07-16).
 -- Facade walls sit on the plot model; side/back walls live in the tier-built
 -- "Shell" submodel (S2), so scan both levels.
 local function updateWallFades(cameraPos: Vector3)
@@ -56,11 +61,19 @@ local function updateWallFades(cameraPos: Vector3)
 	if not plots then
 		return
 	end
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart")
+	local charPos = if hrp and hrp:IsA("BasePart") then hrp.Position else nil
 	for _, plot in plots:GetChildren() do
-		fadeWallsIn(plot, cameraPos)
+		local inside = false
+		local origin = plot:GetAttribute("origin")
+		if charPos and typeof(origin) == "CFrame" then
+			inside = Grid.distanceToPlotRect(origin, charPos) < 0.5
+		end
+		fadeWallsIn(plot, cameraPos, inside)
 		local shell = plot:FindFirstChild("Shell")
 		if shell then
-			fadeWallsIn(shell, cameraPos)
+			fadeWallsIn(shell, cameraPos, inside)
 		end
 	end
 end

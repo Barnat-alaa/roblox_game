@@ -416,6 +416,9 @@ local function buildPlot(index: number, parent: Instance): Plot
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 	model:SetAttribute("plotIndex", index)
+	-- Clients read this to know whether their character is INSIDE this plot
+	-- (the camera only x-rays the café you are actually in).
+	model:SetAttribute("origin", origin)
 
 	-- FRONT FACADE: two wall segments + lintel around a centred door gap.
 	local gapL = width / 2 - DOOR_W / 2

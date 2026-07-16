@@ -44,7 +44,7 @@ licensed for on-platform use; IDs pinned in `src/shared/Config/AssetManifest.lua
 | customerRig | 75156750439794 | NPC Civilian | BlazePixelAce3480 | R6 appearance donor |
 | staff:Barista | 139800912587260 | Barista Coffee Shop | Xx_PhoenixVenomTiger | Mia |
 | staff:Waiter | 154539270 | Waiter | SweII | Noah (held tools stripped) |
-| staff:Cleaner | 108490018615318 | Chef NPC | TurboTigerByte2002 | Pia (uniformed staff look) |
+| staff:Cook | 108490018615318 | Chef NPC | TurboTigerByte2002 | Sam · Cook (S2 role split; Pia the cleaner is procedural until a rig is shopped) |
 
 **Rejected during vetting (2026-07-15), do NOT adopt:**
 - `8678272489` "Miraculous Ladybug Table" — IP-named (copyrighted franchise).

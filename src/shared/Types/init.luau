@@ -108,6 +108,7 @@ export type RecipeDefinition = {
 	masteryThresholds: { number },
 	cookTime: number, -- seconds on the stove (cook-ahead loop)
 	servings: number, -- counter stock added per collected batch
+	icon: string?, -- emoji shown in order/prep bubbles (assigned in Config/Recipes)
 }
 
 export type FurnitureDefinition = {

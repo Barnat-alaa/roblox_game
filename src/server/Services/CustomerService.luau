@@ -11,7 +11,6 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local PathfindingService = game:GetService("PathfindingService")
 
 local Shared = ReplicatedStorage.Shared
 local Customers = require(Shared.Config.Customers)
@@ -25,6 +24,8 @@ local Types = require(Shared.Types)
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local Fx = require(script.Parent.Parent.Fx)
 local NpcAnimator = require(script.Parent.Parent.NpcAnimator)
+local NpcNav = require(script.Parent.Parent.NpcNav)
+local PlateFactory = require(script.Parent.Parent.PlateFactory)
 
 local CustomerService = {}
 CustomerService.Name = "CustomerService"
@@ -140,6 +141,7 @@ type ActiveCustomer = {
 	bubble: TextLabel,
 	def: Types.CustomerDefinition,
 	baseHip: number, -- resting HipHeight (differs per rig); waddle bobs around it
+	anim: NpcAnimator.AnimHandle?, -- real-rig animation control (nil on chibis)
 	spawnClock: number,
 	orderId: string?,
 	served: boolean,
@@ -434,62 +436,16 @@ local function slotPosition(origin: CFrame, slot: number): Vector3
 	return (origin * CFrame.new(width / 2 - 6, 2, 10 - (slot - 1) * QUEUE_SPACING)).Position
 end
 
--- Move toward one point with a deadline + the chibi waddle (harmless on real
--- rigs, which are animated instead). Returns true on arrival, false on timeout.
-local function moveToward(
-	cust: ActiveCustomer,
-	point: Vector3,
-	deadline: number,
-	t0: number
-): boolean
-	while not cust.leaving and cust.root.Parent ~= nil do
-		local flat = (cust.root.Position - point) * Vector3.new(1, 0, 1)
-		if flat.Magnitude < 2 then
-			return true
-		end
-		if os.clock() > deadline then
-			return false
-		end
-		cust.humanoid:MoveTo(point)
-		cust.humanoid.HipHeight = cust.baseHip + 0.14 * math.abs(math.sin((os.clock() - t0) * 9))
-		task.wait(0.1)
-	end
-	return false
-end
-
--- Walk to a target, routing AROUND collidable furniture with a navmesh path
--- (so customers stop clipping through tables). Falls back to a straight line
--- if the path fails, and teleport-recovers on a stuck waypoint.
+-- Walk routing around collidable furniture, straight-line + teleport recovery
+-- as fallback — shared with staff via NpcNav.
 local function walkTo(cust: ActiveCustomer, target: Vector3)
-	local t0 = os.clock()
-	local path = PathfindingService:CreatePath({
-		AgentRadius = 1.8,
-		AgentHeight = 5,
-		AgentCanJump = false,
-		WaypointSpacing = 4,
+	NpcNav.walkTo(cust.model, cust.humanoid, cust.root, target, {
+		baseHip = cust.baseHip,
+		straightTimeout = WALK_TIMEOUT,
+		cancelled = function()
+			return cust.leaving
+		end,
 	})
-	local ok = pcall(function()
-		path:ComputeAsync(cust.root.Position, target)
-	end)
-	if ok and path.Status == Enum.PathStatus.Success then
-		local waypoints = path:GetWaypoints()
-		for i = 2, #waypoints do -- [1] is the current position
-			if cust.leaving or cust.root.Parent == nil then
-				break
-			end
-			if not moveToward(cust, waypoints[i].Position, os.clock() + 4, t0) then
-				cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
-				break
-			end
-		end
-	else
-		if not moveToward(cust, target, os.clock() + WALK_TIMEOUT, t0) then
-			cust.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
-		end
-	end
-	if not cust.leaving and cust.root.Parent ~= nil then
-		cust.humanoid.HipHeight = cust.baseHip
-	end
 end
 
 local function myIndex(cust: ActiveCustomer): number?
@@ -505,14 +461,7 @@ local function removeFromQueue(cust: ActiveCustomer)
 	end
 end
 
--- ————— seated dining (Phase 2) —————
-
-local FOOD_COLORS: { [string]: Color3 } = {
-	Coffee = Color3.fromRGB(120, 82, 55),
-	Tea = Color3.fromRGB(140, 180, 110),
-	Pastry = Color3.fromRGB(230, 180, 100),
-	Sandwich = Color3.fromRGB(215, 160, 90),
-}
+-- ————— seated dining (Phase 2; plate visuals live in PlateFactory) —————
 
 -- instanceId → true, per user, for chairs currently holding a diner.
 local occupiedSeats: { [number]: { [string]: boolean } } = {}
@@ -632,7 +581,9 @@ local function eatMeal(
 	removeFromQueue(cust)
 	local recipe = Recipes[recipeId]
 	if announcedPay ~= nil then
-		cust.bubble.Text = "🍽️ " .. (if recipe then recipe.displayName else recipeId)
+		cust.bubble.Text = (
+			if recipe then (recipe.icon or "🍽️") .. " " .. recipe.displayName else recipeId
+		)
 	end
 
 	local seatCf, seatId = claimSeat(player)
@@ -640,54 +591,29 @@ local function eatMeal(
 		walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
 		if not cust.leaving and cust.root.Parent ~= nil then
 			-- Sit: lower onto the seat, face the chair's way, and lock in.
+			-- setSeated stops the walk cycle (anchored roots never fire
+			-- Running(0), which left seated legs pedalling — owner bug).
 			local sitPos = Vector3.new(seatCf.Position.X, 2.05, seatCf.Position.Z)
 			cust.root.Anchored = true
 			cust.model:PivotTo(CFrame.lookAt(sitPos, sitPos + seatCf.LookVector))
-
-			-- The waiter runs the plate over when he's free (Phase 3b).
-			if StaffService and StaffService:RequestDelivery(player, sitPos) then
-				task.wait(1.6)
+			if cust.anim then
+				cust.anim.setSeated(true)
 			end
 
-			-- A little plate of food in their lap-space.
-			local plate = Instance.new("Part")
-			plate.Shape = Enum.PartType.Cylinder
-			plate.Size = Vector3.new(0.2, 1.4, 1.4)
-			plate.Color = Color3.fromRGB(245, 242, 235)
-			plate.Anchored = true
-			plate.CanCollide = false
-			plate.CanQuery = false
-			plate.CFrame = cust.model:GetPivot()
-				* CFrame.new(0, -0.2, -1.3)
-				* CFrame.Angles(0, 0, math.rad(90))
-			plate.Parent = cust.model
-			local food: Instance
-			local foodProp: Model? = if AssetLibraryService and recipe
-				then AssetLibraryService:GetProp(recipe.category)
-				else nil
-			if foodProp then
-				for _, d in foodProp:GetDescendants() do
-					if d:IsA("BasePart") then
-						d.Anchored = true
-						d.CanCollide = false
-						d.CanQuery = false
-					end
-				end
-				foodProp:PivotTo(plate.CFrame * CFrame.new(0, 0.3, 0.4))
-				foodProp.Parent = cust.model
-				food = foodProp
-			else
-				local ball = Instance.new("Part")
-				ball.Shape = Enum.PartType.Ball
-				ball.Size = Vector3.new(0.8, 0.6, 0.8)
-				ball.Color = FOOD_COLORS[if recipe then recipe.category else ""]
-					or Color3.fromRGB(200, 160, 110)
-				ball.Anchored = true
-				ball.CanCollide = false
-				ball.CanQuery = false
-				ball.CFrame = plate.CFrame * CFrame.new(0, 0, 0.5)
-				ball.Parent = cust.model
-				food = ball
+			-- S2 service theater: barista/cook prepares the dish (icon bubble),
+			-- the waiter carries the plate over and sets it on the table.
+			local plate: Model?, food: Instance?
+			if StaffService and StaffService.DeliverMeal then
+				plate, food = StaffService:DeliverMeal(player, recipeId, seatCf)
+			end
+			if not plate then
+				-- No staff at all: the plate simply appears on the table.
+				plate, food = PlateFactory.make(AssetLibraryService, recipe)
+				plate:PivotTo(
+					CFrame.new(seatCf.Position + seatCf.LookVector * 1.8 + Vector3.new(0, 1.15, 0))
+				)
+				local folder = CafeService:GetFurnitureFolder(player)
+				plate.Parent = (folder and folder.Parent) or cust.model
 			end
 
 			-- Eat with a happy bob.
@@ -703,36 +629,44 @@ local function eatMeal(
 				task.wait(0.55)
 			end
 
-			plate:Destroy()
-			food:Destroy()
+			if cust.leaving or cust.root.Parent == nil then
+				-- Left mid-meal (despawn): don't leave theater props behind.
+				if plate then
+					plate:Destroy()
+				end
+			else
+				-- The food is eaten; the EMPTY plate stays on the table until
+				-- the cleaner collects it for washing (+1 Buzz).
+				if food then
+					food:Destroy()
+				end
+				if plate then
+					plate.Name = "DirtyPlate"
+					if StaffService then
+						StaffService:NotifyMess(player, plate)
+					else
+						task.delay(60, function()
+							if plate.Parent ~= nil then
+								plate:Destroy()
+							end
+						end)
+					end
+				end
 
-			-- Tips are the seated-dining exclusive: reward for having chairs.
-			if recipe and not cust.leaving then
-				local tip =
-					RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), cust.def.tipMultiplier)
-				if tip > 0 then
-					dropTip(player, seatCf, tip)
+				-- Tips are the seated-dining exclusive: reward for having chairs.
+				if recipe then
+					local tip = RewardMath.tipAmount(
+						recipe,
+						rng:NextInteger(1, 100),
+						cust.def.tipMultiplier
+					)
+					if tip > 0 then
+						dropTip(player, seatCf, tip)
+					end
 				end
 			end
-
-			-- Diners leave a dirty plate; the cleaner clears it for +Buzz.
-			if StaffService and not cust.leaving then
-				local mess = Instance.new("Part")
-				mess.Name = "DirtyPlate"
-				mess.Shape = Enum.PartType.Cylinder
-				mess.Size = Vector3.new(0.18, 1.3, 1.3)
-				mess.Color = Color3.fromRGB(190, 182, 170)
-				mess.Material = Enum.Material.SmoothPlastic
-				mess.Anchored = true
-				mess.CanCollide = false
-				mess.CFrame = CFrame.new(seatCf.Position + Vector3.new(0, 1.1, 0))
-					* CFrame.Angles(0, 0, math.rad(90))
-				local folder = CafeService:GetFurnitureFolder(player)
-				local plotModel = folder and folder.Parent
-				if plotModel then
-					mess.Parent = plotModel
-					StaffService:NotifyMess(player, mess)
-				end
+			if cust.anim then
+				cust.anim.setSeated(false)
 			end
 			if cust.root.Parent ~= nil then
 				cust.root.Anchored = false
@@ -772,7 +706,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	pcall(function()
 		cust.root:SetNetworkOwner(nil)
 	end)
-	NpcAnimator.setup(cust.humanoid)
+	cust.anim = NpcAnimator.setup(cust.humanoid)
 	cust.bubble.Text = "…"
 
 	-- Queue phase: walk to my slot; step forward whenever the line advances.
@@ -832,7 +766,8 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	end
 	cust.orderId = orderId
 	local recipe = Recipes[recipeId :: string]
-	cust.bubble.Text = "🗨️ " .. recipe.displayName
+	-- The want-bubble: dish icon + name, readable at a glance (Café World B7).
+	cust.bubble.Text = "🗨️ " .. (recipe.icon or "🍽️") .. " " .. recipe.displayName
 
 	local deadline = os.clock() + PATIENCE_SECONDS
 	local nextStockCheck = 0

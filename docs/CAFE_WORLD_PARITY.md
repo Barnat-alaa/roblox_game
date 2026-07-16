@@ -27,8 +27,16 @@ session roadmap (ROADMAP.md).
 > live (`AssetLibraryService` + `AssetManifest`): real espresso machine, oven,
 > counter, chair, food/drink props, four clothed customer rigs, and barista/
 > waiter/cleaner rigs — all script-stripped, grid-scaled, procedural fallback
-> intact. This moves **D1** and **C4** forward (see rows). Everything still
-> ❌ below stays on S2–S5. Next up: **S2 — customer feelings**.
+> intact. This moves **D1** and **C4** forward (see rows).
+>
+> **Progress — S2 architecture + service theater shipped 2026-07-16:** cafés
+> are real buildings (facade + auto-door + private garden + expansion tiers,
+> see ROADMAP S2), and the original game's FULL service choreography now runs:
+> defined staff roles (Barista Mia = drinks · Cook Sam = food · Waiter Noah =
+> carries plates · Cleaner Pia = washes up), dish-icon bubbles on order and on
+> "ready!", the waiter walks the plate to the table, the emptied plate stays
+> until it's collected and washed. Rows B2–B4, C2–C3 updated below. Still open
+> in S2: mood faces/patience meters, storm-outs, regulars.
 
 ## A. Cooking (the core)
 
@@ -55,11 +63,11 @@ session roadmap (ROADMAP.md).
 |---|---|---|---|
 | B1 | Counters between kitchen and floor hold the food | ✅ | |
 | B2 | Customers enter, queue, take a seat at table+chair | ✅ | Phase 2 seated dining |
-| B3 | Waiter carries plate from counter to table | ✅ | Noah tray delivery (Phase 3b) |
-| B4 | Customers eat, pay, leave; dirty plates cleared | ✅ | Pia cleaner, +1 Buzz per plate |
+| B3 | Waiter carries plate from counter to table | ✅ | S2 theater: Noah walks (pathfinding) to the kitchen, picks up the REAL finished plate and sets it in front of the diner |
+| B4 | Customers eat, pay, leave; dirty plates cleared | ✅ | Visible meal on the table; the EMPTY plate remains after eating until Pia collects it and carries it off to wash (+1 Buzz) |
 | B5 | **Buzz Rating 5→105**, rises on service, falls on walkouts, drives traffic | ✅ | Buzz 0–105 on café sign drives spawn cadence |
 | B6 | Impatient customers **walk out visibly angry** | 🟡 **[S2]** | We have grumpy exits on no-stock; make the drama readable: red mood, storm-out, Buzz "−3" floater |
-| B7 | **Mood/feeling display** per customer (thought bubbles, reactions) | 🟡 **[S2]** | Order bubbles exist; add patience meter + mood faces (😊😐😠), hearts on great service — the owner's #2 complaint |
+| B7 | **Mood/feeling display** per customer (thought bubbles, reactions) | 🟡 **[S2]** | Want-bubbles now show the dish ICON + name (2026-07-16); still to come: patience meter + mood faces (😊😐😠), hearts on great service — the owner's #2 complaint |
 | B8 | Named customers; recurring **regulars** | 🟡 **[S2]** | Name tags exist; add regulars who return with a favourite dish + greeting |
 | B9 | Tips: visitors fill a **tip jar** you claim (2×/day cap) | 🟡 **[S5]** | NPC table tips exist; add a visitor tip jar (players who visit can tip once/day) |
 | B10 | Satisfaction scales payout | 🟡 **[S2]** | Wire tips/coins to mood at serve time |
@@ -70,8 +78,8 @@ session roadmap (ROADMAP.md).
 | # | Café World feature | Ours | Notes / plan |
 |---|---|---|---|
 | C1 | Hire **friends** as waiters/chefs (avatar cameo) | 🚫→🟡 | Roblox-native twist later (Phase 4+): friend cameo NPCs when you're neighbours; core staff stays NPC |
-| C2 | NPC helper (sous-chef Remmy) | ✅ | Mia barista rescue |
-| C3 | Waiter + cleaner staff | ✅ | Noah + Pia (Phase 3b) |
+| C2 | NPC helper (sous-chef Remmy) | ✅ | S2 role split — every employee has ONE job: **Mia · Barista** prepares drinks at the coffee machine, **Sam · Cook** (chef rig) prepares food at the oven/prep station; both flash the dish icon when it's ready |
+| C3 | Waiter + cleaner staff | ✅ | **Noah · Waiter** carries plates kitchen→table; **Pia · Cleaner** collects empty plates and washes them |
 | C4 | Staff outfits per café theme | 🟡 **[S1→]** | Real barista/waiter/cleaner rigs adopted (Mia/Noah/Pia). Per-theme uniform variants stay Phase 6 cosmetics |
 | C5 | Wages balancing automation | ❌ | Deliberate debt — when economy matures |
 

@@ -218,4 +218,25 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 	},
 }
 
+-- Bubble icons: what a customer wants, what the kitchen finished preparing.
+local ICONS: { [string]: string } = {
+	espresso = "☕",
+	cappuccino = "☕",
+	latte = "☕",
+	mocha = "☕",
+	slow_roast = "☕",
+	tea = "🍵",
+	iced_tea = "🧋",
+	croissant = "🥐",
+	muffin = "🧁",
+	cinnamon_roll = "🍩",
+	sandwich = "🥪",
+	club_sandwich = "🥪",
+	fruit_salad = "🍉",
+	quiche = "🥧",
+}
+for id, recipe in Recipes do
+	recipe.icon = ICONS[id] or "🍽️"
+end
+
 return Recipes

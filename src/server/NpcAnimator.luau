@@ -7,19 +7,25 @@
 
 local NpcAnimator = {}
 
+export type AnimHandle = {
+	-- Seated NPCs must stop the walk cycle (anchoring the root mid-walk left
+	-- the legs pedalling in place — owner bug report 2026-07-16).
+	setSeated: (seated: boolean) -> (),
+}
+
 local ANIMS = {
 	R6 = { idle = "rbxassetid://180435571", walk = "rbxassetid://180426354" },
 	R15 = { idle = "rbxassetid://507766388", walk = "rbxassetid://507777826" },
 }
 
-function NpcAnimator.setup(humanoid: Humanoid)
+function NpcAnimator.setup(humanoid: Humanoid): AnimHandle?
 	local char = humanoid.Parent
 	if not char then
-		return
+		return nil
 	end
 	-- Only real avatar rigs have these; procedural part-rigs would no-op.
 	if not (char:FindFirstChild("Torso") or char:FindFirstChild("LowerTorso")) then
-		return
+		return nil
 	end
 
 	local isR15 = humanoid.RigType == Enum.HumanoidRigType.R15
@@ -47,6 +53,7 @@ function NpcAnimator.setup(humanoid: Humanoid)
 	local idle = track(ids.idle)
 	local walk = track(ids.walk)
 
+	local seated = false
 	local current: boolean? = nil
 	local function setMoving(moving: boolean)
 		if moving == current then
@@ -72,8 +79,22 @@ function NpcAnimator.setup(humanoid: Humanoid)
 
 	setMoving(false)
 	humanoid.Running:Connect(function(speed)
-		setMoving(speed > 0.5)
+		if not seated then
+			setMoving(speed > 0.5)
+		end
 	end)
+
+	return {
+		setSeated = function(isSeated: boolean)
+			seated = isSeated
+			if isSeated then
+				-- Force the calm pose regardless of the last Running event —
+				-- an anchored root never fires Running(0).
+				current = nil
+				setMoving(false)
+			end
+		end,
+	}
 end
 
 return NpcAnimator

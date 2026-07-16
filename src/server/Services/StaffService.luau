@@ -1,10 +1,16 @@
 --!strict
--- Staff v2 (Phase 3b): three free employees per café, each visibly useful.
---   Mia  (barista) — static behind the counter; auto-serves any manual order
---                    left waiting past Economy.staffServeAfterSeconds.
---   Noah (waiter)  — walks plates from the counter to seated diners.
---   Pia  (cleaner) — clears dirty plates diners leave behind, +1 Buzz each.
--- All server-authoritative; grant paths stay in OrderService/KitchenService.
+-- Staff v3 (S2 service theater): four employees per café with DEFINED JOBS —
+-- the full Café-World-style choreography (see docs/CAFE_WORLD_PARITY.md C/B):
+--   Mia  (barista) — prepares DRINKS (Coffee/Tea) at the coffee machine; also
+--                    rescues manual orders left waiting too long (v1 role).
+--   Sam  (cook)    — prepares FOOD dishes at the oven/prep station.
+--                    Both show a bubble with the dish icon when it's ready.
+--   Noah (waiter)  — walks over, picks the finished plate up, carries it to
+--                    the table and sets it in front of the customer.
+--   Pia  (cleaner) — collects the emptied plate after the meal and carries it
+--                    off to be washed (+1 Buzz per plate).
+-- All server-authoritative; grant paths stay in OrderService/KitchenService —
+-- this whole flow is post-payment theater, so it can never dupe a coin.
 -- Hiring/wages arrive with monetisation-era balancing (Phase 6).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,10 +19,13 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local EconomyConfig = require(Shared.Config.Economy)
+local Recipes = require(Shared.Config.Recipes)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local Fx = require(script.Parent.Parent.Fx)
 local NpcAnimator = require(script.Parent.Parent.NpcAnimator)
+local NpcNav = require(script.Parent.Parent.NpcNav)
+local PlateFactory = require(script.Parent.Parent.PlateFactory)
 
 local StaffService = {}
 StaffService.Name = "StaffService"
@@ -29,11 +38,11 @@ local AssetLibraryService: any
 
 local CHECK_INTERVAL = 5
 local STAFF_WALK_SPEED = 11
-local STAFF_WALK_TIMEOUT = 8
 
 type StaffNpc = {
 	model: Model,
 	bubble: TextLabel,
+	displayName: string, -- bubble resting text, e.g. "Mia · Barista"
 	humanoid: Humanoid?,
 	root: BasePart?,
 	home: CFrame,
@@ -43,12 +52,21 @@ type StaffNpc = {
 
 type Crew = {
 	barista: StaffNpc?,
+	cook: StaffNpc?,
 	waiter: StaffNpc?,
 	cleaner: StaffNpc?,
 }
 
 local crewByUser: { [number]: Crew } = {}
-local messQueues: { [number]: { BasePart } } = {}
+local messQueues: { [number]: { Model } } = {}
+
+local function crewList(crew: Crew): { StaffNpc }
+	local list = {}
+	for _, npc in { crew.barista, crew.cook, crew.waiter, crew.cleaner } do
+		table.insert(list, npc)
+	end
+	return list
+end
 
 local function part(
 	model: Model,
@@ -138,6 +156,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 			return {
 				model = rig,
 				bubble = label,
+				displayName = look.displayName,
 				humanoid = humanoid,
 				root = root,
 				home = base * CFrame.new(0, 2, 0),
@@ -328,6 +347,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 	return {
 		model = model,
 		bubble = label,
+		displayName = look.displayName,
 		humanoid = humanoid,
 		root = if look.walker then root else nil,
 		home = base * CFrame.new(0, 2, 0),
@@ -336,32 +356,17 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 	}
 end
 
--- Straight-line staff walk with waddle + timeout teleport (same recovery
--- philosophy as customers).
+-- Staff walk: pathfinding around collidable furniture (NpcNav), waddle +
+-- timeout teleport as last resort — same recovery philosophy as customers.
+-- (The waiter used to "teleport" constantly: his straight-line walk hit the
+-- now-solid tables and fell into the timeout recovery every trip.)
 local function staffWalk(npc: StaffNpc, target: Vector3)
 	local humanoid = npc.humanoid
 	local root = npc.root
 	if not humanoid or not root then
 		return
 	end
-	local deadline = os.clock() + STAFF_WALK_TIMEOUT
-	local t0 = os.clock()
-	while root.Parent ~= nil do
-		local flat = (root.Position - target) * Vector3.new(1, 0, 1)
-		if flat.Magnitude < 1.6 then
-			break
-		end
-		if os.clock() > deadline then
-			npc.model:PivotTo(CFrame.new(target + Vector3.new(0, 2, 0)))
-			break
-		end
-		humanoid:MoveTo(target)
-		humanoid.HipHeight = npc.baseHip + 0.14 * math.abs(math.sin((os.clock() - t0) * 10))
-		task.wait(0.1)
-	end
-	if root.Parent ~= nil then
-		humanoid.HipHeight = npc.baseHip
-	end
+	NpcNav.walkTo(npc.model, humanoid, root, target, { baseHip = npc.baseHip })
 end
 
 local function crewOf(userId: number): Crew
@@ -373,46 +378,144 @@ local function crewOf(userId: number): Crew
 	return crew
 end
 
--- Waiter carries a plate to the seat and returns. Fire-and-forget; returns
--- false when he's mid-delivery so the caller can just spawn the plate.
-function StaffService.RequestDelivery(_self: any, player: Player, target: Vector3): boolean
-	local crew = crewOf(player.UserId)
-	local waiter = crew.waiter
-	if not waiter or waiter.busy or not waiter.root or waiter.root.Parent == nil then
+-- Wait (bounded) for a staff member to be free. Returns true when claimed.
+local function claimStaff(npc: StaffNpc?, timeout: number): boolean
+	if not npc then
 		return false
 	end
-	waiter.busy = true
-	task.spawn(function()
-		local tray = Instance.new("Part")
-		tray.Name = "Tray"
-		tray.Shape = Enum.PartType.Cylinder
-		tray.Size = Vector3.new(0.2, 1.4, 1.4)
-		tray.Color = Color3.fromRGB(245, 242, 235)
-		tray.CanCollide = false
-		tray.CanQuery = false
-		tray.Massless = true
-		tray.CFrame = (waiter.root :: BasePart).CFrame
-			* CFrame.new(0, 0.4, -1.2)
-			* CFrame.Angles(0, 0, math.rad(90))
-		tray.Parent = waiter.model
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = waiter.root
-		weld.Part1 = tray
-		weld.Parent = waiter.root
-
-		waiter.bubble.Text = "🍽️ Coming through!"
-		staffWalk(waiter, target)
-		task.wait(0.4)
-		tray:Destroy()
-		staffWalk(waiter, waiter.home.Position)
-		waiter.bubble.Text = "Noah · Waiter"
-		waiter.busy = false
-	end)
+	local deadline = os.clock() + timeout
+	while npc.busy do
+		if os.clock() > deadline or npc.model.Parent == nil then
+			return false
+		end
+		task.wait(0.25)
+	end
+	if npc.model.Parent == nil or not npc.root or (npc.root :: BasePart).Parent == nil then
+		return false
+	end
+	npc.busy = true
 	return true
 end
 
--- Cleaner queue: dirty plates diners leave behind.
-function StaffService.NotifyMess(_self: any, player: Player, mess: BasePart)
+-- Hold a plate in front of a staff member while they walk; returns a release
+-- function. The plate is anchored, so a light follow loop beats welds here.
+local function carryPlate(npc: StaffNpc, plate: Model): () -> ()
+	local carrying = true
+	task.spawn(function()
+		while carrying and plate.Parent ~= nil do
+			local root = npc.root
+			if not root or root.Parent == nil then
+				break
+			end
+			plate:PivotTo(CFrame.new((root.CFrame * CFrame.new(0, 0.2, -1.4)).Position))
+			task.wait(0.06)
+		end
+	end)
+	return function()
+		carrying = false
+	end
+end
+
+-- Find where a dish gets prepared: the matching placed appliance, and a spot
+-- BESIDE it to stand (the appliance itself is a collidable navmesh obstacle).
+local function prepStationFor(player: Player, recipe: any, fallback: Vector3): (Vector3, Vector3)
+	local wanted: { string } = if recipe.category == "Coffee" or recipe.category == "Tea"
+		then { "coffee_machine", "counter" }
+		else { recipe.applianceId, "oven", "prep_station", "counter" }
+	local folder = CafeService:GetFurnitureFolder(player)
+	if folder then
+		for _, name in wanted do
+			for _, child in folder:GetChildren() do
+				if child:IsA("Model") and child.Name == name then
+					local station = child:GetPivot().Position
+					local away = (fallback - station) * Vector3.new(1, 0, 1)
+					local dir = if away.Magnitude > 0.1 then away.Unit else Vector3.zAxis
+					return station, station + dir * 3
+				end
+			end
+		end
+	end
+	return fallback, fallback
+end
+
+-- The S2 service theater: the right preparer (barista for drinks, cook for
+-- food) walks to their appliance and finishes the dish (bubble shows its
+-- icon), then the waiter carries the plate to the table. Yields until the
+-- plate is in front of the customer. Every stage degrades gracefully — busy
+-- or missing staff just means the plate appears at the next stage directly —
+-- so a customer is never blocked on theater. Returns (plate, food) or nil.
+function StaffService.DeliverMeal(
+	_self: any,
+	player: Player,
+	recipeId: string,
+	seatCf: CFrame
+): (Model?, Instance?)
+	local recipe = Recipes[recipeId]
+	local folder = CafeService:GetFurnitureFolder(player)
+	if not recipe or not folder then
+		return nil, nil
+	end
+	local plotModel = folder.Parent :: Model
+	local crew = crewOf(player.UserId)
+	local icon = recipe.icon or "🍽️"
+	-- Where the finished plate must land: on the table, in front of the chair.
+	local tableCf = CFrame.new(seatCf.Position + seatCf.LookVector * 1.8 + Vector3.new(0, 1.15, 0))
+
+	local isDrink = recipe.category == "Coffee" or recipe.category == "Tea"
+	local preparer = if isDrink then (crew.barista or crew.cook) else (crew.cook or crew.barista)
+	local fallbackPos = if preparer then preparer.home.Position else seatCf.Position
+	local station, standAt = prepStationFor(player, recipe, fallbackPos)
+
+	local plate: Model, food: Instance
+	-- STAGE 1 — preparation, with the "dish ready" icon bubble.
+	if preparer and claimStaff(preparer, 6) then
+		preparer.bubble.Text = if isDrink then "☕ Preparing…" else "🍳 Preparing…"
+		staffWalk(preparer, standAt)
+		task.wait(1.6)
+		preparer.bubble.Text = icon .. " " .. recipe.displayName .. " ✓"
+		plate, food = PlateFactory.make(AssetLibraryService, recipe)
+		plate:PivotTo(CFrame.new(station.X, 3.3, station.Z))
+		plate.Parent = plotModel
+		task.delay(1.4, function()
+			if preparer.model.Parent ~= nil then
+				staffWalk(preparer, preparer.home.Position)
+				preparer.bubble.Text = preparer.displayName
+			end
+			preparer.busy = false
+		end)
+	else
+		plate, food = PlateFactory.make(AssetLibraryService, recipe)
+		plate:PivotTo(CFrame.new(station.X, 3.3, station.Z))
+		plate.Parent = plotModel
+	end
+
+	-- STAGE 2 — the waiter picks the plate up and carries it to the table.
+	local waiter = crew.waiter
+	if waiter and claimStaff(waiter, 6) then
+		waiter.bubble.Text = "🍽️ Coming through!"
+		staffWalk(waiter, plate:GetPivot().Position)
+		local release = carryPlate(waiter, plate)
+		staffWalk(waiter, seatCf.Position + seatCf.RightVector * 2.4)
+		release()
+		plate:PivotTo(tableCf)
+		task.spawn(function()
+			task.wait(0.4)
+			if waiter.model.Parent ~= nil then
+				staffWalk(waiter, waiter.home.Position)
+				waiter.bubble.Text = waiter.displayName
+			end
+			waiter.busy = false
+		end)
+	else
+		task.wait(0.8) -- beat so the "ready" bubble reads even with no waiter
+		plate:PivotTo(tableCf)
+	end
+
+	return plate, food
+end
+
+-- Cleaner queue: emptied plates diners leave behind (whole plate models).
+function StaffService.NotifyMess(_self: any, player: Player, mess: Model)
 	local queue = messQueues[player.UserId]
 	if not queue then
 		queue = {}
@@ -427,6 +530,7 @@ function StaffService.NotifyMess(_self: any, player: Player, mess: BasePart)
 	end)
 end
 
+-- Pia collects the empty plate and carries it off to be washed (+1 Buzz).
 local function runCleaner(player: Player)
 	local crew = crewOf(player.UserId)
 	local cleaner = crew.cleaner
@@ -438,21 +542,33 @@ local function runCleaner(player: Player)
 	if not mess or mess.Parent == nil then
 		return
 	end
-	cleaner.busy = true
+	if not claimStaff(cleaner, 0.1) then
+		table.insert(queue, 1, mess)
+		return
+	end
 	task.spawn(function()
 		cleaner.bubble.Text = "🧹 On it!"
-		staffWalk(cleaner, mess.Position)
+		staffWalk(cleaner, mess:GetPivot().Position)
 		if mess.Parent ~= nil then
 			Fx.floatText(
-				mess.Position + Vector3.new(0, 1.2, 0),
+				mess:GetPivot().Position + Vector3.new(0, 1.2, 0),
 				"+1 🔥",
 				Color3.fromRGB(255, 180, 120)
 			)
-			mess:Destroy()
 			KitchenService:AddBuzz(player, 1)
+			-- Carry the dirty plate back to the kitchen and wash it.
+			local release = carryPlate(cleaner, mess)
+			staffWalk(cleaner, cleaner.home.Position)
+			release()
+			cleaner.bubble.Text = "🧼 Washing…"
+			task.wait(1.4)
+			if mess.Parent ~= nil then
+				mess:Destroy()
+			end
+		else
+			staffWalk(cleaner, cleaner.home.Position)
 		end
-		staffWalk(cleaner, cleaner.home.Position)
-		cleaner.bubble.Text = "Pia · Cleaner"
+		cleaner.bubble.Text = cleaner.displayName
 		cleaner.busy = false
 	end)
 end
@@ -466,7 +582,8 @@ local function ensureCrew(player: Player)
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 
 	if crew.barista == nil then
-		local npc = buildStaff(
+		-- Walker now: she walks to the coffee machine to prepare drinks (S2).
+		crew.barista = buildStaff(
 			origin * CFrame.new(width / 2 - 10, 0, 18) * CFrame.Angles(0, math.rad(180), 0),
 			{
 				displayName = "Mia · Barista",
@@ -474,10 +591,23 @@ local function ensureCrew(player: Player)
 				skin = Color3.fromRGB(235, 185, 150),
 				shirt = Color3.fromRGB(90, 70, 60),
 				hair = Color3.fromRGB(90, 55, 35),
-				walker = false,
+				walker = true,
 			}
 		)
-		crew.barista = npc
+	end
+	if crew.cook == nil then
+		-- The chef prepares every FOOD dish at the oven/prep station (S2).
+		crew.cook = buildStaff(
+			origin * CFrame.new(width / 2 - 22, 0, 19) * CFrame.Angles(0, math.rad(180), 0),
+			{
+				displayName = "Sam · Cook",
+				role = "Cook",
+				skin = Color3.fromRGB(215, 165, 125),
+				shirt = Color3.fromRGB(245, 242, 235),
+				hair = Color3.fromRGB(60, 45, 35),
+				walker = true,
+			}
+		)
 	end
 	if crew.waiter == nil then
 		crew.waiter = buildStaff(
@@ -549,10 +679,8 @@ function StaffService.Start(_self: any)
 	Players.PlayerRemoving:Connect(function(player)
 		local crew = crewByUser[player.UserId]
 		if crew then
-			for _, npc in { crew.barista, crew.waiter, crew.cleaner } do
-				if npc then
-					npc.model:Destroy()
-				end
+			for _, npc in crewList(crew) do
+				npc.model:Destroy()
 			end
 			crewByUser[player.UserId] = nil
 		end
@@ -564,10 +692,8 @@ function StaffService.Start(_self: any)
 	if AssetLibraryService then
 		AssetLibraryService:OnReady(function()
 			for userId, crew in crewByUser do
-				for _, npc in { crew.barista, crew.waiter, crew.cleaner } do
-					if npc then
-						npc.model:Destroy()
-					end
+				for _, npc in crewList(crew) do
+					npc.model:Destroy()
 				end
 				crewByUser[userId] = nil
 			end
