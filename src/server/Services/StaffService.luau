@@ -38,6 +38,7 @@ type StaffNpc = {
 	root: BasePart?,
 	home: CFrame,
 	busy: boolean,
+	baseHip: number, -- resting HipHeight (real rigs differ); the waddle bobs around it
 }
 
 type Crew = {
@@ -141,6 +142,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 				root = root,
 				home = base * CFrame.new(0, 2, 0),
 				busy = false,
+				baseHip = humanoid.HipHeight,
 			}
 		end
 		rig:Destroy()
@@ -330,6 +332,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 		root = if look.walker then root else nil,
 		home = base * CFrame.new(0, 2, 0),
 		busy = false,
+		baseHip = 1,
 	}
 end
 
@@ -353,11 +356,11 @@ local function staffWalk(npc: StaffNpc, target: Vector3)
 			break
 		end
 		humanoid:MoveTo(target)
-		humanoid.HipHeight = 1 + 0.14 * math.abs(math.sin((os.clock() - t0) * 10))
+		humanoid.HipHeight = npc.baseHip + 0.14 * math.abs(math.sin((os.clock() - t0) * 10))
 		task.wait(0.1)
 	end
 	if root.Parent ~= nil then
-		humanoid.HipHeight = 1
+		humanoid.HipHeight = npc.baseHip
 	end
 end
 
@@ -464,7 +467,7 @@ local function ensureCrew(player: Player)
 
 	if crew.barista == nil then
 		local npc = buildStaff(
-			origin * CFrame.new(width / 2 + 4, 0, 2.4) * CFrame.Angles(0, math.rad(180), 0),
+			origin * CFrame.new(width / 2 - 10, 0, 18) * CFrame.Angles(0, math.rad(180), 0),
 			{
 				displayName = "Mia · Barista",
 				role = "Barista",
@@ -478,7 +481,7 @@ local function ensureCrew(player: Player)
 	end
 	if crew.waiter == nil then
 		crew.waiter = buildStaff(
-			origin * CFrame.new(width / 2 - 6, 0, 8) * CFrame.Angles(0, math.rad(180), 0),
+			origin * CFrame.new(width / 2 + 6, 0, 16) * CFrame.Angles(0, math.rad(180), 0),
 			{
 				displayName = "Noah · Waiter",
 				role = "Waiter",
@@ -491,7 +494,7 @@ local function ensureCrew(player: Player)
 	end
 	if crew.cleaner == nil then
 		crew.cleaner =
-			buildStaff(origin * CFrame.new(4, 0, 8) * CFrame.Angles(0, math.rad(160), 0), {
+			buildStaff(origin * CFrame.new(8, 0, 16) * CFrame.Angles(0, math.rad(160), 0), {
 				displayName = "Pia · Cleaner",
 				role = "Cleaner",
 				skin = Color3.fromRGB(255, 210, 175),

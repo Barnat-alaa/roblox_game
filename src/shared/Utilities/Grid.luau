@@ -5,8 +5,8 @@
 local Grid = {}
 
 Grid.CELL_SIZE = 4 -- studs per grid cell
-Grid.PLOT_WIDTH = 12 -- cells along local X
-Grid.PLOT_DEPTH = 12 -- cells along local Z
+Grid.PLOT_WIDTH = 18 -- cells along local X (fixed for every expansion tier)
+Grid.PLOT_DEPTH = 32 -- cells along local Z at MAX expansion tier
 
 -- A footprint rotated 90 or 270 degrees swaps its width and depth.
 function Grid.footprintSize(width: number, depth: number, rotation: number): (number, number)
@@ -16,18 +16,41 @@ function Grid.footprintSize(width: number, depth: number, rotation: number): (nu
 	return width, depth
 end
 
+-- Optional plotWidth/plotDepth override the constants so callers can clamp to
+-- the owner's CURRENT expansion tier (World.interiorDepthTiers) — placement
+-- must never spill into the not-yet-purchased garden.
 function Grid.inBounds(
 	gridX: number,
 	gridY: number,
 	width: number,
 	depth: number,
-	rotation: number
+	rotation: number,
+	plotWidth: number?,
+	plotDepth: number?
 ): boolean
+	local maxW = plotWidth or Grid.PLOT_WIDTH
+	local maxD = plotDepth or Grid.PLOT_DEPTH
 	local w, d = Grid.footprintSize(width, depth, rotation)
-	return gridX >= 0
-		and gridY >= 0
-		and (gridX + w) <= Grid.PLOT_WIDTH
-		and (gridY + d) <= Grid.PLOT_DEPTH
+	return gridX >= 0 and gridY >= 0 and (gridX + w) <= maxW and (gridY + d) <= maxD
+end
+
+-- Horizontal distance (studs) from a world position to the plot's interior
+-- rectangle — 0 when inside. Proximity checks ("am I at my café?") must use
+-- this instead of distance-to-centre: on deep plots the centre is far from
+-- the front counters, so a radius check would reject a player standing at
+-- their own stove.
+function Grid.distanceToPlotRect(
+	origin: CFrame,
+	worldPos: Vector3,
+	widthCells: number?,
+	depthCells: number?
+): number
+	local w = (widthCells or Grid.PLOT_WIDTH) * Grid.CELL_SIZE
+	local d = (depthCells or Grid.PLOT_DEPTH) * Grid.CELL_SIZE
+	local lp = origin:PointToObjectSpace(worldPos)
+	local dx = math.max(-lp.X, lp.X - w, 0)
+	local dz = math.max(-lp.Z, lp.Z - d, 0)
+	return math.sqrt(dx * dx + dz * dz)
 end
 
 -- Axis-aligned rectangle overlap in cell space.

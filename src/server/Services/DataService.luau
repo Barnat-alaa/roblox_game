@@ -45,24 +45,27 @@ local function defaultProfile(): Types.PlayerData
 		reputation = Economy.startingReputation,
 		cafeStars = 0,
 		buzz = 10,
+		expansionTier = 0,
 		kitchen = { cooks = {}, stock = {} },
 		daily = { dateKey = "", goals = {}, streak = 0 },
 		trophies = {},
 		inventory = { table_round = 2, chair_wood = 4, plant_small = 1 },
+		-- Seed kitchen sits a few cells into the room, clear of the front door
+		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {
 			{
 				instanceId = "seed_coffee",
 				catalogId = "coffee_machine",
-				gridX = 1,
-				gridY = 0,
+				gridX = 2,
+				gridY = 3,
 				floor = 0,
 				rotation = 0,
 			},
 			{
 				instanceId = "seed_counter",
 				catalogId = "counter",
-				gridX = 4,
-				gridY = 0,
+				gridX = 5,
+				gridY = 3,
 				floor = 0,
 				rotation = 0,
 			},

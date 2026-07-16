@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage.Shared
 local Types = require(Shared.Types)
 local Grid = require(Shared.Utilities.Grid)
+local World = require(Shared.Config.World)
 local Furniture = require(Shared.Config.Furniture)
 local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
@@ -53,7 +54,11 @@ local function validatePlacement(
 	if not def.rotatable and rotation ~= 0 then
 		return false, "not_rotatable"
 	end
-	if not Grid.inBounds(gridX, gridY, def.width, def.depth, rotation) then
+	-- Placement is clamped to the owner's CURRENT interior depth: the garden
+	-- behind the back wall is not buildable until the expansion is bought (S4).
+	local tier = math.max(0, math.floor(tonumber(data.expansionTier) or 0))
+	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+	if not Grid.inBounds(gridX, gridY, def.width, def.depth, rotation, nil, depthCells) then
 		return false, "out_of_bounds"
 	end
 	if #data.placedFurniture >= EconomyConfig.maxPlacedFurniture then

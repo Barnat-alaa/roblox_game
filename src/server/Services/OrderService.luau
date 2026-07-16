@@ -78,10 +78,9 @@ local function isNearOwnCafe(player: Player): boolean
 	if not origin then
 		return false
 	end
-	local w = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local d = Grid.PLOT_DEPTH * Grid.CELL_SIZE
-	local centre = (origin * CFrame.new(w / 2, 0, d / 2)).Position
-	return (hrp.Position - centre).Magnitude <= 60
+	-- Rect distance, not centre distance: the S2 plots are deep, so a radius
+	-- from the centre would reject a player standing at their own front counter.
+	return Grid.distanceToPlotRect(origin, hrp.Position) <= 40
 end
 
 local function handleClaim(player: Player, orderId: unknown, _manualCook: unknown)

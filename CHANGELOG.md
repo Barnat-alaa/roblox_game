@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-16 — S2 architecture: facade + auto-door, 3x interiors, private gardens
+- **Every café is now a real building** (CafeService rework): a front facade
+  with two windows and a centred **door that swings open automatically** for
+  any approaching player/customer/staff and closes behind them (never
+  collidable — nobody can ever be trapped; the wall gap is the navmesh route).
+  The sign moved to the facade; walls are 9 studs (unjumpable) — the door is
+  the way in AND out, which also fixes "I can't exit my own café".
+- **Interiors are 3x bigger** (18×24 cells = 72×96 studs, was 12×12 = 48×48)
+  and **tiered**: `PlayerData.expansionTier` (0–2) drives interior depth
+  (24/28/32 cells). The shell (floors, side/back walls, garden) rebuilds per
+  tier; `CafeService.RefreshTier` is the S4 buy-land hook, already functional.
+- **Private garden** behind every café: fenced grass with a gate off the back
+  wall (auto-door), stone path, tree and flower beds. Buying land (S4) will
+  convert garden depth into interior depth, Café-World-style; ≥40 studs of
+  garden always remain.
+- **Proximity checks are rect-based** (`Grid.distanceToPlotRect`, unit-tested):
+  distance-to-centre would have rejected cooking/serving at the front counters
+  of the deep new plots. Serve/cook/compliment guards migrated.
+- Queue moved INSIDE the café (through the front door); staff idle spots and
+  trophy shelf repositioned (shelf now on the left wall — tier-independent);
+  camera fades the new facade + shell walls and zooms out to 120; build
+  preview + server placement clamp to the owner's tier (garden previews red).
+- Seed kitchen moved off the doorway lane; new placement spec cases for
+  per-tier bounds and rect distance.
+- NOT yet live-verified: Studio MCP was disconnected this session — owner
+  playtest checklist in KNOWN_ISSUES.md.
+
 ### Fixed — 2026-07-15 — S1 polish from playtest feedback (dimensions, walk, pathing)
 - **Object dimensions**: switched furniture scaling from fit-to-footprint (which
   squashed long/tall pieces — the counter shrank to 23% and chairs to ~16%) to

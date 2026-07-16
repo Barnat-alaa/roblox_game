@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Grid = require(Shared.Utilities.Grid)
+local World = require(Shared.Config.World)
 local Furniture = require(Shared.Config.Furniture)
 local Remotes = require(Shared.Network.Remotes)
 
@@ -91,7 +92,11 @@ local function updatePreview()
 	pv.Size =
 		Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
 	pv.CFrame = Grid.cellToWorld(origin, gx, gy, def.width, def.depth, rotation, def.height)
-	local fits = Grid.inBounds(gx, gy, def.width, def.depth, rotation)
+	-- Mirror the server's tier clamp (CafeService sets the ExpansionTier
+	-- attribute): the unpurchased garden must preview red, not green.
+	local tier = tonumber(player:GetAttribute("ExpansionTier")) or 0
+	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+	local fits = Grid.inBounds(gx, gy, def.width, def.depth, rotation, nil, depthCells)
 	pv.Color = if fits then Color3.fromRGB(90, 200, 110) else Color3.fromRGB(220, 80, 80)
 	pv.Parent = workspace
 end

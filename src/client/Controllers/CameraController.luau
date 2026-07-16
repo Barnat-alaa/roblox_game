@@ -22,34 +22,45 @@ local targetYaw = currentYaw
 
 local zoom = 40
 local targetZoom = zoom
-local ZOOM_MIN, ZOOM_MAX = 24, 95
+local ZOOM_MIN, ZOOM_MAX = 24, 120
 
 local focus = Vector3.new(24, 2, 24)
 
 local WALL_NORMALS: { [string]: Vector3 } = {
+	WallFront = Vector3.new(0, 0, -1),
 	WallLeft = Vector3.new(-1, 0, 0),
 	WallRight = Vector3.new(1, 0, 0),
 	WallBack = Vector3.new(0, 0, 1),
 }
 
+local function fadeWallsIn(container: Instance, cameraPos: Vector3)
+	for _, child in container:GetChildren() do
+		local localNormal = WALL_NORMALS[child.Name]
+		if localNormal and child:IsA("BasePart") then
+			-- Row-1 plots are rotated 180°, so resolve the outward normal
+			-- in the wall's own space instead of assuming world axes.
+			local normal = child.CFrame:VectorToWorldSpace(localNormal)
+			local toCam = cameraPos - child.Position
+			toCam = Vector3.new(toCam.X, 0, toCam.Z)
+			local facing = toCam.Magnitude > 0.01 and toCam.Unit:Dot(normal) > 0.35
+			child.LocalTransparencyModifier = if facing then 0.98 else 0
+		end
+	end
+end
+
 -- Fade any wall whose outward face points at the camera (you see through it).
+-- Facade walls sit on the plot model; side/back walls live in the tier-built
+-- "Shell" submodel (S2), so scan both levels.
 local function updateWallFades(cameraPos: Vector3)
 	local plots = workspace:FindFirstChild("Plots")
 	if not plots then
 		return
 	end
 	for _, plot in plots:GetChildren() do
-		for _, child in plot:GetChildren() do
-			local localNormal = WALL_NORMALS[child.Name]
-			if localNormal and child:IsA("BasePart") then
-				-- Row-1 plots are rotated 180°, so resolve the outward normal
-				-- in the wall's own space instead of assuming world axes.
-				local normal = child.CFrame:VectorToWorldSpace(localNormal)
-				local toCam = cameraPos - child.Position
-				toCam = Vector3.new(toCam.X, 0, toCam.Z)
-				local facing = toCam.Magnitude > 0.01 and toCam.Unit:Dot(normal) > 0.35
-				child.LocalTransparencyModifier = if facing then 0.98 else 0
-			end
+		fadeWallsIn(plot, cameraPos)
+		local shell = plot:FindFirstChild("Shell")
+		if shell then
+			fadeWallsIn(shell, cameraPos)
 		end
 	end
 end

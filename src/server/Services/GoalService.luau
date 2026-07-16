@@ -10,7 +10,6 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage.Shared
 local Goals = require(Shared.Config.Goals)
-local Grid = require(Shared.Utilities.Grid)
 local Types = require(Shared.Types)
 local Remotes = require(Shared.Network.Remotes)
 
@@ -94,8 +93,6 @@ local function renderShelf(player: Player)
 
 	local shelf = Instance.new("Model")
 	shelf.Name = "TrophyShelf"
-	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
 
 	local board = Instance.new("Part")
 	board.Name = "ShelfBoard"
@@ -104,7 +101,9 @@ local function renderShelf(player: Player)
 	board.Size = Vector3.new(7, 0.4, 1.4)
 	board.Color = Color3.fromRGB(120, 90, 70)
 	board.Material = Enum.Material.Wood
-	board.CFrame = origin * CFrame.new(width - 5.5, 5.4, depth - 1.2)
+	-- On the LEFT wall near the entrance: the front of the room never moves
+	-- when the interior expands (the back wall does — S2 tier system).
+	board.CFrame = origin * CFrame.new(1.35, 5.4, 9) * CFrame.Angles(0, math.rad(90), 0)
 	board.Parent = shelf
 
 	local slot = 0

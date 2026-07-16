@@ -2,6 +2,30 @@
 
 Tracked shortcomings of the current build. Each has an owner-facing note and a plan.
 
+## S2 architecture build (2026-07-16) — NOT yet live-verified
+The facade/auto-door/3x-interior/garden rework shipped gates-green but the
+Studio MCP link was down, so it has not run once. **Owner playtest checklist**
+(open `SocialCafe.rbxlx` — if Studio shows its home page, use the Recent list):
+1. Spawn: you stand on the street facing your café's DOOR; sign + Buzz above it.
+2. Walk at the door → it swings open, closes behind you. Same on the way OUT
+   (the original "trapped inside" bug). You can never be stuck: the leaf never
+   blocks movement even closed.
+3. Interior: noticeably bigger room (3x); furniture renders; placement preview
+   turns RED past the back wall (the garden is not buildable yet — that's the
+   S4 land purchase).
+4. Back wall gate → the private garden: fence, tree, flower beds, stone path.
+5. Customers walk IN through the door, queue inside, sit, eat, leave through
+   the door. Staff (Mia/Noah/Pia) idle deeper in the room.
+6. Cooking at a front stove still works (the serve/cook distance check was
+   rebuilt for deep plots — this is the regression to watch).
+If anything is off, screenshot + tell Claude; the next session fixes before S2
+moods work starts.
+
+## Movement
+- **Staff walk in straight lines** (timeout teleport recovery): with collidable
+  furniture they can bump/pop. Customers already use PathfindingService;
+  migrate staffWalk to it in the S2 polish pass.
+
 ## Data / persistence
 - **No cross-server session locking.** `DataService` uses a single DataStore key
   with retries + autosave, not ProfileStore. Risk: item duplication / data loss

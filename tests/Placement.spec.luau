@@ -31,6 +31,38 @@ return function()
 			expect(Grid.inBounds(Grid.PLOT_WIDTH - 1, 0, 1, 2, 0)).to.equal(true)
 			expect(Grid.inBounds(Grid.PLOT_WIDTH - 1, 0, 1, 2, 1)).to.equal(false)
 		end)
+		it("clamps to a per-tier depth when one is passed", function()
+			-- expansion tiers shrink the buildable depth below PLOT_DEPTH (S2)
+			local tierDepth = 24
+			expect(Grid.inBounds(0, tierDepth - 1, 1, 1, 0, nil, tierDepth)).to.equal(true)
+			expect(Grid.inBounds(0, tierDepth, 1, 1, 0, nil, tierDepth)).to.equal(false)
+			-- the same cell is fine at max depth
+			expect(Grid.inBounds(0, tierDepth, 1, 1, 0)).to.equal(true)
+		end)
+	end)
+
+	describe("Grid.distanceToPlotRect", function()
+		local origin = CFrame.new(100, 0, 50)
+		it("returns 0 anywhere inside the plot rectangle", function()
+			expect(Grid.distanceToPlotRect(origin, Vector3.new(101, 3, 51))).to.equal(0)
+			local w = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+			local d = Grid.PLOT_DEPTH * Grid.CELL_SIZE
+			expect(Grid.distanceToPlotRect(origin, Vector3.new(100 + w - 1, 0, 50 + d - 1))).to.equal(
+				0
+			)
+		end)
+		it("measures straight-out distance from the front edge", function()
+			-- 10 studs street-side of the front wall (local -Z)
+			expect(Grid.distanceToPlotRect(origin, Vector3.new(110, 2, 40))).to.be.near(10, 0.001)
+		end)
+		it("measures diagonal distance from a corner", function()
+			expect(Grid.distanceToPlotRect(origin, Vector3.new(97, 0, 46))).to.be.near(5, 0.001)
+		end)
+		it("respects a rotated origin", function()
+			local rotated = CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(180), 0)
+			-- with a 180° origin, local +Z runs along world -Z
+			expect(Grid.distanceToPlotRect(rotated, Vector3.new(0, 0, 8))).to.be.near(8, 0.001)
+		end)
 	end)
 
 	describe("Grid.rectsOverlap", function()

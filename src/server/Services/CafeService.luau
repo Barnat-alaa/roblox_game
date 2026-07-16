@@ -1,11 +1,24 @@
 --!strict
--- Builds the greybox neighbourhood street of plots, assigns one plot per player,
--- renders their saved furniture, and teleports them in. Each plot exposes a local
--- origin CFrame that the grid system uses for placement.
+-- Builds the neighbourhood street of café BUILDINGS, assigns one plot per
+-- player, renders their saved furniture, and teleports them in. Each plot
+-- exposes a local origin CFrame that the grid system uses for placement.
+--
+-- S2 architecture (2026-07-16): a café is a real building —
+--   • FRONT FACADE with windows and an auto-door that swings open when any
+--     player/customer/staff approaches and closes behind them (the door is
+--     the only way in and out; walls are too tall to jump).
+--   • TIERED INTERIOR: floor area starts at 3x the original and deepens with
+--     PlayerData.expansionTier (buy-land flow lands in S4; the geometry,
+--     data field and rebuild path already work — see RefreshTier).
+--   • PRIVATE GARDEN behind the café: fenced grass with a gate off the back
+--     wall. Buying land converts garden depth into interior depth.
+-- Static parts (facade, sign, awning) build once; the tier-dependent "Shell"
+-- (floors, side/back walls, garden) rebuilds on claim/expand/release.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
@@ -22,7 +35,19 @@ local BuildService: any
 
 local NUM_PLOTS = World.plotCount
 local PLOTS_PER_ROW = World.plotsPerRow
-local PLOT_SPACING = Grid.PLOT_WIDTH * Grid.CELL_SIZE + 12
+local PLOT_SPACING = Grid.PLOT_WIDTH * Grid.CELL_SIZE + World.plotGap
+
+local WALL_H = World.wallHeight
+local DOOR_W = World.doorWidth
+local DOOR_H = World.doorHeight
+local GATE_W = World.gateWidth
+
+-- Total plot depth in studs: max interior + the garden strip that always remains.
+local TOTAL_DEPTH = Grid.PLOT_DEPTH * Grid.CELL_SIZE + World.gardenMinDepth
+
+local function tierDepthCells(tier: number): number
+	return World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+end
 
 -- Two rows of cafés face each other across a boulevard. Row 0 fronts -Z;
 -- row 1 is rotated 180° so its fronts face +Z toward the same street. All
@@ -46,10 +71,132 @@ type Plot = {
 	ownerLabel: TextLabel,
 	ownerUserId: number?,
 	shutter: Model?,
+	shell: Model?,
+	tier: number,
 }
 
 local plots: { Plot } = {}
 local plotByUser: { [number]: Plot } = {}
+
+-- ————— auto-doors —————
+
+type Door = {
+	leaf: BasePart,
+	closedCf: CFrame,
+	openCf: CFrame,
+	isOpen: boolean,
+}
+
+local doors: { [string]: Door } = {}
+
+-- A swinging door leaf. NEVER collidable — a door must never trap anyone —
+-- and the wall gap it fills is what the pathfinding navmesh routes through.
+local function makeDoor(
+	key: string,
+	parent: Instance,
+	cf: CFrame,
+	w: number,
+	h: number,
+	color: Color3,
+	openDeg: number
+): BasePart
+	local leaf = Instance.new("Part")
+	leaf.Name = "DoorLeaf"
+	leaf.Anchored = true
+	leaf.CanCollide = false
+	leaf.CanQuery = false
+	leaf.Size = Vector3.new(w, h, 0.35)
+	leaf.CFrame = cf
+	leaf.Color = color
+	leaf.Material = Enum.Material.Wood
+	leaf.Parent = parent
+
+	-- Handle detail so the leaf reads as a door, not a plank.
+	local handle = Instance.new("Part")
+	handle.Name = "DoorHandle"
+	handle.Anchored = true
+	handle.CanCollide = false
+	handle.CanQuery = false
+	handle.Shape = Enum.PartType.Ball
+	handle.Size = Vector3.new(0.4, 0.4, 0.4)
+	handle.Color = Color3.fromRGB(220, 190, 120)
+	handle.Material = Enum.Material.Metal
+	handle.CFrame = cf * CFrame.new(w / 2 - 0.5, -0.2, -0.3)
+	handle.Parent = leaf
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = leaf
+	weld.Part1 = handle
+	weld.Parent = leaf
+	handle.Anchored = false
+
+	local hinge = cf * CFrame.new(-w / 2, 0, 0)
+	doors[key] = {
+		leaf = leaf,
+		closedCf = cf,
+		openCf = hinge * CFrame.Angles(0, math.rad(openDeg), 0) * CFrame.new(w / 2, 0, 0),
+		isOpen = false,
+	}
+	return leaf
+end
+
+local function setDoorOpen(door: Door, open: boolean)
+	if door.isOpen == open or door.leaf.Parent == nil then
+		return
+	end
+	door.isOpen = open
+	TweenService:Create(
+		door.leaf,
+		TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ CFrame = if open then door.openCf else door.closedCf }
+	):Play()
+end
+
+-- Anyone near a door opens it: players, customers, staff.
+local function collectCharacterPositions(): { Vector3 }
+	local positions: { Vector3 } = {}
+	for _, player in Players:GetPlayers() do
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if hrp and hrp:IsA("BasePart") then
+			table.insert(positions, hrp.Position)
+		end
+	end
+	for _, folderName in { "Customers", "Staff" } do
+		local folder = workspace:FindFirstChild(folderName)
+		if folder then
+			for _, npc in folder:GetChildren() do
+				if npc:IsA("Model") then
+					local root = npc:FindFirstChild("HumanoidRootPart")
+					if root and root:IsA("BasePart") then
+						table.insert(positions, root.Position)
+					end
+				end
+			end
+		end
+	end
+	return positions
+end
+
+local function tickDoors()
+	local positions = collectCharacterPositions()
+	for key, door in doors do
+		if door.leaf.Parent == nil then
+			doors[key] = nil
+		else
+			local centre = door.closedCf.Position
+			local near = false
+			for _, pos in positions do
+				local flat = (pos - centre) * Vector3.new(1, 0, 1)
+				if flat.Magnitude < 9 then
+					near = true
+					break
+				end
+			end
+			setDoorOpen(door, near)
+		end
+	end
+end
+
+-- ————— part helper —————
 
 local function makePart(
 	name: string,
@@ -70,81 +217,250 @@ local function makePart(
 	return part
 end
 
+local function makeWindow(parent: Instance, cf: CFrame)
+	makePart("WindowFrame", Vector3.new(5, 3.6, 0.4), cf, Color3.fromRGB(245, 242, 235), parent)
+	local glass = makePart(
+		"WindowGlass",
+		Vector3.new(4.2, 2.8, 0.3),
+		cf * CFrame.new(0, 0, -0.07),
+		Color3.fromRGB(170, 210, 230),
+		parent,
+		Enum.Material.Glass
+	)
+	glass.Transparency = 0.15
+	glass.CanCollide = false
+end
+
+-- ————— tier-dependent shell: floors, side/back walls, garden —————
+
+local function rebuildShell(plot: Plot, tier: number)
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local depth = tierDepthCells(tier) * Grid.CELL_SIZE
+	local origin = plot.origin
+
+	doors["G" .. plot.index] = nil
+	if plot.shell then
+		plot.shell:Destroy()
+	end
+	local shell = Instance.new("Model")
+	shell.Name = "Shell"
+
+	-- Warm oak interior floor (tier-sized), grass garden behind it.
+	makePart(
+		"Floor",
+		Vector3.new(width, 1, depth),
+		origin * CFrame.new(width / 2, -0.5, depth / 2),
+		Color3.fromRGB(176, 132, 90),
+		shell,
+		Enum.Material.WoodPlanks
+	)
+	makePart(
+		"GardenFloor",
+		Vector3.new(width, 1, TOTAL_DEPTH - depth),
+		origin * CFrame.new(width / 2, -0.5, (depth + TOTAL_DEPTH) / 2),
+		Color3.fromRGB(112, 152, 88),
+		shell,
+		Enum.Material.Grass
+	)
+
+	-- Side walls run the interior only; the garden gets picket fences.
+	makePart(
+		"WallLeft",
+		Vector3.new(1, WALL_H, depth),
+		origin * CFrame.new(0, WALL_H / 2, depth / 2),
+		Color3.fromRGB(158, 70, 58),
+		shell
+	)
+	makePart(
+		"WallRight",
+		Vector3.new(1, WALL_H, depth),
+		origin * CFrame.new(width, WALL_H / 2, depth / 2),
+		Color3.fromRGB(158, 70, 58),
+		shell
+	)
+
+	-- Back wall with a garden gate gap in the middle + interior windows.
+	local gateL = width / 2 - GATE_W / 2
+	local gateR = width / 2 + GATE_W / 2
+	makePart(
+		"WallBack",
+		Vector3.new(gateL, WALL_H, 1),
+		origin * CFrame.new(gateL / 2, WALL_H / 2, depth),
+		Color3.fromRGB(150, 60, 50),
+		shell
+	)
+	makePart(
+		"WallBack",
+		Vector3.new(width - gateR, WALL_H, 1),
+		origin * CFrame.new(gateR + (width - gateR) / 2, WALL_H / 2, depth),
+		Color3.fromRGB(150, 60, 50),
+		shell
+	)
+	makePart(
+		"WallBack",
+		Vector3.new(GATE_W, WALL_H - 6.5, 1),
+		origin * CFrame.new(width / 2, 6.5 + (WALL_H - 6.5) / 2, depth),
+		Color3.fromRGB(150, 60, 50),
+		shell
+	)
+	for _, fx in { 0.22, 0.78 } do
+		makeWindow(shell, origin * CFrame.new(width * fx, 4.6, depth - 0.55))
+	end
+
+	-- Garden gate (auto-door, swings into the garden).
+	makeDoor(
+		"G" .. plot.index,
+		shell,
+		origin * CFrame.new(width / 2, 3.2, depth),
+		GATE_W - 0.3,
+		6.3,
+		Color3.fromRGB(112, 78, 55),
+		100
+	)
+
+	-- Picket fence around the garden (low — players can hop it, NPCs won't path over).
+	local fenceColor = Color3.fromRGB(235, 228, 212)
+	local gardenDepth = TOTAL_DEPTH - depth
+	local function fenceRun(centerCf: CFrame, length: number, alongX: boolean)
+		for _, y in { 0.9, 2 } do
+			makePart(
+				"FenceRail",
+				if alongX then Vector3.new(length, 0.3, 0.25) else Vector3.new(0.25, 0.3, length),
+				centerCf * CFrame.new(0, y, 0),
+				fenceColor,
+				shell,
+				Enum.Material.Wood
+			)
+		end
+		local posts = math.max(2, math.floor(length / 8))
+		for i = 0, posts do
+			local along = -length / 2 + (length / posts) * i
+			makePart(
+				"FencePost",
+				Vector3.new(0.45, 2.6, 0.45),
+				centerCf * CFrame.new(if alongX then along else 0, 1.3, if alongX then 0 else along),
+				fenceColor,
+				shell,
+				Enum.Material.Wood
+			)
+		end
+	end
+	fenceRun(origin * CFrame.new(0, 0, depth + gardenDepth / 2), gardenDepth, false)
+	fenceRun(origin * CFrame.new(width, 0, depth + gardenDepth / 2), gardenDepth, false)
+	fenceRun(origin * CFrame.new(width / 2, 0, TOTAL_DEPTH), width, true)
+
+	-- Garden charm: stone path from the gate, a tree, two flower beds.
+	for i = 1, 3 do
+		makePart(
+			"GardenPath",
+			Vector3.new(2.6, 0.2, 2),
+			origin * CFrame.new(width / 2, 0.1, depth + i * 3 - 1),
+			Color3.fromRGB(190, 180, 165),
+			shell,
+			Enum.Material.Slate
+		)
+	end
+	makePart(
+		"GardenTrunk",
+		Vector3.new(1.2, 5, 1.2),
+		origin * CFrame.new(10, 2.5, depth + gardenDepth * 0.55),
+		Color3.fromRGB(110, 82, 60),
+		shell,
+		Enum.Material.Wood
+	)
+	local canopy = makePart(
+		"GardenCanopy",
+		Vector3.new(6.5, 6.5, 6.5),
+		origin * CFrame.new(10, 6.6, depth + gardenDepth * 0.55),
+		Color3.fromRGB(105, 150, 88),
+		shell,
+		Enum.Material.Grass
+	)
+	canopy.Shape = Enum.PartType.Ball
+	canopy.CanCollide = false
+	for bi, bx in { width - 12, 16 } do
+		local bedZ = depth + gardenDepth * (if bi == 1 then 0.35 else 0.75)
+		makePart(
+			"FlowerBed",
+			Vector3.new(2.6, 0.8, 2.6),
+			origin * CFrame.new(bx, 0.4, bedZ),
+			Color3.fromRGB(185, 115, 90),
+			shell,
+			Enum.Material.Concrete
+		)
+		for fi, fc in { Color3.fromRGB(220, 90, 90), Color3.fromRGB(240, 200, 90) } do
+			local bloom = makePart(
+				"Flower",
+				Vector3.new(0.9, 0.9, 0.9),
+				origin * CFrame.new(bx + (fi - 1.5) * 1.1, 1.2, bedZ),
+				fc,
+				shell,
+				Enum.Material.Grass
+			)
+			bloom.Shape = Enum.PartType.Ball
+			bloom.CanCollide = false
+		end
+	end
+
+	shell.Parent = plot.model
+	plot.shell = shell
+	plot.tier = tier
+end
+
+-- ————— per-plot static build: facade, door, sign, awning —————
+
 local function buildPlot(index: number, parent: Instance): Plot
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
 	local origin = plotOriginFor(index)
 
 	local model = Instance.new("Model")
 	model.Name = "Plot_" .. index
 	model:SetAttribute("plotIndex", index)
 
-	-- Warm oak planks + deep maroon walls: the cosy interior read of the
-	-- classic café sims (see docs/ART_DIRECTION.md).
+	-- FRONT FACADE: two wall segments + lintel around a centred door gap.
+	local gapL = width / 2 - DOOR_W / 2
+	local gapR = width / 2 + DOOR_W / 2
 	makePart(
-		"Floor",
-		Vector3.new(width, 1, depth),
-		origin * CFrame.new(width / 2, -0.5, depth / 2),
-		Color3.fromRGB(176, 132, 90),
-		model,
-		Enum.Material.WoodPlanks
-	)
-
-	local wallH = 8
-	makePart(
-		"WallBack",
-		Vector3.new(width, wallH, 1),
-		origin * CFrame.new(width / 2, wallH / 2, depth),
+		"WallFront",
+		Vector3.new(gapL, WALL_H, 1),
+		origin * CFrame.new(gapL / 2, WALL_H / 2, 0),
 		Color3.fromRGB(150, 60, 50),
 		model
 	)
 	makePart(
-		"WallLeft",
-		Vector3.new(1, wallH, depth),
-		origin * CFrame.new(0, wallH / 2, depth / 2),
-		Color3.fromRGB(158, 70, 58),
+		"WallFront",
+		Vector3.new(width - gapR, WALL_H, 1),
+		origin * CFrame.new(gapR + (width - gapR) / 2, WALL_H / 2, 0),
+		Color3.fromRGB(150, 60, 50),
 		model
 	)
 	makePart(
-		"WallRight",
-		Vector3.new(1, wallH, depth),
-		origin * CFrame.new(width, wallH / 2, depth / 2),
-		Color3.fromRGB(158, 70, 58),
+		"WallFront",
+		Vector3.new(DOOR_W, WALL_H - DOOR_H, 1),
+		origin * CFrame.new(width / 2, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
+		Color3.fromRGB(150, 60, 50),
 		model
 	)
-
-	-- White-framed windows + a wooden door on the back wall.
-	for _, fx in { 0.25, 0.72 } do
-		makePart(
-			"WindowFrame",
-			Vector3.new(4.4, 3.6, 0.4),
-			origin * CFrame.new(width * fx, 4.6, depth - 0.55),
-			Color3.fromRGB(245, 242, 235),
-			model
-		)
-		local glass = makePart(
-			"WindowGlass",
-			Vector3.new(3.6, 2.8, 0.3),
-			origin * CFrame.new(width * fx, 4.6, depth - 0.62),
-			Color3.fromRGB(170, 210, 230),
-			model,
-			Enum.Material.Glass
-		)
-		glass.Transparency = 0.15
+	for _, wx in { 15, width - 15 } do
+		makeWindow(model, origin * CFrame.new(wx, 4.6, -0.55))
 	end
-	makePart(
-		"Door",
-		Vector3.new(3.2, 5.6, 0.4),
-		origin * CFrame.new(width * 0.5, 2.8, depth - 0.55),
-		Color3.fromRGB(112, 78, 55),
+
+	-- The FRONT DOOR: swings inward for anyone approaching, closes behind them.
+	makeDoor(
+		"F" .. index,
 		model,
-		Enum.Material.Wood
+		origin * CFrame.new(width / 2, DOOR_H / 2 - 0.05, 0),
+		DOOR_W - 0.4,
+		DOOR_H - 0.25,
+		Color3.fromRGB(112, 78, 55),
+		-100
 	)
 
+	-- Sign above the door: the café's name + Buzz, readable from the street.
 	local sign = makePart(
 		"Sign",
 		Vector3.new(width, 2, 0.5),
-		origin * CFrame.new(width / 2, wallH + 1, depth),
+		origin * CFrame.new(width / 2, WALL_H + 1, 0),
 		Color3.fromRGB(120, 90, 70),
 		model
 	)
@@ -167,13 +483,13 @@ local function buildPlot(index: number, parent: Instance): Plot
 	label.Text = "Empty Café"
 	label.Parent = gui
 
-	-- Striped awning over the open front (Phase 2 charm pass).
+	-- Striped awning over the front (Phase 2 charm pass).
 	for i = 0, 7 do
 		local slat = makePart(
 			"AwningSlat",
 			Vector3.new(width / 8, 0.25, 3.4),
 			origin
-				* CFrame.new(width / 16 + i * (width / 8), wallH - 0.7, -0.9)
+				* CFrame.new(width / 16 + i * (width / 8), WALL_H - 0.7, -0.9)
 				* CFrame.Angles(math.rad(-12), 0, 0),
 			if i % 2 == 0 then Color3.fromRGB(196, 60, 50) else Color3.fromRGB(245, 242, 235),
 			model,
@@ -186,7 +502,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	local glowAnchor = makePart(
 		"InteriorGlow",
 		Vector3.new(0.4, 0.4, 0.4),
-		origin * CFrame.new(width / 2, wallH - 1.6, depth / 2),
+		origin * CFrame.new(width / 2, WALL_H - 1.6, 14),
 		Color3.fromRGB(255, 220, 170),
 		model
 	)
@@ -194,7 +510,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	glowAnchor.CanCollide = false
 	local interiorLight = Instance.new("PointLight")
 	interiorLight.Color = Color3.fromRGB(255, 214, 160)
-	interiorLight.Range = 20
+	interiorLight.Range = 24
 	interiorLight.Brightness = 0.65
 	interiorLight.Parent = glowAnchor
 
@@ -215,14 +531,18 @@ local function buildPlot(index: number, parent: Instance): Plot
 
 	model.Parent = parent
 
-	return {
+	local plot: Plot = {
 		index = index,
 		origin = origin,
 		model = model,
 		furnitureFolder = furnitureFolder,
 		ownerLabel = label,
 		ownerUserId = nil,
+		shell = nil,
+		tier = -1,
 	}
+	rebuildShell(plot, 0)
+	return plot
 end
 
 -- Warm golden-hour pass: the street should feel like a Mediterranean evening.
@@ -356,7 +676,7 @@ local function buildPlaza(parent: Instance)
 	)
 	water.Shape = Enum.PartType.Cylinder
 	water.Transparency = 0.35
-	local column = makePart(
+	makePart(
 		"FountainColumn",
 		Vector3.new(1.6, 3, 1.6),
 		CFrame.new(midX, 2.4, plazaZ),
@@ -364,7 +684,6 @@ local function buildPlaza(parent: Instance)
 		folder,
 		Enum.Material.Slate
 	)
-	column.Name = "FountainColumn"
 	local bowl = makePart(
 		"FountainBowl",
 		Vector3.new(0.6, 4, 4),
@@ -455,9 +774,8 @@ local function buildPlaza(parent: Instance)
 	workspace:SetAttribute("PlazaCenter", centre)
 end
 
--- Unowned cafés read as CLOSED: wooden shutters across the open front and a
--- dark interior. Claiming a plot visibly "opens" the café — lobbies feel
--- alive with real neighbours instead of identical empty boxes.
+-- Unowned cafés read as CLOSED: wooden shutters across the facade and a dark
+-- interior. Claiming a plot visibly "opens" the café.
 local function buildShutter(plot: Plot): Model
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 	local shutter = Instance.new("Model")
@@ -466,7 +784,7 @@ local function buildShutter(plot: Plot): Model
 	makePart(
 		"ShutterPanel",
 		Vector3.new(width - 1, 5.4, 0.6),
-		plot.origin * CFrame.new(width / 2, 2.7, 0.4),
+		plot.origin * CFrame.new(width / 2, 2.7, -0.9),
 		Color3.fromRGB(139, 112, 82),
 		shutter,
 		Enum.Material.WoodPlanks
@@ -475,7 +793,7 @@ local function buildShutter(plot: Plot): Model
 		makePart(
 			"ShutterSlat",
 			Vector3.new(width - 1, 0.18, 0.68),
-			plot.origin * CFrame.new(width / 2, 0.9 + i * 0.9, 0.4),
+			plot.origin * CFrame.new(width / 2, 0.9 + i * 0.9, -0.9),
 			Color3.fromRGB(112, 88, 62),
 			shutter,
 			Enum.Material.Wood
@@ -484,7 +802,7 @@ local function buildShutter(plot: Plot): Model
 	local board = makePart(
 		"ClosedBoard",
 		Vector3.new(6, 2.2, 0.3),
-		plot.origin * CFrame.new(width / 2, 4, -0.1),
+		plot.origin * CFrame.new(width / 2, 4, -1.4),
 		Color3.fromRGB(96, 70, 52),
 		shutter,
 		Enum.Material.Wood
@@ -549,6 +867,8 @@ function CafeService.GetPlotInfo(_self: any, index: number): (CFrame?, number?)
 end
 
 -- Shared proximity guard for interactions that must happen at your own café.
+-- Rect-based (distance to the plot rectangle), NOT distance-to-centre: on the
+-- deep S2 plots the centre is ~70 studs from the front counters.
 function CafeService.IsNearOwnPlot(_self: any, player: Player, maxDistance: number): boolean
 	local plot = plotByUser[player.UserId]
 	local character = player.Character
@@ -559,10 +879,22 @@ function CafeService.IsNearOwnPlot(_self: any, player: Player, maxDistance: numb
 	if not (hrp and hrp:IsA("BasePart")) then
 		return false
 	end
-	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
-	local centre = (plot.origin * CFrame.new(width / 2, 0, depth / 2)).Position
-	return (hrp.Position - centre).Magnitude <= maxDistance
+	return Grid.distanceToPlotRect(plot.origin, hrp.Position) <= maxDistance
+end
+
+-- Re-read the owner's expansionTier and rebuild the shell if it changed.
+-- Called on join (after data load) and by the S4 buy-land flow.
+function CafeService.RefreshTier(_self: any, player: Player)
+	local plot = plotByUser[player.UserId]
+	if not plot then
+		return
+	end
+	local data = DataService:GetProfile(player)
+	local tier = if data then math.max(0, math.floor(tonumber(data.expansionTier) or 0)) else 0
+	if plot.tier ~= tier then
+		rebuildShell(plot, tier)
+	end
+	player:SetAttribute("ExpansionTier", tier)
 end
 
 local function assignPlot(player: Player): Plot?
@@ -583,7 +915,7 @@ end
 local function teleportOnto(plot: Plot, character: Model)
 	local hrp = character:WaitForChild("HumanoidRootPart", 5)
 	if hrp and hrp:IsA("BasePart") then
-		-- Arrive on the street IN FRONT of your own café, facing it —
+		-- Arrive on the street IN FRONT of your own café, facing the door —
 		-- the "this is my restaurant" moment (owner request).
 		local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 		local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
@@ -609,6 +941,7 @@ local function onPlayerAdded(player: Player)
 		task.wait(0.1)
 		tries += 1
 	end
+	CafeService:RefreshTier(player)
 	BuildService:RenderProfile(player)
 
 	if player.Character then
@@ -625,6 +958,9 @@ local function onPlayerRemoving(player: Player)
 		plot.ownerUserId = nil
 		plot.furnitureFolder:ClearAllChildren()
 		plot.model:SetAttribute("ownerUserId", nil)
+		if plot.tier ~= 0 then
+			rebuildShell(plot, 0)
+		end
 		setPlotClosed(plot)
 		plotByUser[player.UserId] = nil
 	end
@@ -646,8 +982,8 @@ function CafeService.Start(_self: any)
 	end
 
 	-- Shared street ground so nobody falls into the void: spans both rows
-	-- and the boulevard between them.
-	local depthSpan = World.boulevardWidth + 2 * Grid.PLOT_DEPTH * Grid.CELL_SIZE + 80
+	-- (café + garden) and the boulevard between them.
+	local depthSpan = World.boulevardWidth + 2 * TOTAL_DEPTH + 80
 	local ground = Instance.new("Part")
 	ground.Name = "StreetGround"
 	ground.Anchored = true
@@ -665,13 +1001,24 @@ function CafeService.Start(_self: any)
 	buildStreetDecor(workspace)
 	buildPlaza(workspace)
 
+	-- The door watcher: swings any door whose approach zone has a character in it.
+	task.spawn(function()
+		while true do
+			task.wait(0.25)
+			local ok, err = pcall(tickDoors)
+			if not ok then
+				Log.warn("Door tick failed:", err)
+			end
+		end
+	end)
+
 	for _, player in Players:GetPlayers() do
 		task.spawn(onPlayerAdded, player)
 	end
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
 
-	Log.info("CafeService built", NUM_PLOTS, "plots")
+	Log.info("CafeService built", NUM_PLOTS, "plots (facade + garden architecture)")
 end
 
 return CafeService

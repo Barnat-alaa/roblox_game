@@ -54,10 +54,8 @@ local function isNearPlot(player: Player, origin: CFrame, maxDistance: number): 
 	if not (hrp and hrp:IsA("BasePart")) then
 		return false
 	end
-	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local depth = Grid.PLOT_DEPTH * Grid.CELL_SIZE
-	local centre = (origin * CFrame.new(width / 2, 0, depth / 2)).Position
-	return (hrp.Position - centre).Magnitude <= maxDistance
+	-- Rect distance (S2 deep plots): 0 while inside the café, grows outside.
+	return Grid.distanceToPlotRect(origin, hrp.Position) <= maxDistance
 end
 
 local function handleVisit(player: Player, payload: unknown)

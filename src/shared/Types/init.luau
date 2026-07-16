@@ -81,6 +81,7 @@ export type PlayerData = {
 	reputation: number,
 	cafeStars: number,
 	buzz: number, -- 0..105 café hype: fed customers raise it, walkouts drop it
+	expansionTier: number, -- 0-based index into World.interiorDepthTiers (buy land → deeper café)
 	inventory: { [string]: number },
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },

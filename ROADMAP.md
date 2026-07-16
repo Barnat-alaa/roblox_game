@@ -61,10 +61,17 @@ _Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying" + facade_
 - **Regulars**: named repeat customers with a favourite dish and a greeting
   bubble ("Zoe's back — she loves Croissants!"); serving the favourite pays
   a loyalty bonus. Mobile-size touch targets, sound stingers on reactions.
-- **Café facade + front door** (owner feedback): a proper front wall with a
-  **door that opens as a customer enters and closes behind them** (tween +
-  chime), so the café reads as a building, not an open box. Customers path to
-  the door, through it, to the counter/seat.
+- **[DONE 2026-07-16 — awaiting owner playtest]** Café facade + front door:
+  proper front wall with windows, sign over the door, and an **auto-door**
+  that swings open for players/customers/staff and closes behind them —
+  the café is a building and the door is the only way in/out (fixes being
+  trapped inside). Customers path through the door to an inside queue.
+- **[DONE 2026-07-16 — awaiting owner playtest]** Bigger cafés + private
+  gardens (owner request, pulled forward from S4 groundwork): interiors are
+  **3x the floor area** (18×24 cells), every plot has a **fenced private
+  garden** with a gate, and the interior deepens by `expansionTier` (24/28/32
+  cells) — the S4 "buy land" flow only needs the purchase UI + pricing; the
+  geometry, persistence field, placement clamps and rebuild path all work.
 - Exit: 2 minutes of watching the room tells a story with zero UI reading.
 
 ### S3 — THE MENU: exact Café World parity (market + cookbook + prep)

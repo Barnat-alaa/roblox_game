@@ -427,10 +427,11 @@ local function spawnCustomerModel(
 	return buildNpcModel(def, style)
 end
 
--- Line slot 1 is the service window; the rest trail toward the street.
+-- The queue now lives INSIDE the café (S2 facade): customers path through the
+-- front door and line up in front of the counter area; slot 1 is the deepest.
 local function slotPosition(origin: CFrame, slot: number): Vector3
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	return (origin * CFrame.new(width / 2, 2, -3 - (slot - 1) * QUEUE_SPACING)).Position
+	return (origin * CFrame.new(width / 2 - 6, 2, 10 - (slot - 1) * QUEUE_SPACING)).Position
 end
 
 -- Move toward one point with a deadline + the chibi waddle (harmless on real
