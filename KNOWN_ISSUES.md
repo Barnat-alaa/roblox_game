@@ -2,11 +2,12 @@
 
 Tracked shortcomings of the current build. Each has an owner-facing note and a plan.
 
-## S2 build (2026-07-16, two passes) — NOT yet live-verified
-Facade/auto-door/3x-interior/garden + the full service theater shipped
-gates-green, but the Studio MCP link was down both sessions, so none of it has
-run once. **Owner playtest checklist** (open `SocialCafe.rbxlx` — if Studio
-shows its home page, use the Recent list):
+## S2 build — LIVE-VERIFIED 2026-07-17 (by Claude via Studio MCP)
+Confirmed running: facade+door+garden+14-stud walls, chair auto-facing, still
+seated legs, icon bubbles, Barista/Cook role split, waiter plate carry (zero
+teleports after the collision-group + station-target fixes), dirty plate →
+owner Clean-up prompt / Pia wash cycle, cleaner sweeping, 16/16 assets.
+**Owner feel-pass checklist still worth a run** (things only a human notices):
 1. From the STREET the café reads as a building: front wall + windows + sign
    visible (walls only x-ray once you step inside — that was the fade bug).
 2. Walk at the door → swings open, closes behind you; works on the way OUT too.

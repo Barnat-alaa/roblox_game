@@ -170,6 +170,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 				staffFolder.Parent = workspace
 			end
 			rig.Parent = staffFolder
+			NpcNav.assignNpcGroup(rig)
 			pcall(function()
 				root:SetNetworkOwner(nil)
 			end)
@@ -360,6 +361,7 @@ local function buildStaff(base: CFrame, look: StaffLook): StaffNpc
 		staffFolder.Parent = workspace
 	end
 	model.Parent = staffFolder
+	NpcNav.assignNpcGroup(model)
 	if look.walker and root then
 		pcall(function()
 			root:SetNetworkOwner(nil)
@@ -515,7 +517,10 @@ function StaffService.DeliverMeal(
 	local waiter = crew.waiter
 	if waiter and claimStaff(waiter, 6) then
 		waiter.bubble.Text = "🍽️ Coming through!"
-		staffWalk(waiter, plate:GetPivot().Position)
+		-- Walk to the STAND SPOT beside the station, not to the plate itself —
+		-- the plate sits ON the collidable appliance, and pathing into it made
+		-- the walk fail into the teleport recovery (live-caught 2026-07-17).
+		staffWalk(waiter, standAt)
 		local release = carryPlate(waiter, plate)
 		staffWalk(waiter, seatCf.Position + seatCf.RightVector * 2.4)
 		release()

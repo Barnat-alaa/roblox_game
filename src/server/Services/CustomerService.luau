@@ -731,6 +731,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 
 	cust.model:PivotTo(CFrame.lookAt(streetPos, slotPosition(origin, 1)))
 	cust.model.Parent = customersFolder
+	NpcNav.assignNpcGroup(cust.model)
 	pcall(function()
 		cust.root:SetNetworkOwner(nil)
 	end)

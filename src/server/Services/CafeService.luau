@@ -26,6 +26,7 @@ local World = require(Shared.Config.World)
 local Log = require(Shared.Utilities.Log)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
+local NpcNav = require(script.Parent.Parent.NpcNav)
 
 local CafeService = {}
 CafeService.Name = "CafeService"
@@ -918,6 +919,8 @@ end
 
 local function teleportOnto(plot: Plot, character: Model)
 	local hrp = character:WaitForChild("HumanoidRootPart", 5)
+	-- Players never collide with NPCs (walk through your own queue freely).
+	NpcNav.assignPlayerGroup(character)
 	if hrp and hrp:IsA("BasePart") then
 		-- Arrive on the street IN FRONT of your own café, facing the door —
 		-- the "this is my restaurant" moment (owner request).

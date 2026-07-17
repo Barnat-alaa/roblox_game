@@ -204,16 +204,25 @@ local function buildRigTemplate(assetId: number): Model?
 		container:Destroy()
 		return nil
 	end
-	-- Walk-capability gate: a rig with fewer Motor6D joints than a minimal R6
-	-- skeleton was weld-assembled (a statue) and would slide instead of walk.
+	-- Walk-capability gate: an INCOMPLETE Motor6D skeleton walks wrong (the
+	-- 5/6-joint barista kit limped and hopped — live-verified 2026-07-17).
+	-- Full skeleton required: R6 = 6 joints, R15 = 15.
 	local motors = 0
 	for _, d in rig:GetDescendants() do
 		if d:IsA("Motor6D") then
 			motors += 1
 		end
 	end
-	if motors < 4 then
-		Log.warn("AssetLibrary: rig has no walk joints — rejected", assetId)
+	local required = if humanoid.RigType == Enum.HumanoidRigType.R15 then 15 else 6
+	if motors < required then
+		Log.warn(
+			string.format(
+				"AssetLibrary: rig %d has %d/%d walk joints — rejected",
+				assetId,
+				motors,
+				required
+			)
+		)
 		container:Destroy()
 		return nil
 	end

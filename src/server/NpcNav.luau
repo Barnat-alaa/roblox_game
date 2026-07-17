@@ -7,8 +7,52 @@
 -- at 0.14 studs but keeps the code path identical).
 
 local PathfindingService = game:GetService("PathfindingService")
+local PhysicsService = game:GetService("PhysicsService")
 
 local NpcNav = {}
+
+-- NPCs never collide with each other or with player characters (live-verified
+-- 2026-07-16: the waiter got body-blocked by queueing customers, timed out and
+-- teleported). They still collide with the world (walls, floors, furniture).
+local NPC_GROUP = "Npc"
+local PLAYER_GROUP = "PlayerChar"
+
+local groupsReady = false
+local function ensureGroups()
+	if groupsReady then
+		return
+	end
+	groupsReady = true
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup(NPC_GROUP)
+	end)
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup(PLAYER_GROUP)
+	end)
+	pcall(function()
+		PhysicsService:CollisionGroupSetCollidable(NPC_GROUP, NPC_GROUP, false)
+		PhysicsService:CollisionGroupSetCollidable(NPC_GROUP, PLAYER_GROUP, false)
+	end)
+end
+
+local function assignGroup(model: Model, group: string)
+	ensureGroups()
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CollisionGroup = group
+		end
+	end
+end
+
+-- Call on every spawned customer/staff model.
+function NpcNav.assignNpcGroup(model: Model)
+	assignGroup(model, NPC_GROUP)
+end
+
+-- Call on every player character (walk through your own queue freely).
+function NpcNav.assignPlayerGroup(character: Model)
+	assignGroup(character, PLAYER_GROUP)
+end
 
 export type WalkOptions = {
 	baseHip: number,
@@ -86,7 +130,12 @@ function NpcNav.walkTo(
 				t0,
 				opts
 			)
-			if outcome ~= "arrived" then
+			if outcome == "timeout" then
+				-- Stuck on one leg: hop to that waypoint and keep WALKING the
+				-- rest of the route (a cross-room teleport reads terribly).
+				model:PivotTo(CFrame.new(waypoints[i].Position + Vector3.new(0, 2, 0)))
+				outcome = "arrived"
+			elseif outcome ~= "arrived" then
 				break
 			end
 		end

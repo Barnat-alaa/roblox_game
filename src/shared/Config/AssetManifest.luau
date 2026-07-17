@@ -81,7 +81,9 @@ local AssetManifest = {
 	-- docs/ASSET_SHOPPING_LIST.md. Any rig that fails the walk-capability gate
 	-- in AssetLibraryService falls back to the procedural chibi.
 	staff = {
-		Barista = { assetId = 139800912587260, name = "Barista Coffee Shop (Xx_PhoenixVenomTiger)" },
+		-- The barista kit (139800912587260) had a 5/6-joint skeleton and
+		-- limped — rejected by the walk gate; Mia uses a verified base + apron.
+		Barista = { assetId = 7315192066, name = "Walking NPC base (Victional101)" },
 		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
 		Waiter = { assetId = 7907970704, name = "Walking NPC base (ARISTOKRAT1CHE)" },
 		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },

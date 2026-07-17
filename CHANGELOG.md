@@ -5,6 +5,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-17 — LIVE-VERIFIED: the whole S2 stack, + 3 movement fixes it caught
+Studio MCP reconnected; everything from the three S2 passes ran live. Confirmed
+working: facade/door/garden/14-stud walls, 16/16 assets loaded, chair
+auto-facing (deliberately wrong rotations corrected server-side), seated
+customers' legs STILL, dish-icon bubbles, Barista/Cook role split ("🍳
+Preparing…" → "🥪 Café Sandwich ✓"), waiter carry with real MealPlate, dirty
+plate + owner Clean-up prompt + Pia's collect-carry-wash cycle, take-order
+prompt present, cleaner idle sweeping. Movement was measured (max step per
+0.4s across the crew) and three real bugs were caught and fixed:
+- **NPCs no longer collide with NPCs or players** (collision groups in
+  NpcNav): the waiter was body-blocked by queueing customers, timed out and
+  teleported 23 studs. Verified after: everyone at walk speed, zero jumps.
+- **Stuck-recovery hops to the blocked waypoint** and keeps walking instead
+  of teleporting across the room to the final target.
+- **Waiter walks to the stand-spot beside the station**, not to the plate on
+  top of the collidable appliance (that unreachable target failed pathing
+  into the teleport recovery), and the barista kit (139800912587260) turned
+  out to have a 5/6-joint skeleton — it limped; the walk gate now requires a
+  COMPLETE skeleton per rig type (R6=6, R15=15) and Mia moved to a verified
+  walking base with her uniform apron. Final audit: max step ≤4.6 studs
+  (= walk speed) for every staff member across service cycles.
+
 ### Added — 2026-07-16 — S2 third pass: work your own café + walk-verified rigs + taller walls
 - **The owner can WORK the café** (the gameplay transformation): `E` on the
   ordering customer to **take the order** and serve it from stock (+2 Buzz
