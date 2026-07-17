@@ -25,6 +25,7 @@ AssetLibraryService.Name = "AssetLibraryService"
 
 local templates: { [string]: Model } = {}
 local customerRigKeys: { string } = {}
+local worldVariants: { [string]: { Model } } = {} -- split packs (e.g. trees)
 local rng = Random.new()
 local cacheFolder: Folder
 local isReady = false
@@ -179,6 +180,93 @@ local function buildFurnitureTemplate(
 	return model
 end
 
+local function cache(key: string, template: Model?)
+	if template then
+		template.Name = key
+		template.Parent = cacheFolder
+		templates[key] = template
+	end
+end
+
+-- Height-scale a loose model in place (world decor variants).
+local function scaleToHeight(model: Model, height: number)
+	local _, size = model:GetBoundingBox()
+	if size.Y > 0.01 then
+		local scale = height / size.Y
+		if scale > 0 and scale == scale then
+			pcall(function()
+				model:ScaleTo(model:GetScale() * scale)
+			end)
+		end
+	end
+end
+
+-- World dressing (garden/street/plaza): one template, or a SPLIT pack whose
+-- child models become variants (tree packs ship as a whole forest scene).
+local function buildWorldTemplates(key: string, entry: any)
+	local container = loadAndSanitise(entry.assetId)
+	if not container then
+		return false
+	end
+	local model = unwrap(container)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		end
+	end
+	if entry.split then
+		-- Packs ship as child Models, loose (Mesh)Parts, or Models inside a
+		-- Folder (the tree pack) — flatten one folder level, wrap loose parts.
+		local pool: { Instance } = {}
+		for _, child in model:GetChildren() do
+			if child:IsA("Folder") then
+				for _, sub in child:GetChildren() do
+					table.insert(pool, sub)
+				end
+			else
+				table.insert(pool, child)
+			end
+		end
+		local variants: { Model } = {}
+		for _, child in pool do
+			local variant: Model? = nil
+			if child:IsA("Model") and child:FindFirstChildWhichIsA("BasePart", true) then
+				child.Parent = nil
+				variant = child
+			elseif child:IsA("BasePart") then
+				local wrapper = Instance.new("Model")
+				child.Parent = wrapper
+				variant = wrapper
+			end
+			if variant then
+				if ensurePrimary(variant) then
+					scaleToHeight(variant, entry.height)
+					variant.Name = key .. "_variant"
+					variant.Parent = cacheFolder
+					table.insert(variants, variant)
+				else
+					variant:Destroy()
+				end
+			end
+		end
+		model:Destroy()
+		if #variants == 0 then
+			return false
+		end
+		worldVariants[key] = variants
+		return true
+	end
+	if not ensurePrimary(model) then
+		model:Destroy()
+		return false
+	end
+	scaleToHeight(model, entry.height)
+	cache("world:" .. key, model)
+	return true
+end
+
 -- Rigs: keep Humanoid + HumanoidRootPart + Head, ready for MoveTo. The rig can
 -- sit one level below the LoadAsset container (a Model wrapping the character),
 -- so locate the Humanoid recursively and adopt its parent as the template.
@@ -247,14 +335,6 @@ local function buildRigTemplate(assetId: number): Model?
 	return rig
 end
 
-local function cache(key: string, template: Model?)
-	if template then
-		template.Name = key
-		template.Parent = cacheFolder
-		templates[key] = template
-	end
-end
-
 -- ————— public API: always returns a fresh clone or nil —————
 
 local function cloneOf(key: string): Model?
@@ -279,6 +359,15 @@ function AssetLibraryService.GetCustomerRig(_self: any): Model?
 		return nil
 	end
 	return cloneOf(customerRigKeys[rng:NextInteger(1, #customerRigKeys)])
+end
+
+-- World decor clone: a split pack returns a random variant.
+function AssetLibraryService.GetWorld(_self: any, key: string): Model?
+	local variants = worldVariants[key]
+	if variants and #variants > 0 then
+		return variants[rng:NextInteger(1, #variants)]:Clone()
+	end
+	return cloneOf("world:" .. key)
 end
 
 function AssetLibraryService.IsReady(_self: any): boolean
@@ -314,8 +403,14 @@ function AssetLibraryService.Start(_self: any)
 
 		for catalogId, entry in AssetManifest.furniture do
 			local t = buildFurnitureTemplate(entry.assetId, entry.height, entry.maxSpan, entry.yaw)
+			if t and entry.liftY then
+				t:SetAttribute("liftY", entry.liftY)
+			end
 			cache("furniture:" .. catalogId, t)
 			tally(t ~= nil)
+		end
+		for key, entry in AssetManifest.world do
+			tally(buildWorldTemplates(key, entry))
 		end
 		for category, entry in AssetManifest.props do
 			local t = buildPropTemplate(entry.assetId, entry.fit)

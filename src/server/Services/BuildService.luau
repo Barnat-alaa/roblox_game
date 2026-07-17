@@ -387,7 +387,9 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		end
 		local _, size = template:GetBoundingBox()
 		local floorY = cf.Y - def.height / 2
-		local pos = Vector3.new(cf.Position.X, floorY + size.Y / 2, cf.Position.Z)
+		-- Wall art / clocks / hanging lamps mount above the floor (liftY).
+		local lift = tonumber(template:GetAttribute("liftY")) or 0
+		local pos = Vector3.new(cf.Position.X, floorY + lift + size.Y / 2, cf.Position.Z)
 		template:PivotTo(CFrame.new(pos) * CFrame.Angles(0, math.rad(90 * placed.rotation), 0))
 		template.Parent = folder
 		return

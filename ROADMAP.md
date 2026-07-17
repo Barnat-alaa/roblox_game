@@ -48,8 +48,14 @@ props. Polish pass (dimensions, walk animations, pathfinding) also shipped._
 - Every asset logged in docs/ASSET_LICENSES.md. Exit: before/after screenshot
   where a stranger says "café" in 1 second. **Then publish to cloud (HANDOFF §6.2).**
 
-### S2 — Customers you can FEEL + a café that reads as a building
-_Parity: B6, B7, B8, B10 · the owner's "interaction isn't satisfying" + facade_
+### S2 — Customers you can FEEL + a café that reads as a building ✅ CLOSED (2026-07-17)
+_All shipped and live-verified: facade/auto-door/3x interiors/private gardens/
+14-stud walls · service theater with four defined staff roles on walk-verified
+rigs · owner works the café (take orders/clean/tips + COMBO streaks) · mood
+faces + patience bars, storm-outs, persisted REGULARS with favourite dishes ·
+Priorité 4 dressing (11 buyable interior items, auto-dressed gardens, real
+street furniture + plaza fountain). Next: S3 — THE MENU._
+_Original bullets kept below for history:_
 - **[DONE early, in the S1 polish pass]** Natural NPC movement: real R6/R15
   **walk/idle animations** (NpcAnimator) and **PathfindingService routing
   around collidable furniture** (customers no longer slide or clip through

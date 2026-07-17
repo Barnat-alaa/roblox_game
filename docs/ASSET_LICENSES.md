@@ -47,6 +47,39 @@ licensed for on-platform use; IDs pinned in `src/shared/Config/AssetManifest.lua
 | staff:Waiter | 7907970704 | Walking NPC | ARISTOKRAT1CHE | Noah — customer base + navy uniform apron (walk-verified rig policy) |
 | staff:Cleaner | 8243272714 | Mom's NPC | RAMAS_RMZ | Pia — customer base + green uniform apron; shop a dedicated maid rig (shopping list #63) |
 
+## Priorité 4 haul (adopted 2026-07-17, live-verified)
+
+All free Creator Store models, scripts stripped by AssetLibraryService, IDs
+pinned in `Config/AssetManifest.luau` (furniture/world sections):
+
+| Our key | Asset ID | Use |
+| --- | --- | --- |
+| furniture:painting_wall | 100568868323466 | buyable wall art (liftY mount) |
+| furniture:menu_board | 105938474697422 | buyable menu board |
+| furniture:ceiling_lamp | 98590526337131 | buyable hanging lamp |
+| furniture:shelf_plants | 115524597372020 | buyable plant shelf |
+| furniture:shelf_wall | 71513583918977 | buyable wall shelf |
+| furniture:wall_clock | 121238777618172 | buyable clock (scripts stripped) |
+| furniture:curtains | 129812037524677 | buyable window curtains |
+| furniture:booth_diner | 8740051429 | buyable seat (87 parts — perf note) |
+| furniture:bar_stool | 127833501873867 | buyable seat |
+| furniture:coat_rack | 18647331589 | buyable decor |
+| furniture:cake_display | 175775615 | buyable display |
+| world:flowers / hedge / garden_bench / lantern | 108093169082433 / 128530453132742 / 111807972344737 / 77070881706017 | automatic garden dressing |
+| world:tree (11 split variants) | 111344033786189 | gardens + street |
+| world:street_lamp / mailbox / hydrant | 96506787384113 / 118252021806923 / 116893320502654 | street furniture |
+| world:fountain | 5477511653 | plaza centrepiece (247 parts, single instance) |
+| staff:Waiter | 3230955000 | Butler — R15, 15/15 joints, zero scripts |
+
+**Rejected 2026-07-17:**
+- `14466134917` "Black Maid" — incomplete skeleton (13/15 Motor6D), fails the
+  walk gate; shop another maid rig (shopping list #63).
+- `10014128477` "Updated TrashCan" — 636 parts with a hidden R6 rig inside.
+
+**Rejected 2026-07-16/17 (rig policy — cannot walk correctly):**
+- `139800912587260` "Barista Coffee Shop" — 5/6-joint R6 skeleton, limped in
+  live measurement; Mia uses a verified walking base + apron instead.
+
 **Rejected 2026-07-16 (rig policy — cannot walk):**
 - `154539270` "Waiter" (SweII) — no native HumanoidRootPart/walk joints; slid
   and teleported in play. AssetLibraryService now auto-rejects any such rig

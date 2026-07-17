@@ -73,9 +73,9 @@ session roadmap (ROADMAP.md).
 | B3 | Waiter carries plate from counter to table | ✅ | S2 theater: Noah walks (pathfinding) to the kitchen, picks up the REAL finished plate and sets it in front of the diner |
 | B4 | Customers eat, pay, leave; dirty plates cleared | ✅ | Visible meal on the table; the EMPTY plate remains after eating until Pia collects it and carries it off to wash (+1 Buzz) |
 | B5 | **Buzz Rating 5→105**, rises on service, falls on walkouts, drives traffic | ✅ | Buzz 0–105 on café sign drives spawn cadence |
-| B6 | Impatient customers **walk out visibly angry** | 🟡 **[S2]** | We have grumpy exits on no-stock; make the drama readable: red mood, storm-out, Buzz "−3" floater |
-| B7 | **Mood/feeling display** per customer (thought bubbles, reactions) | 🟡 **[S2]** | Want-bubbles now show the dish ICON + name (2026-07-16); still to come: patience meter + mood faces (😊😐😠), hearts on great service — the owner's #2 complaint |
-| B8 | Named customers; recurring **regulars** | 🟡 **[S2]** | Name tags exist; add regulars who return with a favourite dish + greeting |
+| B6 | Impatient customers **walk out visibly angry** | ✅ | S2: storm-out with red "−N 🔥" floater + speed-up; line walkouts dent Buzz too |
+| B7 | **Mood/feeling display** per customer (thought bubbles, reactions) | ✅ | S2: mood faces 😊😐😠 + draining patience bar over every waiting head; dish-icon want-bubbles; hearts on personal service & favourites |
+| B8 | Named customers; recurring **regulars** | ✅ | S2: persisted regulars (max 8) return by name ("💚 Zoe is back!") and order their favourite; serving it pays +1 Buzz + hearts |
 | B9 | Tips: visitors fill a **tip jar** you claim (2×/day cap) | 🟡 **[S5]** | NPC table tips exist; add a visitor tip jar (players who visit can tip once/day) |
 | B10 | Satisfaction scales payout | 🟡 **[S2]** | Wire tips/coins to mood at serve time |
 | B11 | VIP / celebrity customers, food critic events | ❌ | Phase 5 events (original characters only) |

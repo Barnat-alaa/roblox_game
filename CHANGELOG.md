@@ -5,6 +5,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-17 — S2 CLOSED: feelings, regulars, combo + the Priorité 4 dressing haul
+**The feelings layer (S2 finish, live-verified):**
+- **Mood faces + patience bars** over every waiting customer (😊→😐→😠 with a
+  draining colour bar), in the line AND at the window.
+- **Storm-outs**: impatient customers flash red "−N 🔥", speed up and leave —
+  line walkouts now also dent Buzz (they didn't before).
+- **Regulars (persisted, max 8)**: diners are remembered by name; 35% of
+  spawns are a returning regular ("💚 Zoe is back!") who orders their
+  favourite dish — serving it pays +1 Buzz and a burst of hearts.
+- **Personal-service COMBO**: chaining owner actions (serve orders, clean
+  tables) within 45s pays escalating bonus coins ("COMBO ×4 +8 🪙") — an
+  active owner visibly out-earns an idle one.
+**The Priorité 4 graphics haul (20 assets adopted, live-verified):**
+- 11 new buyable interior items (wall painting, menu board, hanging lamp,
+  plant shelf, wall shelf, wall clock, curtains, diner booth, bar stool,
+  coat rack, cake display) — wall pieces mount at height via liftY.
+- **Gardens auto-dress**: hedges along the fences, flower patches, garden
+  bench, lantern, real trees (the tree pack splits into 11 variants).
+- **Street + plaza**: real lampposts (32), mailboxes, hydrants, trees, and
+  the fancy plaza fountain — procedural fallback everywhere, redressed
+  automatically when the async asset load lands.
+- **Noah is the Butler** (R15, complete 15/15 skeleton, zero scripts). The
+  maid kit was auto-rejected (13/15 joints — the limp gate works); Pia keeps
+  her verified base until a complete maid rig is found. The 636-part
+  trash-can joke asset was rejected for performance.
+
 ### Fixed — 2026-07-17 — LIVE-VERIFIED: the whole S2 stack, + 3 movement fixes it caught
 Studio MCP reconnected; everything from the three S2 passes ran live. Confirmed
 working: facade/door/garden/14-stud walls, 16/16 assets loaded, chair

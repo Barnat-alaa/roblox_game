@@ -14,6 +14,14 @@ export type FurnitureAsset = {
 	height: number,
 	maxSpan: number, -- max horizontal studs after scaling (grid footprint cap)
 	yaw: number?, -- degrees to rotate so the model's long axis aligns to +X
+	liftY: number?, -- studs above the floor (wall art, clocks, hanging lamps)
+}
+
+export type WorldAsset = {
+	assetId: number,
+	name: string,
+	height: number, -- target height in studs
+	split: boolean?, -- pack: cache each child model as a separate variant
 }
 
 export type PropAsset = {
@@ -53,7 +61,98 @@ local AssetManifest = {
 			height = 3.3,
 			maxSpan = 3.4,
 		},
+		-- Priorité 4 interior (owner haul 2026-07-17):
+		painting_wall = {
+			assetId = 100568868323466,
+			name = "Desert Painting (owner pick)",
+			height = 3.2,
+			maxSpan = 7.4,
+			liftY = 4.6,
+		},
+		menu_board = {
+			assetId = 105938474697422,
+			name = "Cafe Menu Board",
+			height = 4.2,
+			maxSpan = 3.6,
+		},
+		ceiling_lamp = {
+			assetId = 98590526337131,
+			name = "Ceiling Lamp Modern",
+			height = 1.9,
+			maxSpan = 3.4,
+			liftY = 8.2,
+		},
+		shelf_plants = {
+			assetId = 115524597372020,
+			name = "Garden Shelf Decor",
+			height = 5.2,
+			maxSpan = 7.4,
+		},
+		shelf_wall = {
+			assetId = 71513583918977,
+			name = "Wall Shelf Bookshelf",
+			height = 2.6,
+			maxSpan = 7.4,
+			liftY = 4.6,
+		},
+		wall_clock = {
+			assetId = 121238777618172,
+			name = "Regulator Wall Clock",
+			height = 3.4,
+			maxSpan = 3.4,
+			liftY = 5.6,
+		},
+		curtains = {
+			assetId = 129812037524677,
+			name = "Window Curtains",
+			height = 5,
+			maxSpan = 7.4,
+			liftY = 2.6,
+		},
+		booth_diner = {
+			assetId = 8740051429,
+			name = "Diner Booth",
+			height = 3.6,
+			maxSpan = 11.4,
+		},
+		bar_stool = {
+			assetId = 127833501873867,
+			name = "Bar Stool",
+			height = 2.6,
+			maxSpan = 3.2,
+		},
+		coat_rack = {
+			assetId = 18647331589,
+			name = "Coat Hanger",
+			height = 4.6,
+			maxSpan = 3.2,
+		},
+		cake_display = {
+			assetId = 175775615,
+			name = "Cake Display Case",
+			height = 2.9,
+			maxSpan = 7.4,
+		},
 	} :: { [string]: FurnitureAsset },
+
+	-- World dressing (garden + street + plaza), applied automatically by
+	-- CafeService — not buyable items. Procedural fallback everywhere.
+	world = {
+		flowers = { assetId = 108093169082433, name = "Plants and Flowers pack", height = 2.6 },
+		hedge = { assetId = 128530453132742, name = "Remastered Bush", height = 3.4 },
+		garden_bench = { assetId = 111807972344737, name = "Low Poly Bench", height = 3.2 },
+		lantern = { assetId = 77070881706017, name = "Lamp post (owner pick)", height = 9 },
+		tree = {
+			assetId = 111344033786189,
+			name = "Low Poly Tree Pack",
+			height = 11,
+			split = true,
+		},
+		street_lamp = { assetId = 96506787384113, name = "Low Poly Lamppost", height = 11 },
+		mailbox = { assetId = 118252021806923, name = "Mailbox Classic", height = 4 },
+		fountain = { assetId = 5477511653, name = "Fancy fountain with benches", height = 12 },
+		hydrant = { assetId = 116893320502654, name = "Fire Hydrant", height = 2.8 },
+	} :: { [string]: WorldAsset },
 
 	-- Food/drink props, keyed by recipe CATEGORY, shown on counters and diner
 	-- plates in place of the old coloured cylinders.
@@ -85,7 +184,11 @@ local AssetManifest = {
 		-- limped — rejected by the walk gate; Mia uses a verified base + apron.
 		Barista = { assetId = 7315192066, name = "Walking NPC base (Victional101)" },
 		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
-		Waiter = { assetId = 7907970704, name = "Walking NPC base (ARISTOKRAT1CHE)" },
+		-- Butler: R15, complete 15/15 skeleton, zero scripts — Noah's real look.
+		Waiter = { assetId = 3230955000, name = "Butler (Verdonis)" },
+		-- The maid kit (14466134917) has a 13/15-joint skeleton → walk gate
+		-- rejects it; Pia stays on the verified Mom base until a complete
+		-- maid rig is shopped (docs/ASSET_SHOPPING_LIST.md #63).
 		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },
 	},
 }

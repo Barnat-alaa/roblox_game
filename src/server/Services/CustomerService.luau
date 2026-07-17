@@ -134,6 +134,12 @@ local STYLES: { StyleDef } = {
 	},
 }
 
+type MoodUi = {
+	gui: BillboardGui,
+	face: TextLabel,
+	fill: Frame,
+}
+
 type ActiveCustomer = {
 	userId: number,
 	model: Model,
@@ -143,6 +149,10 @@ type ActiveCustomer = {
 	def: Types.CustomerDefinition,
 	baseHip: number, -- resting HipHeight (differs per rig); waddle bobs around it
 	anim: NpcAnimator.AnimHandle?, -- real-rig animation control (nil on chibis)
+	name: string,
+	regular: boolean, -- a returning customer (S2 feelings pass)
+	favourite: string?, -- the regular's favourite recipeId
+	mood: MoodUi?, -- face + patience bar over the head while they wait
 	spawnClock: number,
 	orderId: string?,
 	served: boolean,
@@ -152,6 +162,33 @@ type ActiveCustomer = {
 local queues: { [number]: { ActiveCustomer } } = {}
 local rng = Random.new()
 local customersFolder: Folder
+
+-- Personal-service COMBO (S2 gameplay): chaining hands-on actions (serving
+-- orders, cleaning tables) within 45s builds a streak that pays bonus coins —
+-- an active owner visibly out-earns an idle one.
+local COMBO_WINDOW = 45
+local combos: { [number]: { count: number, lastAt: number } } = {}
+
+local function bumpCombo(player: Player, position: Vector3)
+	local now = os.clock()
+	local state = combos[player.UserId]
+	if state and now - state.lastAt <= COMBO_WINDOW then
+		state.count += 1
+		state.lastAt = now
+	else
+		state = { count = 1, lastAt = now }
+		combos[player.UserId] = state
+	end
+	if state.count >= 2 and EconomyService then
+		local bonus = math.min(state.count, 10) * 2
+		EconomyService:AddCoins(player, bonus)
+		Fx.floatText(
+			position + Vector3.new(0, 5.6, 0),
+			string.format("COMBO ×%d  +%d 🪙", state.count, bonus),
+			Color3.fromRGB(255, 224, 130)
+		)
+	end
+end
 
 local function pickUnlockedRecipe(data: Types.PlayerData): string?
 	local pool: { string } = {}
@@ -201,7 +238,7 @@ end
 
 -- Order bubble (returned label) + floating first name, parented to any head.
 -- Shared by the procedural chibi and the Creator Store rigs.
-local function attachBubbles(head: BasePart): TextLabel
+local function attachBubbles(head: BasePart, name: string): TextLabel
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Bubble"
 	gui.Size = UDim2.fromScale(6, 1.6)
@@ -239,16 +276,113 @@ local function attachBubbles(head: BasePart): TextLabel
 	nameLabel.Font = Enum.Font.GothamMedium
 	nameLabel.TextColor3 = Color3.fromRGB(255, 236, 190)
 	nameLabel.TextStrokeTransparency = 0.2
-	nameLabel.Text = NAMES[rng:NextInteger(1, #NAMES)]
+	nameLabel.Text = name
 	nameLabel.Parent = nameGui
 
 	return label
 end
 
+-- Mood face + draining patience bar over the head (Café World B6/B7): green
+-- and smiling while fresh, amber, then red and angry as patience runs out.
+local function attachMood(head: BasePart): MoodUi
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Mood"
+	gui.Size = UDim2.fromScale(3.4, 0.7)
+	gui.StudsOffset = Vector3.new(0, 4.15, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 90
+	gui.Parent = head
+
+	local face = Instance.new("TextLabel")
+	face.Name = "Face"
+	face.Size = UDim2.fromScale(0.24, 1)
+	face.BackgroundTransparency = 1
+	face.TextScaled = true
+	face.Text = "😊"
+	face.Parent = gui
+
+	local barBack = Instance.new("Frame")
+	barBack.Name = "BarBack"
+	barBack.Size = UDim2.fromScale(0.72, 0.42)
+	barBack.Position = UDim2.fromScale(0.28, 0.29)
+	barBack.BackgroundColor3 = Color3.fromRGB(45, 35, 32)
+	barBack.BackgroundTransparency = 0.35
+	barBack.BorderSizePixel = 0
+	local backCorner = Instance.new("UICorner")
+	backCorner.CornerRadius = UDim.new(1, 0)
+	backCorner.Parent = barBack
+	barBack.Parent = gui
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(1, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(120, 200, 120)
+	fill.BorderSizePixel = 0
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = fill
+	fill.Parent = barBack
+
+	return { gui = gui, face = face, fill = fill }
+end
+
+local function setMood(cust: ActiveCustomer, fraction: number)
+	local mood = cust.mood
+	if not mood or mood.gui.Parent == nil then
+		return
+	end
+	local f = math.clamp(fraction, 0, 1)
+	mood.fill.Size = UDim2.fromScale(f, 1)
+	if f > 0.55 then
+		mood.face.Text = "😊"
+		mood.fill.BackgroundColor3 = Color3.fromRGB(120, 200, 120)
+	elseif f > 0.25 then
+		mood.face.Text = "😐"
+		mood.fill.BackgroundColor3 = Color3.fromRGB(240, 200, 90)
+	else
+		mood.face.Text = "😠"
+		mood.fill.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+	end
+end
+
+local function clearMood(cust: ActiveCustomer)
+	if cust.mood then
+		cust.mood.gui:Destroy()
+		cust.mood = nil
+	end
+end
+
+-- Angry walkout drama: the Buzz loss is something you SEE, not just a number.
+local function stormOut(cust: ActiveCustomer, buzzDelta: number)
+	cust.bubble.Text = "😠 Too slow…"
+	clearMood(cust)
+	cust.humanoid.WalkSpeed = WALK_SPEED + 5
+	Fx.floatText(
+		cust.root.Position + Vector3.new(0, 4.6, 0),
+		string.format("%d 🔥", buzzDelta),
+		Color3.fromRGB(235, 90, 80)
+	)
+end
+
+-- Three little hearts for delightful service (regular's favourite, personal
+-- serves) — floats staggered so they read as a burst.
+local function hearts(position: Vector3)
+	for i = 1, 3 do
+		task.delay((i - 1) * 0.18, function()
+			Fx.floatText(
+				position + Vector3.new((i - 2) * 1.1, 3.4 + i * 0.4, 0),
+				"❤️",
+				Color3.fromRGB(235, 100, 110)
+			)
+		end)
+	end
+end
+
 -- Chibi block-person with one of eight procedural styles.
 local function buildNpcModel(
 	def: Types.CustomerDefinition,
-	style: StyleDef
+	style: StyleDef,
+	name: string
 ): (Model, Humanoid, BasePart, TextLabel)
 	local model = Instance.new("Model")
 	model.Name = "Customer_" .. def.id
@@ -398,7 +532,7 @@ local function buildNpcModel(
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	humanoid.Parent = model
 
-	local label = attachBubbles(head)
+	local label = attachBubbles(head, name)
 
 	model.PrimaryPart = root
 	return model, humanoid, root, label
@@ -408,7 +542,8 @@ end
 -- procedural chibi. Either way we attach our own order bubble + name tag and
 -- return the same tuple the rest of the lifecycle expects.
 local function spawnCustomerModel(
-	def: Types.CustomerDefinition
+	def: Types.CustomerDefinition,
+	name: string
 ): (Model, Humanoid, BasePart, TextLabel)
 	local rig: Model? = if AssetLibraryService then AssetLibraryService:GetCustomerRig() else nil
 	if rig then
@@ -420,14 +555,32 @@ local function spawnCustomerModel(
 			humanoid.WalkSpeed = WALK_SPEED
 			humanoid.BreakJointsOnDeath = false
 			humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-			local label = attachBubbles(head)
+			local label = attachBubbles(head, name)
 			rig.PrimaryPart = root
 			return rig, humanoid, root, label
 		end
 		rig:Destroy()
 	end
 	local style = STYLES[rng:NextInteger(1, #STYLES)]
-	return buildNpcModel(def, style)
+	return buildNpcModel(def, style, name)
+end
+
+-- 35% of spawns are RETURNING regulars once the café has some: same name,
+-- and they'll order their favourite dish (Café World B8).
+local function pickRegular(data: Types.PlayerData?): (string?, string?)
+	if not data or typeof((data :: any).regulars) ~= "table" then
+		return nil, nil
+	end
+	local names: { string } = {}
+	for name in (data :: any).regulars do
+		table.insert(names, name)
+	end
+	if #names == 0 or rng:NextNumber() > 0.35 then
+		return nil, nil
+	end
+	local name = names[rng:NextInteger(1, #names)]
+	local entry = (data :: any).regulars[name]
+	return name, if typeof(entry) == "table" then entry.favourite else nil
 end
 
 -- The queue now lives INSIDE the café (S2 facade): customers path through the
@@ -617,6 +770,17 @@ local function eatMeal(
 				plate.Parent = (folder and folder.Parent) or cust.model
 			end
 
+			-- A regular getting their FAVOURITE is a heart moment (+1 Buzz).
+			if cust.regular and cust.favourite == recipeId and not cust.leaving then
+				KitchenService:AddBuzz(player, 1)
+				hearts(cust.model:GetPivot().Position)
+				Fx.floatText(
+					cust.model:GetPivot().Position + Vector3.new(0, 5, 0),
+					"❤️ My favourite! +1 🔥",
+					Color3.fromRGB(235, 100, 110)
+				)
+			end
+
 			-- Eat with a happy bob.
 			local basePivot = cust.model:GetPivot()
 			for i = 1, 12 do
@@ -667,6 +831,7 @@ local function eatMeal(
 								"+1 🔥",
 								Color3.fromRGB(255, 180, 120)
 							)
+							bumpCombo(player, plate:GetPivot().Position)
 							plate:Destroy()
 						end)
 					end
@@ -690,6 +855,30 @@ local function eatMeal(
 					)
 					if tip > 0 then
 						dropTip(player, seatCf, tip)
+					end
+				end
+
+				-- Remember this diner as a REGULAR: next time they may come
+				-- back by name asking for today's dish (persisted, max 8).
+				local data = DataService:GetProfile(player)
+				if data then
+					if typeof((data :: any).regulars) ~= "table" then
+						(data :: any).regulars = {}
+					end
+					local regs = (data :: any).regulars
+					local count = 0
+					for _ in regs do
+						count += 1
+					end
+					if regs[cust.name] ~= nil or count < 8 then
+						local entry = regs[cust.name]
+						if typeof(entry) ~= "table" then
+							entry = { favourite = recipeId, visits = 0 }
+						end
+						entry.visits += 1
+						entry.favourite = recipeId
+						regs[cust.name] = entry
+						DataService:Push(player)
 					end
 				end
 			end
@@ -738,6 +927,20 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	cust.anim = NpcAnimator.setup(cust.humanoid)
 	cust.bubble.Text = "…"
 
+	-- The feelings layer: mood face + patience bar for the whole visit, and a
+	-- little moment when a regular walks back in.
+	local moodHead = cust.model:FindFirstChild("Head")
+	if moodHead and moodHead:IsA("BasePart") then
+		cust.mood = attachMood(moodHead)
+	end
+	if cust.regular then
+		Fx.floatText(
+			cust.root.Position + Vector3.new(0, 5, 0),
+			"💚 " .. cust.name .. " is back!",
+			Color3.fromRGB(150, 220, 140)
+		)
+	end
+
 	-- Queue phase: walk to my slot; step forward whenever the line advances.
 	local lastSlot = -1
 	while not cust.leaving do
@@ -754,8 +957,11 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 			cust.bubble.Text = "⏳"
 			walkTo(cust, slotPosition(origin, slot))
 		end
+		setMood(cust, 1 - (os.clock() - cust.spawnClock) / LINE_PATIENCE_SECONDS)
 		if os.clock() - cust.spawnClock > LINE_PATIENCE_SECONDS then
-			cust.bubble.Text = "😤"
+			-- Gave up in the LINE: same visible Buzz dent as a window walkout.
+			stormOut(cust, Kitchen.buzzPerWalkout)
+			KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 			task.wait(1)
 			depart(cust, streetPos)
 			return
@@ -776,16 +982,29 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	end
 
 	-- Counter stock first (cook-ahead loop): if the café has food ready,
-	-- the customer eats immediately — no tap needed. Empty counters fall
-	-- back to a manual order (serve/brew), which still pays the full rate.
+	-- the customer eats immediately — no tap needed. Regulars reach for their
+	-- FAVOURITE first. Empty counters fall back to a manual order.
+	if cust.favourite then
+		local ateFav, paidFav = KitchenService:ConsumeSpecific(player, cust.favourite)
+		if ateFav then
+			clearMood(cust)
+			eatMeal(player, cust, streetPos, cust.favourite, paidFav)
+			return
+		end
+	end
 	local consumedId, paid = KitchenService:TryConsume(player)
 	if consumedId ~= nil then
+		clearMood(cust)
 		eatMeal(player, cust, streetPos, consumedId, paid)
 		return
 	end
 
 	local data = DataService:GetProfile(player)
 	local recipeId = if data then pickUnlockedRecipe(data) else nil
+	-- A regular always asks for their favourite when they know it.
+	if cust.favourite and data and data.unlockedRecipes[cust.favourite] == true then
+		recipeId = cust.favourite
+	end
 	local orderId = if recipeId
 		then OrderService:CreateOrder(player, recipeId, cust.def.id)
 		else nil
@@ -832,6 +1051,8 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 				"Personal service! +2 🔥",
 				Color3.fromRGB(255, 200, 120)
 			)
+			hearts(cust.root.Position)
+			bumpCombo(player, cust.root.Position)
 		else
 			Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_in_stock" })
 		end
@@ -839,6 +1060,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	end)
 
 	while os.clock() < deadline and cust.orderId ~= nil and not cust.leaving do
+		setMood(cust, (deadline - os.clock()) / PATIENCE_SECONDS)
 		-- A batch may land while they wait — feed them straight from it.
 		if os.clock() >= nextStockCheck and not servingLock then
 			nextStockCheck = os.clock() + 2
@@ -865,11 +1087,12 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		-- Patience ran out at the window: cancel and leave visibly unhappy.
 		OrderService:CancelOrder(cust.orderId)
 		cust.orderId = nil
-		cust.bubble.Text = "😠 Too slow…"
+		stormOut(cust, Kitchen.buzzPerWalkout)
 		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 	end
 	if cust.served and not cust.leaving then
 		-- Fed from stock while waiting, or hand-served: sit down and dine.
+		clearMood(cust)
 		eatMeal(player, cust, streetPos, recipeId :: string, fedPay)
 		return
 	end
@@ -929,7 +1152,10 @@ function CustomerService.Start(_self: any)
 								* (buzz / Kitchen.buzzMax)
 						nextSpawnAt[player.UserId] = os.clock() + interval
 						local def = pickCustomer()
-						local model, humanoid, root, bubble = spawnCustomerModel(def)
+						local data = DataService:GetProfile(player)
+						local regularName, favourite = pickRegular(data)
+						local name = regularName or NAMES[rng:NextInteger(1, #NAMES)]
+						local model, humanoid, root, bubble = spawnCustomerModel(def, name)
 						local cust: ActiveCustomer = {
 							userId = player.UserId,
 							model = model,
@@ -938,6 +1164,9 @@ function CustomerService.Start(_self: any)
 							bubble = bubble,
 							def = def,
 							baseHip = humanoid.HipHeight,
+							name = name,
+							regular = regularName ~= nil,
+							favourite = favourite,
 							spawnClock = os.clock(),
 							orderId = nil,
 							served = false,
@@ -960,6 +1189,7 @@ function CustomerService.Start(_self: any)
 			end
 			queues[player.UserId] = nil
 		end
+		combos[player.UserId] = nil
 	end)
 end
 

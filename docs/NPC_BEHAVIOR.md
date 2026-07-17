@@ -21,10 +21,15 @@ Waiter/Cleaner currently borrow walking customer bases and wear a
 |---|---|---|
 | Cook batches | stove/oven prompt → pick recipe → collect | stock + fresh bonus + mastery |
 | Brew manually | coffee machine prompt, timing bar | quality bonus coins |
-| **Take an order** | `E` on the ordering customer (front of queue) | serves from stock instantly, **+2 Buzz** "personal service" |
-| **Clean a table** | `E` on a dirty plate | **+1 Buzz** (same as Pia) |
+| **Take an order** | `E` on the ordering customer (front of queue) | serves from stock instantly, **+2 Buzz** "personal service", hearts, feeds COMBO |
+| **Clean a table** | `E` on a dirty plate | **+1 Buzz** (same as Pia), feeds COMBO |
 | **Collect tips** | `E` on the tip left at a table | coins |
 | Build/decorate | Build mode | Décor (S4) |
+
+**Personal-service COMBO:** chaining any two owner service actions (take order
+/ clean table) within 45 s starts a streak; each further action inside the
+window pays escalating bonus coins ("COMBO ×4 +8 🪙", capped ×10). Idle café =
+baseline; hustling owner = visibly more — the "one more customer" hook.
 
 Staff do the same jobs automatically — slower and without the personal-service
 bonus — so an ACTIVE owner always out-earns an idle one, but nothing breaks
@@ -35,15 +40,23 @@ when you sleep (§35).
 States: `STREET → DOOR → QUEUE → ORDER → WAIT → DINE → EXIT`
 1. Spawns on the street (rate driven by Buzz), pathfinds through the front
    door to the queue (3 slots inside; the line steps forward on each serve).
-2. At the front: shows the want-bubble "🗨️ {icon} {dish}".
-3. Served when: counter stock has it (auto within ~2s) · the OWNER takes the
-   order (`E`, +2 Buzz) · Mia rescues an overdue manual order · a fresh batch
-   lands. Patience: 120 s at the window, 180 s total → "😠 Too slow…" walkout,
-   −Buzz.
-4. Dining: walks to a free chair (chairs auto-face their table), sits STILL
+   35% chance of being a **returning regular** (persisted, max 8 per café) —
+   they enter by name with "💚 {name} is back!" and will order their favourite.
+2. **Mood + patience**: a face (😊→😐→😠) and a draining colour bar float over
+   the head the whole visit — green fresh, amber, then red near a walkout.
+3. At the front: shows the want-bubble "🗨️ {icon} {dish}" (regulars ask for
+   their favourite when it's unlocked).
+4. Served when: their favourite/any counter stock (auto within ~2s) · the
+   OWNER takes the order (`E`, +2 Buzz, hearts, feeds a COMBO) · Mia rescues
+   an overdue manual order · a fresh batch lands. Patience: 120 s at the
+   window, 180 s total → **storm-out**: red "−N 🔥" floater, speed-up, exit;
+   Buzz drops (line walkouts too).
+5. Dining: walks to a free chair (chairs auto-face their table), sits STILL
    (walk anim stops), the meal arrives via the staff pipeline below, eats
-   (~7 s), may drop a collectible tip, leaves the EMPTY plate.
-5. Exits through the door and despawns. If no chair: quick standing bite.
+   (~7 s). A regular getting their favourite = +1 Buzz + hearts. May drop a
+   collectible tip; leaves the EMPTY plate. On finishing, they're recorded as
+   a regular with today's dish as their favourite.
+6. Exits through the door and despawns. If no chair: quick standing bite.
 
 ## Mia · Barista (brown apron, barista rig)
 

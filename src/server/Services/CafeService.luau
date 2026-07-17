@@ -33,6 +33,7 @@ CafeService.Name = "CafeService"
 
 local DataService: any
 local BuildService: any
+local AssetLibraryService: any
 
 local NUM_PLOTS = World.plotCount
 local PLOTS_PER_ROW = World.plotsPerRow
@@ -350,7 +351,9 @@ local function rebuildShell(plot: Plot, tier: number)
 	fenceRun(origin * CFrame.new(width, 0, depth + gardenDepth / 2), gardenDepth, false)
 	fenceRun(origin * CFrame.new(width / 2, 0, TOTAL_DEPTH), width, true)
 
-	-- Garden charm: stone path from the gate, a tree, two flower beds.
+	-- Garden charm: stone path from the gate, then the owner's Creator Store
+	-- dressing (trees/flowers/hedges/bench/lantern) when loaded — procedural
+	-- tree + flower beds as the fallback.
 	for i = 1, 3 do
 		makePart(
 			"GardenPath",
@@ -361,47 +364,82 @@ local function rebuildShell(plot: Plot, tier: number)
 			Enum.Material.Slate
 		)
 	end
-	makePart(
-		"GardenTrunk",
-		Vector3.new(1.2, 5, 1.2),
-		origin * CFrame.new(10, 2.5, depth + gardenDepth * 0.55),
-		Color3.fromRGB(110, 82, 60),
-		shell,
-		Enum.Material.Wood
-	)
-	local canopy = makePart(
-		"GardenCanopy",
-		Vector3.new(6.5, 6.5, 6.5),
-		origin * CFrame.new(10, 6.6, depth + gardenDepth * 0.55),
-		Color3.fromRGB(105, 150, 88),
-		shell,
-		Enum.Material.Grass
-	)
-	canopy.Shape = Enum.PartType.Ball
-	canopy.CanCollide = false
-	for bi, bx in { width - 12, 16 } do
-		local bedZ = depth + gardenDepth * (if bi == 1 then 0.35 else 0.75)
-		makePart(
-			"FlowerBed",
-			Vector3.new(2.6, 0.8, 2.6),
-			origin * CFrame.new(bx, 0.4, bedZ),
-			Color3.fromRGB(185, 115, 90),
-			shell,
-			Enum.Material.Concrete
+
+	-- Drop a world-decor clone with its bounding box resting on the floor.
+	local function placeWorld(key: string, localX: number, localZ: number, yaw: number?): boolean
+		local m: Model? = if AssetLibraryService then AssetLibraryService:GetWorld(key) else nil
+		if not m then
+			return false
+		end
+		m.Name = "Garden_" .. key
+		local _, size = m:GetBoundingBox()
+		local worldCf = origin * CFrame.new(localX, size.Y / 2, localZ)
+		m:PivotTo(
+			CFrame.new(worldCf.Position)
+				* CFrame.Angles(0, math.rad(yaw or 0), 0)
+				* (origin - origin.Position)
 		)
-		for fi, fc in { Color3.fromRGB(220, 90, 90), Color3.fromRGB(240, 200, 90) } do
-			local bloom = makePart(
-				"Flower",
-				Vector3.new(0.9, 0.9, 0.9),
-				origin * CFrame.new(bx + (fi - 1.5) * 1.1, 1.2, bedZ),
-				fc,
+		m.Parent = shell
+		return true
+	end
+
+	local g = gardenDepth
+	if not placeWorld("tree", 10, depth + g * 0.55) then
+		makePart(
+			"GardenTrunk",
+			Vector3.new(1.2, 5, 1.2),
+			origin * CFrame.new(10, 2.5, depth + g * 0.55),
+			Color3.fromRGB(110, 82, 60),
+			shell,
+			Enum.Material.Wood
+		)
+		local canopy = makePart(
+			"GardenCanopy",
+			Vector3.new(6.5, 6.5, 6.5),
+			origin * CFrame.new(10, 6.6, depth + g * 0.55),
+			Color3.fromRGB(105, 150, 88),
+			shell,
+			Enum.Material.Grass
+		)
+		canopy.Shape = Enum.PartType.Ball
+		canopy.CanCollide = false
+	end
+	placeWorld("tree", width - 10, depth + g * 0.8)
+
+	for bi, bx in { width - 12, 16 } do
+		local bedZ = depth + g * (if bi == 1 then 0.35 else 0.75)
+		if not placeWorld("flowers", bx, bedZ) then
+			makePart(
+				"FlowerBed",
+				Vector3.new(2.6, 0.8, 2.6),
+				origin * CFrame.new(bx, 0.4, bedZ),
+				Color3.fromRGB(185, 115, 90),
 				shell,
-				Enum.Material.Grass
+				Enum.Material.Concrete
 			)
-			bloom.Shape = Enum.PartType.Ball
-			bloom.CanCollide = false
+			for fi, fc in { Color3.fromRGB(220, 90, 90), Color3.fromRGB(240, 200, 90) } do
+				local bloom = makePart(
+					"Flower",
+					Vector3.new(0.9, 0.9, 0.9),
+					origin * CFrame.new(bx + (fi - 1.5) * 1.1, 1.2, bedZ),
+					fc,
+					shell,
+					Enum.Material.Grass
+				)
+				bloom.Shape = Enum.PartType.Ball
+				bloom.CanCollide = false
+			end
 		end
 	end
+
+	-- Store-only extras (no procedural equivalent): hedges along the fences,
+	-- a garden bench and a lantern.
+	for _, hz in { 0.25, 0.55, 0.85 } do
+		placeWorld("hedge", 4, depth + g * hz)
+		placeWorld("hedge", width - 4, depth + g * hz)
+	end
+	placeWorld("garden_bench", width / 2 + 12, depth + 9, 180)
+	placeWorld("lantern", width / 2 - 14, depth + 7)
 
 	shell.Parent = plot.model
 	plot.shell = shell
@@ -582,61 +620,85 @@ local function applyLighting()
 	rays.Parent = Lighting
 end
 
--- Lamp posts and trees give the greybox street a silhouette.
+-- Street furniture: the owner's Creator Store picks when loaded (lampposts,
+-- trees, mailboxes, hydrants), greybox lamps/trees as the fallback.
 local function buildStreetDecor(parent: Instance)
 	local folder = Instance.new("Folder")
 	folder.Name = "StreetDecor"
 	folder.Parent = parent
 
+	local function placeWorld(key: string, x: number, y0: number, z: number): boolean
+		local m: Model? = if AssetLibraryService then AssetLibraryService:GetWorld(key) else nil
+		if not m then
+			return false
+		end
+		m.Name = "Street_" .. key
+		local _, size = m:GetBoundingBox()
+		m:PivotTo(CFrame.new(x, y0 + size.Y / 2, z))
+		m.Parent = folder
+		return true
+	end
+
 	for i = 0, PLOTS_PER_ROW do
 		local x = i * PLOT_SPACING - 6
 		for _, lampZ in { -18, -(World.boulevardWidth - 18) } do
-			local pole = makePart(
-				"LampPole",
-				Vector3.new(0.6, 7, 0.6),
-				CFrame.new(x, 3, lampZ),
-				Color3.fromRGB(70, 60, 55),
-				folder,
-				Enum.Material.Metal
-			)
-			local head = makePart(
-				"LampHead",
-				Vector3.new(1.4, 1.4, 1.4),
-				CFrame.new(x, 7, lampZ),
-				Color3.fromRGB(255, 214, 150),
-				folder,
-				Enum.Material.Neon
-			)
-			head.Shape = Enum.PartType.Ball
-			local light = Instance.new("PointLight")
-			light.Color = Color3.fromRGB(255, 205, 140)
-			light.Range = 22
-			light.Brightness = 1.1
-			light.Parent = head
-			pole.Name = "LampPole_" .. i
+			if not placeWorld("street_lamp", x, -0.5, lampZ) then
+				local pole = makePart(
+					"LampPole",
+					Vector3.new(0.6, 7, 0.6),
+					CFrame.new(x, 3, lampZ),
+					Color3.fromRGB(70, 60, 55),
+					folder,
+					Enum.Material.Metal
+				)
+				local head = makePart(
+					"LampHead",
+					Vector3.new(1.4, 1.4, 1.4),
+					CFrame.new(x, 7, lampZ),
+					Color3.fromRGB(255, 214, 150),
+					folder,
+					Enum.Material.Neon
+				)
+				head.Shape = Enum.PartType.Ball
+				local light = Instance.new("PointLight")
+				light.Color = Color3.fromRGB(255, 205, 140)
+				light.Range = 22
+				light.Brightness = 1.1
+				light.Parent = head
+				pole.Name = "LampPole_" .. i
+			end
+		end
+		-- Sidewalk accents between every few cafés.
+		if i % 3 == 1 then
+			placeWorld("mailbox", x + 10, -0.5, -14)
+		end
+		if i % 4 == 2 then
+			placeWorld("hydrant", x + 10, -0.5, -(World.boulevardWidth - 14))
 		end
 	end
 
 	for i = 1, 4 do
 		local x = (i - 0.5) * (PLOTS_PER_ROW * PLOT_SPACING) / 4 - 12
 		local z = -44
-		makePart(
-			"Trunk",
-			Vector3.new(1.4, 5, 1.4),
-			CFrame.new(x, 2, z),
-			Color3.fromRGB(110, 82, 60),
-			folder,
-			Enum.Material.Wood
-		)
-		local canopy = makePart(
-			"Canopy",
-			Vector3.new(7, 7, 7),
-			CFrame.new(x, 6.4, z),
-			Color3.fromRGB(105, 150, 88),
-			folder,
-			Enum.Material.Grass
-		)
-		canopy.Shape = Enum.PartType.Ball
+		if not placeWorld("tree", x, -0.5, z) then
+			makePart(
+				"Trunk",
+				Vector3.new(1.4, 5, 1.4),
+				CFrame.new(x, 2, z),
+				Color3.fromRGB(110, 82, 60),
+				folder,
+				Enum.Material.Wood
+			)
+			local canopy = makePart(
+				"Canopy",
+				Vector3.new(7, 7, 7),
+				CFrame.new(x, 6.4, z),
+				Color3.fromRGB(105, 150, 88),
+				folder,
+				Enum.Material.Grass
+			)
+			canopy.Shape = Enum.PartType.Ball
+		end
 	end
 end
 
@@ -662,42 +724,53 @@ local function buildPlaza(parent: Instance)
 	)
 	disc.Shape = Enum.PartType.Cylinder
 
-	local base = makePart(
-		"FountainBase",
-		Vector3.new(1.2, 10, 10),
-		CFrame.new(midX, 0.6, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
-		Color3.fromRGB(180, 170, 155),
-		folder,
-		Enum.Material.Slate
-	)
-	base.Shape = Enum.PartType.Cylinder
-	local water = makePart(
-		"FountainWater",
-		Vector3.new(0.4, 8.6, 8.6),
-		CFrame.new(midX, 1.1, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
-		Color3.fromRGB(120, 175, 200),
-		folder,
-		Enum.Material.Glass
-	)
-	water.Shape = Enum.PartType.Cylinder
-	water.Transparency = 0.35
-	makePart(
-		"FountainColumn",
-		Vector3.new(1.6, 3, 1.6),
-		CFrame.new(midX, 2.4, plazaZ),
-		Color3.fromRGB(180, 170, 155),
-		folder,
-		Enum.Material.Slate
-	)
-	local bowl = makePart(
-		"FountainBowl",
-		Vector3.new(0.6, 4, 4),
-		CFrame.new(midX, 4, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
-		Color3.fromRGB(180, 170, 155),
-		folder,
-		Enum.Material.Slate
-	)
-	bowl.Shape = Enum.PartType.Cylinder
+	-- The owner's plaza fountain when loaded; the greybox tiers otherwise.
+	local libFountain: Model? = if AssetLibraryService
+		then AssetLibraryService:GetWorld("fountain")
+		else nil
+	if libFountain then
+		libFountain.Name = "PlazaFountain"
+		local _, fSize = libFountain:GetBoundingBox()
+		libFountain:PivotTo(CFrame.new(midX, fSize.Y / 2 - 0.4, plazaZ))
+		libFountain.Parent = folder
+	else
+		local base = makePart(
+			"FountainBase",
+			Vector3.new(1.2, 10, 10),
+			CFrame.new(midX, 0.6, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(180, 170, 155),
+			folder,
+			Enum.Material.Slate
+		)
+		base.Shape = Enum.PartType.Cylinder
+		local water = makePart(
+			"FountainWater",
+			Vector3.new(0.4, 8.6, 8.6),
+			CFrame.new(midX, 1.1, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(120, 175, 200),
+			folder,
+			Enum.Material.Glass
+		)
+		water.Shape = Enum.PartType.Cylinder
+		water.Transparency = 0.35
+		makePart(
+			"FountainColumn",
+			Vector3.new(1.6, 3, 1.6),
+			CFrame.new(midX, 2.4, plazaZ),
+			Color3.fromRGB(180, 170, 155),
+			folder,
+			Enum.Material.Slate
+		)
+		local bowl = makePart(
+			"FountainBowl",
+			Vector3.new(0.6, 4, 4),
+			CFrame.new(midX, 4, plazaZ) * CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(180, 170, 155),
+			folder,
+			Enum.Material.Slate
+		)
+		bowl.Shape = Enum.PartType.Cylinder
+	end
 
 	for angle = 0, 270, 90 do
 		local rot = CFrame.new(centre) * CFrame.Angles(0, math.rad(angle + 45), 0)
@@ -976,6 +1049,7 @@ end
 function CafeService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	BuildService = ServiceRegistry.get("BuildService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function CafeService.Start(_self: any)
@@ -1018,6 +1092,26 @@ function CafeService.Start(_self: any)
 			end
 		end
 	end)
+
+	-- The street/plaza/gardens build at boot, BEFORE the async asset load
+	-- finishes — re-dress everything with the owner's world decor once ready.
+	if AssetLibraryService then
+		AssetLibraryService:OnReady(function()
+			local sd = workspace:FindFirstChild("StreetDecor")
+			if sd then
+				sd:Destroy()
+			end
+			buildStreetDecor(workspace)
+			local plaza = workspace:FindFirstChild("Plaza")
+			if plaza then
+				plaza:Destroy()
+			end
+			buildPlaza(workspace)
+			for _, plot in plots do
+				rebuildShell(plot, math.max(plot.tier, 0))
+			end
+		end)
+	end
 
 	for _, player in Players:GetPlayers() do
 		task.spawn(onPlayerAdded, player)

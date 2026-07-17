@@ -20,6 +20,12 @@ export type RecipeMasteryEntry = {
 	masteryLevel: number,
 }
 
+-- A returning customer this café has served before (S2 feelings pass).
+export type RegularEntry = {
+	favourite: string, -- recipeId they'll ask for on return visits
+	visits: number,
+}
+
 export type StaffMember = {
 	id: string,
 	typeId: string,
@@ -82,6 +88,7 @@ export type PlayerData = {
 	cafeStars: number,
 	buzz: number, -- 0..105 café hype: fed customers raise it, walkouts drop it
 	expansionTier: number, -- 0-based index into World.interiorDepthTiers (buy land → deeper café)
+	regulars: { [string]: RegularEntry }, -- name-keyed returning customers (max 8)
 	inventory: { [string]: number },
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },
