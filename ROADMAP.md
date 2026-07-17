@@ -18,6 +18,15 @@ spoilage punishment, no fake urgency — *fresh bonuses* instead of rot.
 
 ---
 
+## 🎮 Gameplay vision — see docs/GAMEPLAY_UPGRADES.md
+
+_The full backlog of what makes the game addictive & interactive (juice,
+appliance upgrade trees, offline earnings, daily calendar, rush events,
+ethical prestige, collection walls, social loops) — distilled from Café World,
+Roblox tycoons, and restaurant sims. Recommends an **"S3.5 — Tycoon hooks"**
+mini-step (appliance upgrades + offline earnings + daily rewards) between S3
+and S4. Read it before planning any post-S3 work._
+
 ## ⭐ SESSION ROADMAP — 2026-07-15 — "Café World parity push" (5 steps)
 
 _Owner feedback (screenshot review): the game doesn't LOOK like a café yet,
