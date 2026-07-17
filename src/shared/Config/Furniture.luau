@@ -243,7 +243,10 @@ local Furniture: { [string]: Types.FurnitureDefinition } = {
 		width = 3,
 		depth = 2,
 		rotatable = true,
-		blocksWalk = true,
+		-- Seatable, so it must NOT block the navmesh: a diner has to path to
+		-- the seat, and a solid booth would force a teleport-to-seat (the very
+		-- thing the owner rejected). Matches chairs/stools.
+		blocksWalk = false,
 		seatCount = 1,
 		color = Color3.fromRGB(190, 70, 60),
 		height = 3.6,
