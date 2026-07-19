@@ -20,6 +20,10 @@ local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local EconomyConfig = require(Shared.Config.Economy)
 local Recipes = require(Shared.Config.Recipes)
+local World = require(Shared.Config.World)
+local StaffDefinitions = require(Shared.Config.Staff)
+local Kitchen = require(Shared.Config.Kitchen)
+local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local Fx = require(script.Parent.Parent.Fx)
@@ -60,6 +64,34 @@ type Crew = {
 local crewByUser: { [number]: Crew } = {}
 local messQueues: { [number]: { Model } } = {}
 local rng = Random.new()
+
+function StaffService.CountRole(_self: any, data: Types.PlayerData, role: string): number
+	local count = 0
+	for _, member in data.staff do
+		local definition = StaffDefinitions[member.typeId]
+		if definition and definition.role == role then
+			count += 1
+		end
+	end
+	return count
+end
+
+function StaffService.HasRole(self: any, data: Types.PlayerData, role: string): boolean
+	return StaffService.CountRole(self, data, role) > 0
+end
+
+function StaffService.GetRoleSpeed(_self: any, data: Types.PlayerData, role: string): number
+	local best = 0
+	for _, member in data.staff do
+		local definition = StaffDefinitions[member.typeId]
+		if definition and definition.role == role then
+			local level = math.max(1, math.floor(tonumber(member.level) or 1))
+			local speed = definition.baseSpeed * (1 + (level - 1) * Kitchen.staffLevelSpeedPerLevel)
+			best = math.max(best, speed)
+		end
+	end
+	return best
+end
 
 local function crewList(crew: Crew): { StaffNpc }
 	local list = {}
@@ -489,6 +521,12 @@ function StaffService.DeliverMeal(
 	local preparer = if isDrink then (crew.barista or crew.cook) else (crew.cook or crew.barista)
 	local fallbackPos = if preparer then preparer.home.Position else seatCf.Position
 	local station, standAt = prepStationFor(player, recipe, fallbackPos)
+	local passCf, kitchenSide, diningSide = CafeService:GetKitchenPass(player)
+	if not passCf or not kitchenSide or not diningSide then
+		passCf = CFrame.new(station.X, 3.3, station.Z)
+		kitchenSide = standAt
+		diningSide = standAt
+	end
 
 	local plate: Model, food: Instance
 	-- STAGE 1 — preparation, with the "dish ready" icon bubble.
@@ -500,6 +538,10 @@ function StaffService.DeliverMeal(
 		plate, food = PlateFactory.make(AssetLibraryService, recipe)
 		plate:PivotTo(CFrame.new(station.X, 3.3, station.Z))
 		plate.Parent = plotModel
+		local release = carryPlate(preparer, plate)
+		staffWalk(preparer, kitchenSide)
+		release()
+		plate:PivotTo(passCf)
 		task.delay(1.4, function()
 			if preparer.model.Parent ~= nil then
 				staffWalk(preparer, preparer.home.Position)
@@ -509,7 +551,7 @@ function StaffService.DeliverMeal(
 		end)
 	else
 		plate, food = PlateFactory.make(AssetLibraryService, recipe)
-		plate:PivotTo(CFrame.new(station.X, 3.3, station.Z))
+		plate:PivotTo(passCf)
 		plate.Parent = plotModel
 	end
 
@@ -517,10 +559,9 @@ function StaffService.DeliverMeal(
 	local waiter = crew.waiter
 	if waiter and claimStaff(waiter, 6) then
 		waiter.bubble.Text = "🍽️ Coming through!"
-		-- Walk to the STAND SPOT beside the station, not to the plate itself —
-		-- the plate sits ON the collidable appliance, and pathing into it made
-		-- the walk fail into the teleport recovery (live-caught 2026-07-17).
-		staffWalk(waiter, standAt)
+		-- Collect from the DINING side of the built-in pass. Noah never cuts
+		-- through the kitchen or paths into the collidable appliance.
+		staffWalk(waiter, diningSide)
 		local release = carryPlate(waiter, plate)
 		staffWalk(waiter, seatCf.Position + seatCf.RightVector * 2.4)
 		release()
@@ -602,43 +643,59 @@ end
 
 local function ensureCrew(player: Player)
 	local origin = CafeService:GetPlotOrigin(player)
-	if not origin then
+	local data = DataService:GetProfile(player)
+	if not origin or not data then
 		return
 	end
 	local crew = crewOf(player.UserId)
-	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local kitchenWidth = World.kitchenWidthCells * Grid.CELL_SIZE
+	local hasBarista = StaffService:HasRole(data, "Barista")
+	local hasCook = StaffService:HasRole(data, "Cook")
+	local hasWaiter = StaffService:HasRole(data, "Waiter")
+	local hasCleaner = StaffService:HasRole(data, "Cleaner")
+	if not hasBarista and crew.barista then
+		crew.barista.model:Destroy()
+		crew.barista = nil
+	end
+	if not hasCook and crew.cook then
+		crew.cook.model:Destroy()
+		crew.cook = nil
+	end
+	if not hasWaiter and crew.waiter then
+		crew.waiter.model:Destroy()
+		crew.waiter = nil
+	end
+	if not hasCleaner and crew.cleaner then
+		crew.cleaner.model:Destroy()
+		crew.cleaner = nil
+	end
 
-	if crew.barista == nil then
+	if hasBarista and crew.barista == nil then
 		-- Walker now: she walks to the coffee machine to prepare drinks (S2).
-		crew.barista = buildStaff(
-			origin * CFrame.new(width / 2 - 10, 0, 18) * CFrame.Angles(0, math.rad(180), 0),
-			{
+		crew.barista =
+			buildStaff(origin * CFrame.new(10, 0, 8) * CFrame.Angles(0, math.rad(180), 0), {
 				displayName = "Mia · Barista",
 				role = "Barista",
 				skin = Color3.fromRGB(235, 185, 150),
 				shirt = Color3.fromRGB(90, 70, 60),
 				hair = Color3.fromRGB(90, 55, 35),
 				walker = true,
-			}
-		)
+			})
 	end
-	if crew.cook == nil then
+	if hasCook and crew.cook == nil then
 		-- The chef prepares every FOOD dish at the oven/prep station (S2).
-		crew.cook = buildStaff(
-			origin * CFrame.new(width / 2 - 22, 0, 19) * CFrame.Angles(0, math.rad(180), 0),
-			{
-				displayName = "Sam · Cook",
-				role = "Cook",
-				skin = Color3.fromRGB(215, 165, 125),
-				shirt = Color3.fromRGB(245, 242, 235),
-				hair = Color3.fromRGB(60, 45, 35),
-				walker = true,
-			}
-		)
+		crew.cook = buildStaff(origin * CFrame.new(22, 0, 8) * CFrame.Angles(0, math.rad(180), 0), {
+			displayName = "Sam · Cook",
+			role = "Cook",
+			skin = Color3.fromRGB(215, 165, 125),
+			shirt = Color3.fromRGB(245, 242, 235),
+			hair = Color3.fromRGB(60, 45, 35),
+			walker = true,
+		})
 	end
-	if crew.waiter == nil then
+	if hasWaiter and crew.waiter == nil then
 		crew.waiter = buildStaff(
-			origin * CFrame.new(width / 2 + 6, 0, 16) * CFrame.Angles(0, math.rad(180), 0),
+			origin * CFrame.new(kitchenWidth + 10, 0, 20) * CFrame.Angles(0, math.rad(180), 0),
 			{
 				displayName = "Noah · Waiter",
 				role = "Waiter",
@@ -649,16 +706,18 @@ local function ensureCrew(player: Player)
 			}
 		)
 	end
-	if crew.cleaner == nil then
-		crew.cleaner =
-			buildStaff(origin * CFrame.new(8, 0, 16) * CFrame.Angles(0, math.rad(160), 0), {
+	if hasCleaner and crew.cleaner == nil then
+		crew.cleaner = buildStaff(
+			origin * CFrame.new(kitchenWidth + 6, 0, 24) * CFrame.Angles(0, math.rad(160), 0),
+			{
 				displayName = "Pia · Cleaner",
 				role = "Cleaner",
 				skin = Color3.fromRGB(255, 210, 175),
 				shirt = Color3.fromRGB(120, 150, 110),
 				hair = Color3.fromRGB(200, 170, 90),
 				walker = true,
-			})
+			}
+		)
 	end
 end
 
@@ -713,8 +772,9 @@ function StaffService.Start(_self: any)
 						if origin and claimStaff(cleaner, 0.1) then
 							task.spawn(function()
 								local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+								local kitchenWidth = World.kitchenWidthCells * Grid.CELL_SIZE
 								local spot = (origin * CFrame.new(
-									rng:NextNumber(width * 0.15, width * 0.85),
+									rng:NextNumber(kitchenWidth + 4, width * 0.85),
 									2,
 									rng:NextNumber(4, 22)
 								)).Position

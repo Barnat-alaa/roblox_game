@@ -1,8 +1,5 @@
 --!strict
--- Cook-ahead kitchen client (Phase 1): "Cook" / "Collect" prompts on YOUR
--- OWN appliances plus a recipe-picker panel. The server owns everything —
--- this controller only asks (StartCook / CollectCook) and presents state
--- from the model's `cookState` attribute, which KitchenService maintains.
+-- Cook-ahead appliance prompts and responsive recipe picker.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,6 +11,9 @@ local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
 local Mastery = require(Shared.Utilities.Mastery)
 
+local Components = require(script.Parent.Parent.UI.Components)
+local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
+local Theme = require(script.Parent.Parent.UI.Theme)
 local UIController = require(script.Parent.UIController)
 local AudioController = require(script.Parent.AudioController)
 
@@ -34,135 +34,132 @@ local function formatTime(seconds: number): string
 	return tostring(seconds) .. "s"
 end
 
--- ————— recipe picker panel —————
+local function closePicker()
+	pickerTargetId = nil
+	UIController.closePanel(ui.panel)
+end
 
 local function buildPicker()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "KitchenGui"
-	gui.ResetOnSpawn = false
-	gui.DisplayOrder = 6
-	gui.Parent = player:WaitForChild("PlayerGui")
-
-	local panel = Instance.new("Frame")
-	panel.Name = "CookPanel"
-	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	local panel = Components.Panel(UIController.modalRoot(), "CookPanel")
+	panel.Size = UDim2.fromOffset(440, 480)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(320, 300)
-	panel.BackgroundColor3 = Color3.fromRGB(245, 235, 218)
 	panel.Visible = false
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 16)
-	corner.Parent = panel
-	panel.Parent = gui
-
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -20, 0, 34)
-	title.Position = UDim2.fromOffset(10, 6)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 20
-	title.TextColor3 = Color3.fromRGB(55, 42, 38)
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Text = "🍳 What shall we cook?"
-	title.Parent = panel
-
-	local close = Instance.new("TextButton")
-	close.Size = UDim2.fromOffset(30, 30)
-	close.Position = UDim2.new(1, -38, 0, 8)
-	close.BackgroundColor3 = Color3.fromRGB(200, 100, 70)
-	close.Font = Enum.Font.GothamBold
-	close.TextSize = 16
-	close.TextColor3 = Color3.fromRGB(255, 250, 242)
-	close.Text = "✕"
-	local closeCorner = Instance.new("UICorner")
-	closeCorner.CornerRadius = UDim.new(0, 8)
-	closeCorner.Parent = close
-	close.Activated:Connect(function()
-		panel.Visible = false
-		pickerTargetId = nil
-	end)
-	close.Parent = panel
+	local _, close = Components.PanelHeader(
+		panel,
+		"START A FRESH BATCH",
+		"Pick a recipe for this appliance",
+		Theme.Colors.MintDark
+	)
+	close.Activated:Connect(closePicker)
 
 	local list = Instance.new("ScrollingFrame")
-	list.Name = "List"
-	list.Size = UDim2.new(1, -20, 1, -56)
-	list.Position = UDim2.fromOffset(10, 46)
+	list.Name = "Recipes"
+	list.Size = UDim2.new(1, -20, 1, -78)
+	list.Position = UDim2.fromOffset(10, 70)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
-	list.CanvasSize = UDim2.new()
+	list.ScrollBarThickness = 4
+	list.ScrollBarImageColor3 = Theme.Colors.Mint
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.ZIndex = 21
 	list.Parent = panel
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = list
-
 	ui.panel = panel
 	ui.list = list
+
+	ResponsiveLayout.watch(function(mode, viewport)
+		if mode == "Phone" then
+			panel.AnchorPoint = Vector2.new(0.5, 1)
+			panel.Position = UDim2.new(0.5, 0, 1, -8)
+			panel.Size = UDim2.new(1, -16, 0.68, 0)
+		elseif mode == "Compact" then
+			panel.AnchorPoint = Vector2.new(1, 0.5)
+			panel.Position = UDim2.new(1, -8, 0.5, 0)
+			panel.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.43, 326, 360), viewport.Y - 16)
+		else
+			panel.AnchorPoint = Vector2.new(0.5, 0.5)
+			panel.Position = UDim2.fromScale(0.5, 0.5)
+			panel.Size = UDim2.fromOffset(440, 480)
+		end
+	end)
 end
 
 local function openPicker(applianceId: string, instanceId: string)
 	pickerTargetId = instanceId
 	local profile = UIController.getProfile()
 	local unlocked = (profile and profile.unlockedRecipes) or {}
+	local masteryMap = (profile and profile.recipeMastery) or {}
 
 	ui.list:ClearAllChildren()
 	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
+	layout.Padding = UDim.new(0, 8)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = ui.list
-
-	local masteryMap = (profile and profile.recipeMastery) or {}
-	local order = 0
+	local choices = {}
 	for id, recipe in Recipes do
 		if recipe.applianceId == applianceId and unlocked[id] == true then
-			order += 1
-			local entry = masteryMap[id]
-			local level = (entry and tonumber(entry.masteryLevel)) or 0
-			local cost = Mastery.batchCost(
-				recipe.ingredientCost * Kitchen.batchCostMultiplier,
-				level,
-				Kitchen.masteryCostReductionPerStar
-			)
-			local row = Instance.new("TextButton")
-			row.Size = UDim2.new(1, -6, 0, 52)
-			row.BackgroundColor3 = Color3.fromRGB(255, 250, 240)
-			row.Font = Enum.Font.GothamMedium
-			row.TextSize = 14
-			row.TextColor3 = Color3.fromRGB(55, 42, 38)
-			row.TextXAlignment = Enum.TextXAlignment.Left
-			row.Text = string.format(
-				"  %s\n  🪙%d · ⏱ %s · %d servings",
-				recipe.displayName,
-				cost,
-				formatTime(recipe.cookTime),
-				recipe.servings
-			)
-			row.LayoutOrder = order
-			local rowCorner = Instance.new("UICorner")
-			rowCorner.CornerRadius = UDim.new(0, 10)
-			rowCorner.Parent = row
-			row.Activated:Connect(function()
-				if pickerTargetId then
-					Remotes.event("StartCook"):FireServer(pickerTargetId, id)
-					AudioController.play("brew")
-				end
-				ui.panel.Visible = false
-				pickerTargetId = nil
-			end)
-			row.Parent = ui.list
+			table.insert(choices, id)
 		end
 	end
-	ui.panel.Visible = order > 0
-	if order == 0 then
-		UIController.toast("No recipes for this appliance yet — level up!")
+	table.sort(choices, function(a, b)
+		return Recipes[a].displayName < Recipes[b].displayName
+	end)
+	for order, id in choices do
+		local recipe = Recipes[id]
+		local entry = masteryMap[id]
+		local masteryLevel = (entry and tonumber(entry.masteryLevel)) or 0
+		local cost = Mastery.batchCost(
+			recipe.ingredientCost * Kitchen.batchCostMultiplier,
+			masteryLevel,
+			Kitchen.masteryCostReductionPerStar
+		)
+		local row = Instance.new("TextButton")
+		row.Name = id
+		row.Size = UDim2.new(1, -6, 0, 76)
+		row.BackgroundColor3 = Theme.Colors.Paper
+		row.Font = Theme.Font.Bold
+		row.TextSize = 13
+		row.TextColor3 = Theme.Colors.Ink
+		row.TextXAlignment = Enum.TextXAlignment.Left
+		row.TextWrapped = true
+		row.Text = string.format(
+			"      %s\n      $%d batch  |  %s  |  +%d servings",
+			recipe.displayName,
+			cost,
+			formatTime(recipe.cookTime),
+			recipe.servings
+		)
+		row.LayoutOrder = order
+		row.ZIndex = 22
+		Components.Corner(row, Theme.Radius.Medium)
+		Components.Stroke(row, Theme.Colors.Line, 1, 0.35)
+		local accent = Instance.new("Frame")
+		accent.Size = UDim2.fromOffset(8, 56)
+		accent.Position = UDim2.fromOffset(10, 10)
+		accent.BackgroundColor3 = Components.CategoryColor(recipe.category)
+		accent.ZIndex = 23
+		Components.Corner(accent, 4)
+		accent.Parent = row
+		row.Activated:Connect(function()
+			if pickerTargetId then
+				Remotes.event("StartCook"):FireServer(pickerTargetId, id)
+				AudioController.play("brew")
+			end
+			closePicker()
+		end)
+		row.Parent = ui.list
 	end
+	if #choices == 0 then
+		UIController.toast("No recipes for this appliance yet - level up first")
+		return
+	end
+	UIController.togglePanel(ui.panel)
 end
 
--- ————— appliance prompts —————
-
 local function attachPrompt(model: Model)
+	if model:FindFirstChild("CookPrompt", true) then
+		return
+	end
 	local anchor = model:FindFirstChildWhichIsA("BasePart")
 	if not anchor then
 		return
@@ -176,28 +173,26 @@ local function attachPrompt(model: Model)
 	local function refresh()
 		local state = model:GetAttribute("cookState")
 		if state == "cooking" then
-			prompt.ActionText = "Cooking…"
+			prompt.ActionText = "Cooking..."
 			prompt.Enabled = false
 		elseif state == "ready" then
 			prompt.ActionText = "Collect"
-			prompt.ObjectText = Furniture[model.Name] and Furniture[model.Name].displayName or ""
 			prompt.Enabled = true
 		else
 			prompt.ActionText = "Cook"
-			prompt.ObjectText = Furniture[model.Name] and Furniture[model.Name].displayName or ""
 			prompt.Enabled = true
 		end
+		prompt.ObjectText = Furniture[model.Name] and Furniture[model.Name].displayName
+			or "Appliance"
 	end
 	refresh()
 	model:GetAttributeChangedSignal("cookState"):Connect(refresh)
-
 	prompt.Triggered:Connect(function()
 		local instanceId = model:GetAttribute("instanceId")
 		if typeof(instanceId) ~= "string" then
 			return
 		end
-		local state = model:GetAttribute("cookState")
-		if state == "ready" then
+		if model:GetAttribute("cookState") == "ready" then
 			Remotes.event("CollectCook"):FireServer(instanceId)
 			AudioController.play("serve")
 		else
@@ -208,8 +203,11 @@ local function attachPrompt(model: Model)
 end
 
 local function isCookable(model: Instance): boolean
-	local def = Furniture[model.Name]
-	return model:IsA("Model") and def ~= nil and def.cookable == true
+	if not model:IsA("Model") then
+		return false
+	end
+	local definition = Furniture[model.Name]
+	return definition ~= nil and definition.cookable == true
 end
 
 local function watchMyFurniture()
@@ -217,7 +215,6 @@ local function watchMyFurniture()
 	if not plotsFolder then
 		return
 	end
-	-- Find my plot (ownerUserId attribute), then watch its furniture folder.
 	while true do
 		for _, plot in plotsFolder:GetChildren() do
 			if plot:GetAttribute("ownerUserId") == player.UserId then
@@ -230,7 +227,7 @@ local function watchMyFurniture()
 					end
 					furniture.ChildAdded:Connect(function(child)
 						if isCookable(child) then
-							task.wait(0.1) -- let attributes replicate
+							task.wait(0.1)
 							attachPrompt(child :: Model)
 						end
 					end)

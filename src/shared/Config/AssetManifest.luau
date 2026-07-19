@@ -13,7 +13,7 @@ export type FurnitureAsset = {
 	-- clamp the horizontal span so nothing overflows its grid footprint.
 	height: number,
 	maxSpan: number, -- max horizontal studs after scaling (grid footprint cap)
-	yaw: number?, -- degrees to rotate so the model's long axis aligns to +X
+	yaw: number?, -- degrees added at placement to align the imported model's visible front
 	liftY: number?, -- studs above the floor (wall art, clocks, hanging lamps)
 }
 
@@ -28,6 +28,11 @@ export type PropAsset = {
 	assetId: number,
 	name: string,
 	fit: number, -- longest-axis target in studs (small tabletop props)
+}
+
+export type RetroPropSelection = {
+	sourceName: string,
+	fit: number,
 }
 
 local AssetManifest = {
@@ -60,6 +65,7 @@ local AssetManifest = {
 			name = "Realistic Chair (Chuba7)",
 			height = 3.3,
 			maxSpan = 3.4,
+			yaw = 180, -- native back is -Z; flip it to match the game's +Z chair back
 		},
 		-- Priorité 4 interior (owner haul 2026-07-17):
 		painting_wall = {
@@ -162,6 +168,31 @@ local AssetManifest = {
 		Pastry = { assetId = 9500111031, name = "[PBR] Croissant (ordinarytyson)", fit = 1.6 },
 		Sandwich = { assetId = 2528907852, name = "Sandwich on plate (magaia10)", fit = 1.8 },
 	} :: { [string]: PropAsset },
+
+	-- The owner-approved retro pack is a 118-mesh model, not a set of flat UI
+	-- icons. AssetLibraryService loads it once, strips its five scripts, and
+	-- extracts only these small food meshes as recipe-specific counter/plate
+	-- props. Existing category props remain the fallback if the pack fails.
+	retroPropPack = {
+		assetId = 134670664555156,
+		name = "Retro Food Pack - Old Roblox Meshes",
+		recipes = {
+			espresso = { sourceName = "Starblox Coffee", fit = 1.3 },
+			cappuccino = { sourceName = "Hot Chocolate With Marshmellow Faces", fit = 1.3 },
+			tea = { sourceName = "Teapot", fit = 1.35 },
+			croissant = { sourceName = "8-bit Donut", fit = 1.5 },
+			sandwich = { sourceName = "Cheeseburger", fit = 1.7 },
+			latte = { sourceName = "Chocolate Milk", fit = 1.3 },
+			muffin = { sourceName = "Muffin", fit = 1.45 },
+			iced_tea = { sourceName = "Bloxiade", fit = 1.3 },
+			fruit_salad = { sourceName = "Fruit Bowl", fit = 1.65 },
+			mocha = { sourceName = "Hot Chocolate", fit = 1.3 },
+			cinnamon_roll = { sourceName = "Pancakes", fit = 1.5 },
+			club_sandwich = { sourceName = "Double Cheeseburger", fit = 1.75 },
+			slow_roast = { sourceName = "Pirate Cup", fit = 1.35 },
+			quiche = { sourceName = "Apple Pie", fit = 1.55 },
+		} :: { [string]: RetroPropSelection },
+	},
 
 	-- Customer appearance donors: real clothed rigs (R6/R15). One is picked at
 	-- random per walk-in; our name tag + order bubble + walk logic are attached.

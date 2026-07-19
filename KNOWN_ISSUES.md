@@ -2,8 +2,26 @@
 
 Tracked shortcomings of the current build. Each has an owner-facing note and a plan.
 
+## Idle/tycoon kitchen and compact UI — LIVE-VERIFIED 2026-07-19
+Confirmed in the generated Studio place: 44/44 TestEZ cases pass; Espresso
+automatically schedules, completes into FIFO stock, and schedules again toward
+its target; a real waiting order clears on the waiter cycle; the server accepts
+menu target changes; the permanent inventory rail and manager render cleanly
+on an average laptop and iPhone 16 Pro Max landscape. The phone uses narrow edge
+drawers with 55% world visibility instead of full-width sheets; desktop keeps
+62%. Studio was reset to its default viewport.
+
+- Production currently completes at most one queued batch per appliance while
+  the owner is offline. It intentionally does not simulate hours of unattended
+  repeat production yet; adding capped offline production/earnings remains a
+  later idle-progression feature.
+- Pizza and cakes are not current recipes. The scheduler is data-driven, so they
+  can be added later with their own oven/display requirement without changing
+  the inventory architecture.
+
 ## S2 build — LIVE-VERIFIED 2026-07-17 (by Claude via Studio MCP)
-Confirmed running: facade+door+garden+14-stud walls, chair auto-facing, still
+Confirmed running: facade+door+garden+12-stud walls with an indoor jump cap,
+visible chair-mesh auto-facing, vibrant interior palette, still
 seated legs, icon bubbles, Barista/Cook role split, waiter plate carry (zero
 teleports after the collision-group + station-target fixes), dirty plate →
 owner Clean-up prompt / Pia wash cycle, cleaner sweeping, 16/16 assets.
@@ -24,8 +42,8 @@ owner Clean-up prompt / Pia wash cycle, cleaner sweeping, 16/16 assets.
 7. Cooking at a front stove still works (rect-distance check regression watch).
 8. (Third pass) `E` on the ordering customer serves them from stock (+2 🔥);
    `E` on a dirty plate cleans it (+1 🔥); Noah & Pia walk on customer-rig
-   bodies with navy/green aprons — NO sliding or teleporting; walls too tall
-   to escape even jumping from the counter; Pia sweeps between jobs.
+   bodies with navy/green aprons — NO sliding or teleporting; the indoor jump
+   cap prevents counter-assisted wall escapes; Pia sweeps between jobs.
 If anything is off, screenshot + tell Claude; fixes come before S2 moods work.
 
 ## Data / persistence

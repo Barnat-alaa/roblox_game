@@ -1,7 +1,5 @@
 --!strict
--- Build mode: a catalogue of owned items + a live grid preview (green = fits,
--- red = blocked). The server re-validates every placement — this is only UX.
--- Tap/click the floor to place; Rotate button or R key to rotate.
+-- Responsive build catalogue with server-authoritative placement.
 
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
@@ -15,35 +13,28 @@ local World = require(Shared.Config.World)
 local Furniture = require(Shared.Config.Furniture)
 local Remotes = require(Shared.Network.Remotes)
 
+local Components = require(script.Parent.Parent.UI.Components)
+local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
+local Theme = require(script.Parent.Parent.UI.Theme)
 local UIController = require(script.Parent.UIController)
 
 local player = Players.LocalPlayer
-local DARK = Color3.fromRGB(55, 42, 38)
 
 local BuildController = {}
 BuildController.Name = "BuildController"
 
 local active = false
 local selectedId: string? = nil
+local selectedCategory = "All"
 local rotation = 0
 local previewPart: Part? = nil
 local ui: { [string]: any } = {}
 
-local function corner(radius: number, parent: Instance)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, radius)
-	c.Parent = parent
-end
-
 local function getOrigin(): CFrame?
-	local o = player:GetAttribute("PlotOrigin")
-	return if typeof(o) == "CFrame" then o else nil
+	local origin = player:GetAttribute("PlotOrigin")
+	return if typeof(origin) == "CFrame" then origin else nil
 end
 
--- Your own café's interior floor — the ONLY thing placement clicks may hit.
--- Walls/door/awning would otherwise swallow rays (they're click-transparent
--- visually when faded, but not to a raycast), landing furniture cells away
--- from the click (owner bug 2026-07-16).
 local function ownPlotFloor(): BasePart?
 	local plotsFolder = workspace:FindFirstChild("Plots")
 	if not plotsFolder then
@@ -61,17 +52,14 @@ local function ownPlotFloor(): BasePart?
 	return nil
 end
 
--- Expects VIEWPORT coordinates (GetMouseLocation space). InputObject.Position
--- is GUI space — convert with toViewport before calling. Feeding GUI coords
--- straight in was the "furniture lands away from my click" offset
--- (KNOWN_ISSUES "screen→grid raycast" — now resolved).
-local function raycastCell(viewportPos: Vector2): (number?, number?)
+-- Expects viewport coordinates. InputObject coordinates are converted in Start.
+local function raycastCell(viewportPosition: Vector2): (number?, number?)
 	local origin = getOrigin()
 	local camera = workspace.CurrentCamera
 	if not origin or not camera then
 		return nil, nil
 	end
-	local ray = camera:ViewportPointToRay(viewportPos.X, viewportPos.Y)
+	local ray = camera:ViewportPointToRay(viewportPosition.X, viewportPosition.Y)
 	local params = RaycastParams.new()
 	local floor = ownPlotFloor()
 	if floor then
@@ -92,8 +80,7 @@ local function raycastCell(viewportPos: Vector2): (number?, number?)
 	if not result then
 		return nil, nil
 	end
-	local gx, gy = Grid.worldToCell(origin, result.Position)
-	return gx, gy
+	return Grid.worldToCell(origin, result.Position)
 end
 
 local function updatePreview()
@@ -103,50 +90,74 @@ local function updatePreview()
 		end
 		return
 	end
-	local def = Furniture[selectedId]
+	local definition = Furniture[selectedId]
 	local origin = getOrigin()
-	if not def or not origin then
+	if not definition or not origin then
 		return
 	end
-	local gx, gy = raycastCell(UserInputService:GetMouseLocation())
-	if not gx or not gy then
+	local gridX, gridY = raycastCell(UserInputService:GetMouseLocation())
+	if not gridX or not gridY then
 		return
 	end
 	if not previewPart then
 		local part = Instance.new("Part")
+		part.Name = "BuildPreview"
 		part.Anchored = true
 		part.CanCollide = false
 		part.Transparency = 0.35
 		part.Material = Enum.Material.SmoothPlastic
 		previewPart = part
 	end
-	local pv = previewPart :: Part
-	pv.Size =
-		Vector3.new(def.width * Grid.CELL_SIZE - 0.2, def.height, def.depth * Grid.CELL_SIZE - 0.2)
-	pv.CFrame = Grid.cellToWorld(origin, gx, gy, def.width, def.depth, rotation, def.height)
-	-- Mirror the server's tier clamp (CafeService sets the ExpansionTier
-	-- attribute): the unpurchased garden must preview red, not green.
+	local preview = previewPart :: Part
+	preview.Size = Vector3.new(
+		definition.width * Grid.CELL_SIZE - 0.2,
+		definition.height,
+		definition.depth * Grid.CELL_SIZE - 0.2
+	)
+	preview.CFrame = Grid.cellToWorld(
+		origin,
+		gridX,
+		gridY,
+		definition.width,
+		definition.depth,
+		rotation,
+		definition.height
+	)
 	local tier = tonumber(player:GetAttribute("ExpansionTier")) or 0
 	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
-	local fits = Grid.inBounds(gx, gy, def.width, def.depth, rotation, nil, depthCells)
-	pv.Color = if fits then Color3.fromRGB(90, 200, 110) else Color3.fromRGB(220, 80, 80)
-	pv.Parent = workspace
+	local fits =
+		Grid.inBounds(gridX, gridY, definition.width, definition.depth, rotation, nil, depthCells)
+	preview.Color = if fits then Theme.Colors.Mint else Theme.Colors.Danger
+	preview.Parent = workspace
 end
 
-local function tryPlace(screenPos: Vector2)
+local function tryPlace(screenPosition: Vector2)
 	if not active or not selectedId then
 		return
 	end
-	local gx, gy = raycastCell(screenPos)
-	if not gx or not gy then
+	local gridX, gridY = raycastCell(screenPosition)
+	if not gridX or not gridY then
 		return
 	end
 	Remotes.event("PlaceFurniture"):FireServer({
 		catalogId = selectedId,
-		gridX = gx,
-		gridY = gy,
+		gridX = gridX,
+		gridY = gridY,
 		rotation = rotation,
 	})
+end
+
+local function setCategoryButtons(activeButton: TextButton?)
+	for _, child in ui.categories:GetChildren() do
+		if child:IsA("TextButton") then
+			child.BackgroundColor3 = if child == activeButton
+				then Theme.Colors.Coral
+				else Theme.Colors.PaperDark
+			child.TextColor3 = if child == activeButton
+				then Theme.Colors.White
+				else Theme.Colors.Ink
+		end
+	end
 end
 
 local function refreshCatalogue()
@@ -162,126 +173,206 @@ local function refreshCatalogue()
 	if not profile then
 		return
 	end
-	local order = 0
+	local ids = {}
 	for id, count in profile.inventory do
-		if count > 0 then
-			order += 1
-			local def = Furniture[id]
-			local btn = Instance.new("TextButton")
-			btn.Size = UDim2.new(1, -6, 0, 38)
-			btn.LayoutOrder = order
-			btn.BackgroundColor3 = if selectedId == id
-				then Color3.fromRGB(120, 190, 130)
-				else Color3.fromRGB(255, 250, 240)
-			btn.TextColor3 = DARK
-			btn.Font = Enum.Font.GothamMedium
-			btn.TextSize = 15
-			btn.Text = (if def then def.displayName else id) .. "  x" .. tostring(count)
-			corner(8, btn)
-			btn.Activated:Connect(function()
-				selectedId = id
-				refreshCatalogue()
-			end)
-			btn.Parent = ui.list
+		local definition = Furniture[id]
+		if
+			count > 0
+			and definition
+			and (selectedCategory == "All" or definition.category == selectedCategory)
+		then
+			table.insert(ids, id)
 		end
+	end
+	table.sort(ids, function(a, b)
+		return Furniture[a].displayName < Furniture[b].displayName
+	end)
+	for order, id in ids do
+		local count = profile.inventory[id]
+		local definition = Furniture[id]
+		local selected = selectedId == id
+		local button = Instance.new("TextButton")
+		button.Name = id
+		button.Size = UDim2.new(1, -6, 0, 58)
+		button.LayoutOrder = order
+		button.BackgroundColor3 = if selected then Theme.Colors.Mint else Theme.Colors.Paper
+		button.TextColor3 = if selected then Theme.Colors.White else Theme.Colors.Ink
+		button.Font = Theme.Font.Bold
+		button.TextSize = 13
+		button.TextXAlignment = Enum.TextXAlignment.Left
+		button.TextWrapped = true
+		button.Text = string.format(
+			"      %s\n      %s  |  %dx%d cells  |  x%d",
+			definition.displayName,
+			definition.category,
+			definition.width,
+			definition.depth,
+			count
+		)
+		button.ZIndex = 22
+		Components.Corner(button, Theme.Radius.Medium)
+		Components.Stroke(button, Theme.Colors.Line, 1, 0.35)
+		local accent = Instance.new("Frame")
+		accent.Size = UDim2.fromOffset(8, 42)
+		accent.Position = UDim2.fromOffset(10, 8)
+		accent.BackgroundColor3 = Components.CategoryColor(definition.category)
+		accent.ZIndex = 23
+		Components.Corner(accent, 4)
+		accent.Parent = button
+		button.Activated:Connect(function()
+			selectedId = id
+			refreshCatalogue()
+		end)
+		button.Parent = ui.list
+	end
+	ui.empty.Visible = #ids == 0
+end
+
+local function leaveBuildMode()
+	active = false
+	selectedId = nil
+	if previewPart then
+		previewPart.Parent = nil
 	end
 end
 
 local function toggle()
-	active = not active
-	ui.panel.Visible = active
 	if active then
-		refreshCatalogue()
+		leaveBuildMode()
+		UIController.closePanel(ui.panel)
 	else
-		selectedId = nil
-		if previewPart then
-			previewPart.Parent = nil
-		end
+		active = true
+		UIController.togglePanel(ui.panel)
+		refreshCatalogue()
 	end
 end
 
 local function buildPanel()
-	local playerGui = player:WaitForChild("PlayerGui")
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "BuildUI"
-	gui.ResetOnSpawn = false
-	gui.Parent = playerGui
-
-	local panel = Instance.new("Frame")
-	panel.Size = UDim2.fromOffset(240, 340)
-	panel.Position = UDim2.fromOffset(12, 64)
-	panel.BackgroundColor3 = Color3.fromRGB(245, 235, 218)
+	local panel = Components.Panel(UIController.modalRoot(), "BuildPanel")
+	panel.AnchorPoint = Vector2.new(0, 0.5)
+	panel.Size = UDim2.fromOffset(320, 520)
+	panel.Position = UDim2.new(0, 12, 0.5, 0)
 	panel.Visible = false
-	corner(16, panel)
-	panel.Parent = gui
+	local _, close = Components.PanelHeader(
+		panel,
+		"BUILD MODE",
+		"Choose an item, then tap the cafe floor",
+		Theme.Colors.Coral
+	)
+	close.Activated:Connect(toggle)
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -16, 0, 28)
-	title.Position = UDim2.fromOffset(10, 6)
-	title.BackgroundTransparency = 1
-	title.Text = "🔨 Build — tap the floor"
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 16
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.TextColor3 = DARK
-	title.Parent = panel
+	local categories = Instance.new("Frame")
+	categories.Size = UDim2.new(1, -20, 0, 36)
+	categories.Position = UDim2.fromOffset(10, 72)
+	categories.BackgroundTransparency = 1
+	categories.ZIndex = 21
+	categories.Parent = panel
+	local categoryLayout = Instance.new("UIListLayout")
+	categoryLayout.FillDirection = Enum.FillDirection.Horizontal
+	categoryLayout.Padding = UDim.new(0, 5)
+	categoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	categoryLayout.Parent = categories
+	ui.categories = categories
+	local firstButton: TextButton? = nil
+	for order, category in { "All", "Appliance", "Seating", "Decoration" } do
+		local button = Components.Button(
+			categories,
+			if category == "Decoration" then "Decor" else category,
+			Theme.Colors.PaperDark,
+			UDim2.new(0.25, -4, 1, 0)
+		)
+		button.LayoutOrder = order
+		button.TextColor3 = Theme.Colors.Ink
+		button.TextSize = 10
+		button.ZIndex = 22
+		if category == "All" then
+			firstButton = button
+		end
+		button.Activated:Connect(function()
+			selectedCategory = category
+			setCategoryButtons(button)
+			refreshCatalogue()
+		end)
+	end
+	setCategoryButtons(firstButton)
 
 	local list = Instance.new("ScrollingFrame")
-	list.Size = UDim2.new(1, -16, 1, -90)
-	list.Position = UDim2.fromOffset(8, 38)
+	list.Size = UDim2.new(1, -16, 1, -176)
+	list.Position = UDim2.fromOffset(8, 116)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
-	list.CanvasSize = UDim2.new()
+	list.ScrollBarThickness = 4
+	list.ScrollBarImageColor3 = Theme.Colors.Coral
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.ZIndex = 21
 	list.Parent = panel
 	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 5)
+	layout.Padding = UDim.new(0, 7)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 	ui.list = list
+	local empty = Components.Label(list, "No owned items here. Visit the Shop first.", 12, true)
+	empty.Size = UDim2.new(1, -12, 0, 60)
+	empty.TextWrapped = true
+	empty.TextColor3 = Theme.Colors.Muted
+	empty.Visible = false
+	empty.ZIndex = 22
+	ui.empty = empty
 
-	local rotateBtn = Instance.new("TextButton")
-	rotateBtn.Size = UDim2.new(0.5, -12, 0, 40)
-	rotateBtn.Position = UDim2.new(0, 8, 1, -46)
-	rotateBtn.BackgroundColor3 = Color3.fromRGB(120, 95, 160)
-	rotateBtn.TextColor3 = Color3.fromRGB(255, 250, 242)
-	rotateBtn.Font = Enum.Font.GothamBold
-	rotateBtn.TextSize = 16
-	rotateBtn.Text = "⟳ Rotate"
-	corner(10, rotateBtn)
-	rotateBtn.Activated:Connect(function()
+	local rotateButton =
+		Components.Button(panel, "ROTATE", Theme.Colors.Blue, UDim2.new(0.5, -14, 0, 44), "R")
+	rotateButton.Position = UDim2.new(0, 10, 1, -52)
+	rotateButton.ZIndex = 22
+	rotateButton.Activated:Connect(function()
 		rotation = (rotation + 1) % 4
 	end)
-	rotateBtn.Parent = panel
-
-	local doneBtn = Instance.new("TextButton")
-	doneBtn.Size = UDim2.new(0.5, -12, 0, 40)
-	doneBtn.Position = UDim2.new(0.5, 4, 1, -46)
-	doneBtn.BackgroundColor3 = Color3.fromRGB(90, 165, 95)
-	doneBtn.TextColor3 = Color3.fromRGB(255, 250, 242)
-	doneBtn.Font = Enum.Font.GothamBold
-	doneBtn.TextSize = 16
-	doneBtn.Text = "✓ Done"
-	corner(10, doneBtn)
-	doneBtn.Activated:Connect(toggle)
-	doneBtn.Parent = panel
-
+	local doneButton =
+		Components.Button(panel, "DONE", Theme.Colors.Mint, UDim2.new(0.5, -14, 0, 44), "OK")
+	doneButton.Position = UDim2.new(0.5, 4, 1, -52)
+	doneButton.ZIndex = 22
+	doneButton.Activated:Connect(toggle)
 	ui.panel = panel
+
+	panel:GetPropertyChangedSignal("Visible"):Connect(function()
+		if not panel.Visible and active then
+			leaveBuildMode()
+		end
+	end)
+	ResponsiveLayout.watch(function(mode, viewport)
+		if mode == "Phone" then
+			panel.AnchorPoint = Vector2.new(0.5, 1)
+			panel.Position = UDim2.new(0.5, 0, 1, -8)
+			panel.Size = UDim2.new(1, -16, 0.7, 0)
+		elseif mode == "Compact" then
+			panel.AnchorPoint = Vector2.new(0, 0.5)
+			panel.Position = UDim2.new(0, 8, 0.5, 0)
+			panel.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.39, 300, 324), viewport.Y - 16)
+		else
+			panel.AnchorPoint = Vector2.new(0, 0.5)
+			panel.Position = UDim2.new(0, 12, 0.5, 0)
+			panel.Size = UDim2.fromOffset(320, 520)
+		end
+	end)
 end
 
 function BuildController.Start(_self: any)
 	buildPanel()
-
 	UIController.onBuildToggle = toggle
+	UIController.registerAction(
+		"Build",
+		"Build",
+		Theme.Glyphs.Build,
+		Theme.Colors.Coral,
+		30,
+		toggle
+	)
 	UIController.subscribeProfile(function()
 		if active then
 			refreshCatalogue()
 		end
 	end)
-
 	RunService.RenderStepped:Connect(updatePreview)
-
 	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
 		if gameProcessed then
 			return
@@ -290,7 +381,6 @@ function BuildController.Start(_self: any)
 			input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch
 		then
-			-- InputObject.Position is GUI space; raycastCell wants viewport space.
 			local inset = GuiService:GetGuiInset()
 			tryPlace(Vector2.new(input.Position.X + inset.X, input.Position.Y + inset.Y))
 		elseif input.KeyCode == Enum.KeyCode.R then

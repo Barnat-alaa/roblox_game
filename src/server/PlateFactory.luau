@@ -32,7 +32,7 @@ function PlateFactory.make(assetLibrary: any, recipe: any): (Model, Instance)
 
 	local food: Instance
 	local prop: Model? = if assetLibrary and recipe
-		then assetLibrary:GetProp(recipe.category)
+		then assetLibrary:GetProp(recipe.category, recipe.id)
 		else nil
 	if prop then
 		for _, d in prop:GetDescendants() do

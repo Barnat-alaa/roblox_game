@@ -84,10 +84,10 @@ end
 -- in the item's LOCAL space (cf carries the grid rotation). All greybox —
 -- Blender replacements slot in per-catalogId later.
 
-local WHITE = Color3.fromRGB(245, 242, 235)
+local WHITE = Color3.fromRGB(255, 245, 218)
 local WOOD = Color3.fromRGB(150, 110, 80)
 local DARKWOOD = Color3.fromRGB(96, 70, 52)
-local CLOTH_RED = Color3.fromRGB(196, 60, 50)
+local CLOTH_RED = Color3.fromRGB(238, 76, 62)
 local STEEL = Color3.fromRGB(192, 197, 204)
 
 local function decor(
@@ -389,8 +389,11 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		local floorY = cf.Y - def.height / 2
 		-- Wall art / clocks / hanging lamps mount above the floor (liftY).
 		local lift = tonumber(template:GetAttribute("liftY")) or 0
+		local assetYaw = tonumber(template:GetAttribute("assetYaw")) or 0
 		local pos = Vector3.new(cf.Position.X, floorY + lift + size.Y / 2, cf.Position.Z)
-		template:PivotTo(CFrame.new(pos) * CFrame.Angles(0, math.rad(90 * placed.rotation), 0))
+		template:PivotTo(
+			CFrame.new(pos) * CFrame.Angles(0, math.rad(90 * placed.rotation + assetYaw), 0)
+		)
 		template.Parent = folder
 		return
 	end
@@ -421,12 +424,77 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 	model.Parent = folder
 end
 
+local function isTable(catalogId: string, def: Types.FurnitureDefinition): boolean
+	return def.category == "Seating"
+		and def.seatCount == 0
+		and string.find(string.lower(catalogId), "table", 1, true) ~= nil
+end
+
+-- Recalculate every nearby seat, rather than only the chair being placed.
+-- This makes facing independent of placement order: table-first, chair-first,
+-- and old saved layouts all converge on the same correct rotations.
+local function autoFaceSeats(data: Types.PlayerData): { [string]: boolean }
+	local changed: { [string]: boolean } = {}
+	for _, seat in data.placedFurniture do
+		local seatDef = Furniture[seat.catalogId]
+		if seatDef and seatDef.seatCount > 0 and seatDef.width == 1 and seatDef.depth == 1 then
+			local seatX = seat.gridX + 0.5
+			local seatZ = seat.gridY + 0.5
+			local bestDist = math.huge
+			local facing: number? = nil
+			for _, other in data.placedFurniture do
+				local otherDef = Furniture[other.catalogId]
+				if otherDef and isTable(other.catalogId, otherDef) then
+					local w, d = Grid.footprintSize(otherDef.width, otherDef.depth, other.rotation)
+					local dx = other.gridX + w / 2 - seatX
+					local dz = other.gridY + d / 2 - seatZ
+					local dist = math.max(math.abs(dx), math.abs(dz))
+					if dist <= 2.5 and dist < bestDist then
+						bestDist = dist
+						facing = Grid.rotationFacingDelta(dx, dz)
+					end
+				end
+			end
+			if facing ~= nil and seatDef.rotatable and seat.rotation ~= facing then
+				seat.rotation = facing
+				changed[seat.instanceId] = true
+			end
+		end
+	end
+	return changed
+end
+
+local function respawnFurniture(
+	player: Player,
+	data: Types.PlayerData,
+	instanceIds: { [string]: boolean }
+)
+	local folder = CafeService:GetFurnitureFolder(player)
+	if not folder then
+		return
+	end
+	for instanceId in instanceIds do
+		for _, child in folder:GetChildren() do
+			if child:GetAttribute("instanceId") == instanceId then
+				child:Destroy()
+			end
+		end
+		for _, placed in data.placedFurniture do
+			if placed.instanceId == instanceId then
+				BuildService:SpawnFurniture(player, placed)
+				break
+			end
+		end
+	end
+end
+
 function BuildService.RenderProfile(_self: any, player: Player)
 	local data = DataService:GetProfile(player)
 	local folder = CafeService:GetFurnitureFolder(player)
 	if not data then
 		return
 	end
+	autoFaceSeats(data)
 	if folder then
 		folder:ClearAllChildren()
 	end
@@ -471,36 +539,6 @@ local function handlePlace(player: Player, payload: unknown)
 		return
 	end
 
-	-- Seats auto-face the nearest adjacent table (owner request: a chair must
-	-- never point away from its table). 1x1 footprints only, so overriding the
-	-- rotation can never invalidate the placement we just validated.
-	if def.seatCount > 0 and def.width == 1 and def.depth == 1 then
-		local bestDist = math.huge
-		local facing: number? = nil
-		for _, other in data.placedFurniture do
-			local otherDef = Furniture[other.catalogId]
-			if otherDef and string.find(other.catalogId, "table") ~= nil then
-				local w, d = Grid.footprintSize(otherDef.width, otherDef.depth, other.rotation)
-				local tx = other.gridX + w / 2
-				local ty = other.gridY + d / 2
-				local dx = tx - (gridX + 0.5)
-				local dy = ty - (gridY + 0.5)
-				local dist = math.max(math.abs(dx), math.abs(dy))
-				if dist <= 2.5 and dist < bestDist then
-					bestDist = dist
-					-- Chair look direction by rotation r (plot-local):
-					-- r0 → -Z, r1 → -X, r2 → +Z, r3 → +X.
-					facing = if math.abs(dx) >= math.abs(dy)
-						then (if dx > 0 then 3 else 1)
-						else (if dy > 0 then 2 else 0)
-				end
-			end
-		end
-		if facing ~= nil and def.rotatable then
-			rotation = facing
-		end
-	end
-
 	data.inventory[catalogId] -= 1
 	local placed: Types.PlacedFurniture = {
 		instanceId = newInstanceId(),
@@ -511,7 +549,9 @@ local function handlePlace(player: Player, payload: unknown)
 		rotation = rotation,
 	}
 	table.insert(data.placedFurniture, placed)
-	BuildService:SpawnFurniture(player, placed)
+	local changed = autoFaceSeats(data)
+	changed[placed.instanceId] = true
+	respawnFurniture(player, data, changed)
 	DataService:Push(player)
 end
 
@@ -543,6 +583,7 @@ local function handleRemove(player: Player, instanceId: unknown)
 					end
 				end
 			end
+			respawnFurniture(player, data, autoFaceSeats(data))
 			DataService:Push(player)
 			return
 		end

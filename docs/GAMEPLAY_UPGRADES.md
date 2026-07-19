@@ -26,9 +26,10 @@ this backlog.
 4. **Day-to-day** — a reason to come back tomorrow (offline income, dailies, streaks). 🔜
 5. **Week-to-week & social** — status, seasons, neighbours, events. 🔜 S5
 
-**Our non-negotiable rails (keep these — they're our identity, §35):** no
-spoilage/punishment, no loot boxes, no pay-to-win, no fake-urgency FOMO, no
-free-text chat. Every tycoon pattern below is adapted to fit them.
+**Our non-negotiable rails (keep these — they're our identity, §35):** spoilage
+must be visible, player-controlled, and paused offline; no loot boxes, no
+pay-to-win, no fake-urgency FOMO, and no free-text chat. Every tycoon pattern
+below is adapted to fit them.
 
 ---
 
@@ -201,7 +202,8 @@ unlock/upgrade ~5 min away, and (c) have a concrete reason to return tomorrow.
 
 ## Guardrails (do not violate — this is our brand)
 
-No spoilage. No loot boxes / gacha. No pay-to-win (cosmetics + honest speedups
-only). No fake-urgency countdowns that punish absence — seasons and events are
-generous and additive. No free-text between players. Every "prestige/reset"
-keeps what players are emotionally attached to (recipes, trophies, cosmetics).
+Spoilage pauses offline and must always be preventable through visible stock
+targets and warnings. No loot boxes / gacha. No pay-to-win (cosmetics + honest
+speedups only). No fake-urgency countdowns that punish absence — seasons and
+events are generous and additive. No free-text between players. Every
+"prestige/reset" keeps what players are emotionally attached to.

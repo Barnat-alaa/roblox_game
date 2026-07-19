@@ -17,6 +17,7 @@ local Customers = require(Shared.Config.Customers)
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local World = require(Shared.Config.World)
 local Grid = require(Shared.Utilities.Grid)
 local RewardMath = require(Shared.Utilities.RewardMath)
 local Remotes = require(Shared.Network.Remotes)
@@ -193,7 +194,7 @@ end
 local function pickUnlockedRecipe(data: Types.PlayerData): string?
 	local pool: { string } = {}
 	for recipeId, unlocked in data.unlockedRecipes do
-		if unlocked then
+		if unlocked and KitchenService:IsOnMenu(data, recipeId) then
 			table.insert(pool, recipeId)
 		end
 	end
@@ -586,8 +587,9 @@ end
 -- The queue now lives INSIDE the café (S2 facade): customers path through the
 -- front door and line up in front of the counter area; slot 1 is the deepest.
 local function slotPosition(origin: CFrame, slot: number): Vector3
-	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	return (origin * CFrame.new(width / 2 - 6, 2, 10 - (slot - 1) * QUEUE_SPACING)).Position
+	local diningX = (World.kitchenWidthCells + 1.5) * Grid.CELL_SIZE
+	local firstZ = (World.kitchenDepthCells + 1) * Grid.CELL_SIZE
+	return (origin * CFrame.new(diningX, 2, firstZ - (slot - 1) * QUEUE_SPACING)).Position
 end
 
 -- Walk routing around collidable furniture, straight-line + teleport recovery
@@ -634,7 +636,14 @@ local function claimSeat(player: Player): (CFrame?, string?)
 	end
 	for _, placed in data.placedFurniture do
 		local def = Furniture[placed.catalogId]
-		if def and def.seatCount > 0 and not taken[placed.instanceId] then
+		local w, d = 0, 0
+		if def then
+			w, d = Grid.footprintSize(def.width, def.depth, placed.rotation)
+		end
+		local seatX = placed.gridX + w / 2
+		local seatZ = placed.gridY + d / 2
+		local inKitchen = seatX < World.kitchenWidthCells and seatZ < World.kitchenDepthCells
+		if def and def.seatCount > 0 and not inKitchen and not taken[placed.instanceId] then
 			taken[placed.instanceId] = true
 			local cf = Grid.cellToWorld(
 				origin,
@@ -984,7 +993,8 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	-- Counter stock first (cook-ahead loop): if the café has food ready,
 	-- the customer eats immediately — no tap needed. Regulars reach for their
 	-- FAVOURITE first. Empty counters fall back to a manual order.
-	if cust.favourite then
+	local menuData = DataService:GetProfile(player)
+	if cust.favourite and menuData and KitchenService:IsOnMenu(menuData, cust.favourite) then
 		local ateFav, paidFav = KitchenService:ConsumeSpecific(player, cust.favourite)
 		if ateFav then
 			clearMood(cust)
@@ -1002,7 +1012,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	local data = DataService:GetProfile(player)
 	local recipeId = if data then pickUnlockedRecipe(data) else nil
 	-- A regular always asks for their favourite when they know it.
-	if cust.favourite and data and data.unlockedRecipes[cust.favourite] == true then
+	if cust.favourite and data and KitchenService:IsOnMenu(data, cust.favourite) then
 		recipeId = cust.favourite
 	end
 	local orderId = if recipeId
@@ -1039,7 +1049,7 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 			return
 		end
 		servingLock = true
-		local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string)
+		local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string, true)
 		if ate and cust.orderId ~= nil then
 			OrderService:CancelOrder(cust.orderId, true)
 			cust.orderId = nil
@@ -1146,10 +1156,8 @@ function CustomerService.Start(_self: any)
 					local origin = CafeService:GetPlotOrigin(player)
 					local due = os.clock() >= (nextSpawnAt[player.UserId] or 0)
 					if origin and #q < MAX_QUEUE and due then
-						local buzz = KitchenService:GetBuzz(player)
-						local interval = Kitchen.spawnIntervalBase
-							- (Kitchen.spawnIntervalBase - Kitchen.spawnIntervalBest)
-								* (buzz / Kitchen.buzzMax)
+						local demandPerMinute = KitchenService:GetDemandRate(player)
+						local interval = 60 / math.max(0.2, demandPerMinute)
 						nextSpawnAt[player.UserId] = os.clock() + interval
 						local def = pickCustomer()
 						local data = DataService:GetProfile(player)

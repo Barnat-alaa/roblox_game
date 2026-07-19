@@ -19,6 +19,9 @@ local EVENTS = {
 	"FinishCooking", -- c->s: stop the brew bar (server judges the timing)
 	"StartCook", -- c->s: start a stove batch {applianceInstanceId, recipeId}
 	"CollectCook", -- c->s: collect a finished batch {applianceInstanceId}
+	"SetMenuRecipe", -- c->s: toggle one unlocked product in automatic production
+	"SetTargetStock", -- c->s: set the desired ready-stock level for a product
+	"SetProductionPriority", -- c->s: set automatic production priority (1..3)
 	"ClaimOrder", -- c->s: serve a completed order
 	"CompleteTutorialStep", -- c->s: onboarding progress
 	"VisitCafe", -- c->s: request to visit another plot
