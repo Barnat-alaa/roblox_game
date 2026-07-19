@@ -398,25 +398,30 @@ local FOOD_COLORS: { [string]: Color3 } = {
 	Sandwich = Color3.fromRGB(215, 160, 90),
 }
 
--- One serving marker on the counter: a real food prop when its category has a
--- loaded Creator Store model, else the original coloured cylinder.
+-- Place every food model by its real bounds rather than its imported pivot.
+-- This works for cups, teapots, pastries, plates, and fallback cylinders.
 local function placeFoodMarker(display: Folder, slotCf: CFrame, recipe: Types.RecipeDefinition)
 	local prop: Model? = if AssetLibraryService
 		then AssetLibraryService:GetProp(recipe.category, recipe.id)
 		else nil
 	if prop then
 		prop.Name = "Food_" .. recipe.id
-		for _, d in prop:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.Anchored = true
-				d.CanCollide = false
-				d.CanQuery = false
+		for _, descendant in prop:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Anchored = true
+				descendant.CanCollide = false
+				descendant.CanQuery = false
+				descendant.CanTouch = false
 			end
 		end
 		prop:PivotTo(slotCf)
+		local boundsCf, boundsSize = prop:GetBoundingBox()
+		local bottomY = boundsCf.Position.Y - boundsSize.Y / 2
+		prop:PivotTo(prop:GetPivot() + Vector3.new(0, slotCf.Position.Y - bottomY, 0))
 		prop.Parent = display
 		return
 	end
+
 	local food = Instance.new("Part")
 	food.Name = "Food_" .. recipe.id
 	food.Shape = Enum.PartType.Cylinder
@@ -426,12 +431,14 @@ local function placeFoodMarker(display: Folder, slotCf: CFrame, recipe: Types.Re
 	food.Anchored = true
 	food.CanCollide = false
 	food.CanQuery = false
-	food.CFrame = slotCf * CFrame.Angles(0, 0, math.rad(90))
+	food.CanTouch = false
+	food.CFrame = slotCf * CFrame.new(0, food.Size.X / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
 	food.Parent = display
 end
 
--- Rebuild the little food stacks on the player's first counter so counter
--- stock is something you can SEE filling up and emptying.
+-- Rebuild the visible stock after removing the previous display. Destroying it
+-- before measuring prevents old markers from increasing the measured height on
+-- every refresh. Imported counters use their body rather than the cash register.
 refreshCounterDisplay = function(player: Player)
 	local data = DataService:GetProfile(player)
 	local folder = CafeService:GetFurnitureFolder(player)
@@ -448,21 +455,23 @@ refreshCounterDisplay = function(player: Player)
 	if not counter then
 		return
 	end
-	-- The procedural counter has a "Top" part; a bought counter model does not,
-	-- so fall back to the top surface of its bounding box.
-	local topCf: CFrame
-	local topPart = counter:FindFirstChild("Top") :: BasePart?
-	if topPart then
-		topCf = topPart.CFrame
-	else
-		local pivot, size = counter:GetBoundingBox()
-		topCf = pivot * CFrame.new(0, size.Y / 2, 0)
-	end
 
 	local existing = counter:FindFirstChild("StockDisplay")
 	if existing then
 		existing:Destroy()
 	end
+
+	local topCf: CFrame
+	local topPart = counter:FindFirstChild("Top") :: BasePart?
+	if topPart then
+		topCf = topPart.CFrame * CFrame.new(0, topPart.Size.Y / 2, 0)
+	else
+		local counterBody = counter:FindFirstChild("Counter")
+		local support = if counterBody and counterBody:IsA("Model") then counterBody else counter
+		local pivot, size = support:GetBoundingBox()
+		topCf = pivot * CFrame.new(0, size.Y / 2, 0)
+	end
+
 	local display = Instance.new("Folder")
 	display.Name = "StockDisplay"
 	display.Parent = counter
@@ -479,7 +488,7 @@ refreshCounterDisplay = function(player: Player)
 					break
 				end
 				local x = -4.2 + ((slot - 1) % 6) * 1.7
-				local slotCf = topCf * CFrame.new(x, 0.5, 0.4)
+				local slotCf = topCf * CFrame.new(x, 0, 0.4)
 				placeFoodMarker(display, slotCf, recipe)
 			end
 		end
