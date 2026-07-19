@@ -71,6 +71,29 @@ pinned in `Config/AssetManifest.luau` (furniture/world sections):
 | world:fountain | 5477511653 | plaza centrepiece (247 parts, single instance) |
 | staff:Waiter | 3230955000 | Butler — R15, 15/15 joints, zero scripts |
 
+## UI and neighbourhood graphics (owner-approved 2026-07-19)
+
+The owner added these Creator Store listings to their inventory and explicitly
+approved their use in Social Cafe. Decal listing IDs are loaded through
+`rbxthumb://type=Asset` because listing IDs are not raw image content IDs.
+
+| Asset ID | Store item | Shipped use | Audit |
+| ---: | --- | --- | --- |
+| 99176447965360 | Simulator Icon Pack | HUD resources and edge-menu icons | 112 decals, no scripts; only nine selected image IDs ship |
+| 6020249531 | Coin Icon | Coin HUD badge | clean single decal |
+| 2922135969 | Sidewalk2 | tiled boulevard sidewalks | clean single decal |
+| 17092935 | Road - Straight | two-lane boulevard modules | clean single decal |
+| 17093010 | Road - Left Turn | west boulevard turn | clean single decal |
+| 17092971 | Road - Right Turn | east boulevard turn | clean single decal |
+| 136501975130226 | Wooden floor | tiled restaurant floor | clean single decal |
+| 4462186698 | Sky | cafe skybox | clean single decal |
+| 134670664555156 | Retro Food Pack - Old Roblox Meshes | 14 recipe-specific counter/plate props | 118 meshes; five scripts stripped; only named selections cached |
+
+**Rejected 2026-07-19:**
+- `79519710309081` "American Diner Meal Logo Pack Icons USA Food" — 659
+  instances, two embedded scripts, and real restaurant brand logos. It is not
+  shipped or referenced by source configuration.
+
 **Rejected 2026-07-17:**
 - `14466134917` "Black Maid" — incomplete skeleton (13/15 Motor6D), fails the
   walk gate; shop another maid rig (shopping list #63).

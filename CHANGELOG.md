@@ -5,6 +5,77 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-19 — owner-approved graphics pack
+- Replaced HUD letter badges with approved coin, reputation, level, Buzz,
+  goals, cookbook, build, shop, and pantry images from the Simulator Icon Pack;
+  the code-native glyphs remain available as fallbacks.
+- Added tiled stone sidewalks, a modular two-lane road with straight/left/right
+  modules, a warm wooden restaurant floor texture, and a bright cloud sky.
+- The Retro Food Pack is loaded once, stripped of all five embedded scripts,
+  and reduced to 14 explicitly selected recipe props for counters and plates.
+- Rejected the American diner pack from the shipped build: it contains branded
+  restaurant logos, 659 instances, and two embedded scripts, and is not a clean
+  or original UI-icon source.
+- Live-tested the approved graphics on desktop and iPhone 17 Pro landscape:
+  all HUD/environment images loaded, 50 sanitised templates loaded with zero
+  fallbacks, and the complete TestEZ suite passed 48/48 cases.
+
+### Changed — 2026-07-19 — compact tycoon interface
+- Rebuilt the runtime UI around a single resource capsule, a contextual order
+  ticket, a small active-stock pill, and a collapsible edge action dock so the
+  restaurant remains the visual focus.
+- Landscape phones and short Studio windows now use narrow 41–44% side drawers
+  instead of full-width mobile sheets. Desktop drawers leave at least 62% of
+  the world visible in the tested laptop viewport.
+- Pantry/production, shop, goals, cookbook, build, appliance picker, and visit
+  panels now share one high-order modal layer, preventing tutorial and stock
+  widgets from rendering over an open menu.
+- Added an original Sunset Cafe theme with code-native icon fallbacks, 44px
+  production controls, vibrant status colors, and blank approved-asset hooks.
+  No third-party icon asset was inserted without owner approval.
+- Live-tested in Studio on iPhone 16 Pro Max landscape and an average laptop.
+  The iPhone stock pill used 226–344px depending on active menu count, open
+  drawers left 55% of the world visible, and TestEZ passed 44/44 cases.
+
+### Added — 2026-07-18 — continuous idle/tycoon production
+- All 14 current products now have explicit batch time, yield, online shelf
+  life, waiter cycle, appliance, and staff-role requirements.
+- Placed coffee machines, stone ovens, and prep stations continuously produce
+  enabled menu recipes toward player-controlled stock targets. Production
+  pauses for missing appliances, missing staff, full targets, or ingredients.
+- Inventory is now timestamped FIFO lots with atomic short reservations. A
+  serving is removed before its payout, expired food is tracked as waste, and
+  offline time is shifted out of expiry so absence never destroys stock.
+- `PlayerData.staff` is authoritative. Mia produces drinks, Sam produces food,
+  Noah limits automatic service to each recipe's cycle, and Pia remains the
+  cleaner; staff levels improve role speed.
+- Customer demand now scales from 1.2 to 2.8 visits/minute using Buzz, seating,
+  and waiter capacity instead of overwhelming the kitchen every 3–10 seconds.
+- Added an always-visible vibrant stock rail for every product plus a responsive
+  Production Manager (four menu slots, target stock, P1–P3 priority), incoming
+  batch/freshness timers, and a Business Pulse bottleneck message.
+- Schema v2 migrates old numeric counter stock into fresh timestamped lots and
+  seeds the four existing crew roles without losing old servings.
+- Added deterministic FIFO/reservation/spoilage/balance tests and
+  `docs/PRODUCTION_BALANCE.md`. Live TestEZ result: 44 passed, 0 failed.
+
+### Fixed — 2026-07-18 — visible chair facing, vibrant café, human-scale walls
+- Chairs now face the nearest table regardless of placement order, including
+  saved layouts loaded from older builds.
+- The imported wooden chair's native back is `-Z`, opposite the procedural
+  chair convention. A measured 180° correction is now applied in the final
+  placement transform, so the visible seat faces the table.
+- The restaurant uses a brighter coral, honey-oak, cream, gold and teal palette.
+- The front-right café corner is a real open kitchen with an L-shaped divider
+  and dish pass. Customers queue on the dining side; Mia/Sam prepare inside;
+  Noah collects plates outside; Pia's idle sweep stays out of the kitchen.
+- Exterior walls are back to a human-scale 12 studs. Players use a 3-stud / 28
+  power jump only while inside a café and regain the normal 7.2 / 50 outside;
+  the private garden fence keeps its sealed collision boundary.
+- Live MCP verification: four real chairs all faced inward, indoor/outdoor jump
+  transitions passed, and a wall-directed jump from a 3.8-stud platform peaked
+  at root Y 9.33 and remained inside the 12-stud wall.
+
 ### Added — 2026-07-17 — S2 CLOSED: feelings, regulars, combo + the Priorité 4 dressing haul
 **The feelings layer (S2 finish, live-verified):**
 - **Mood faces + patience bars** over every waiting customer (😊→😐→😠 with a

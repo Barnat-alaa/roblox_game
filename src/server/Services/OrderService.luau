@@ -9,9 +9,7 @@ local Shared = ReplicatedStorage.Shared
 local Types = require(Shared.Types)
 local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
-local RewardMath = require(Shared.Utilities.RewardMath)
 local Recipes = require(Shared.Config.Recipes)
-local Customers = require(Shared.Config.Customers)
 local EconomyConfig = require(Shared.Config.Economy)
 local Grid = require(Shared.Utilities.Grid)
 local Log = require(Shared.Utilities.Log)
@@ -27,13 +25,13 @@ local CafeService: any
 local CustomerService: any
 local AnalyticsService: any
 local RecipeService: any
-local GoalService: any
+local KitchenService: any
 
 local activeOrders: { [string]: Types.Order } = {}
+local servingLocks: { [string]: boolean } = {}
 local nextId = 0
 local claimLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
-local rng = Random.new()
 
 local function newOrderId(): string
 	nextId += 1
@@ -117,49 +115,53 @@ local function handleClaim(player: Player, orderId: unknown, _manualCook: unknow
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "too_far" })
 		return
 	end
+	if servingLocks[orderId] then
+		return
+	end
+	servingLocks[orderId] = true
 
-	-- Mark claimed BEFORE granting so a duplicate request can never double-pay.
+	local manualReady = RecipeService:ConsumeManualCook(player, orderId)
+	local ate, payout = KitchenService:ConsumeSpecific(player, order.recipeId, true)
+	if not ate and manualReady then
+		local madeServing = KitchenService:AddEmergencyServing(player, order.recipeId)
+		if madeServing then
+			ate, payout = KitchenService:ConsumeSpecific(player, order.recipeId, true)
+		end
+	end
+	if not ate or payout == nil then
+		servingLocks[orderId] = nil
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_in_stock" })
+		return
+	end
+
+	-- Mark claimed only after the atomic FIFO reservation committed.
 	order.claimed = true
 	order.status = "served"
 	activeOrders[orderId] = nil
-
-	-- One-shot, armed only by a server-judged brew for exactly this order.
-	local isManual = RecipeService:ConsumeManualCook(player, orderId)
-
-	local recipe = Recipes[order.recipeId]
-	local customer = Customers[order.customerId]
-	local tipMult = if customer then customer.tipMultiplier else 1
-	local payout = RewardMath.orderPayout(recipe, isManual)
-	local tip = RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), tipMult)
-
-	EconomyService:AddCoins(player, payout + tip)
-	EconomyService:AddReputation(player, EconomyConfig.reputationPerServe)
+	servingLocks[orderId] = nil
+	local manualBonus = if manualReady then math.max(1, math.floor(payout * 0.25)) else 0
+	if manualBonus > 0 then
+		EconomyService:AddCoins(player, manualBonus)
+	end
 	EconomyService:AddExperience(player, EconomyConfig.xpPerServe)
 
-	data.stats.customersServed += 1
-	data.stats.recipesCooked += 1
-	DataService:Push(player)
-
 	if CustomerService then
-		CustomerService:OnOrderResolved(player.UserId, payout + tip)
+		CustomerService:OnOrderResolved(player.UserId, payout + manualBonus)
 	end
 	if AnalyticsService then
 		AnalyticsService:TrackOnce(player, "first_customer_served", { recipe = order.recipeId })
 		AnalyticsService:Track(
 			player,
 			"customer_served",
-			{ recipe = order.recipeId, coins = payout + tip }
+			{ recipe = order.recipeId, coins = payout + manualBonus }
 		)
 	end
 
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "served",
-		coins = payout + tip,
+		coins = payout + manualBonus,
 		recipe = order.recipeId,
 	})
-	if GoalService then
-		GoalService:Bump(player, "serve_customers", 1)
-	end
 end
 
 -- Server-internal lookup for sibling services (never exposed to clients).
@@ -195,43 +197,38 @@ function OrderService.StaffServe(_self: any, orderId: string): boolean
 	if not data then
 		return false
 	end
+	if servingLocks[orderId] then
+		return false
+	end
+	servingLocks[orderId] = true
+	local ate, payout = KitchenService:ConsumeSpecific(player, order.recipeId)
+	if not ate or payout == nil then
+		servingLocks[orderId] = nil
+		return false
+	end
 
 	order.claimed = true
 	order.status = "served"
 	activeOrders[orderId] = nil
+	servingLocks[orderId] = nil
 
-	local recipe = Recipes[order.recipeId]
-	local customer = Customers[order.customerId]
-	local tipMult = if customer then customer.tipMultiplier else 1
-	local payout =
-		math.floor(RewardMath.orderPayout(recipe, false) * EconomyConfig.staffPayoutMultiplier)
-	local tip = RewardMath.tipAmount(recipe, rng:NextInteger(1, 100), tipMult)
-
-	EconomyService:AddCoins(player, payout + tip)
-	EconomyService:AddReputation(player, EconomyConfig.reputationPerServe)
 	EconomyService:AddExperience(
 		player,
 		math.floor(EconomyConfig.xpPerServe * EconomyConfig.staffXpMultiplier)
 	)
 
-	data.stats.customersServed += 1
-	DataService:Push(player)
-
 	if CustomerService then
-		CustomerService:OnOrderResolved(player.UserId, payout + tip)
+		CustomerService:OnOrderResolved(player.UserId, payout)
 	end
 	if AnalyticsService then
 		AnalyticsService:Track(player, "staff_served", { recipe = order.recipeId })
 	end
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "served",
-		coins = payout + tip,
+		coins = payout,
 		recipe = order.recipeId,
 		staff = true,
 	})
-	if GoalService then
-		GoalService:Bump(player, "serve_customers", 1)
-	end
 	return true
 end
 
@@ -241,6 +238,9 @@ end
 function OrderService.CancelOrder(_self: any, orderId: string, silent: boolean?): boolean
 	local order = activeOrders[orderId]
 	if not order or order.claimed then
+		return false
+	end
+	if servingLocks[orderId] then
 		return false
 	end
 	activeOrders[orderId] = nil
@@ -265,7 +265,7 @@ function OrderService.Init(_self: any)
 	CustomerService = ServiceRegistry.get("CustomerService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 	RecipeService = ServiceRegistry.get("RecipeService")
-	GoalService = ServiceRegistry.get("GoalService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 end
 
 function OrderService.Start(_self: any)
@@ -275,6 +275,7 @@ function OrderService.Start(_self: any)
 		for id, order in activeOrders do
 			if order.ownerUserId == player.UserId then
 				activeOrders[id] = nil
+				servingLocks[id] = nil
 			end
 		end
 	end)

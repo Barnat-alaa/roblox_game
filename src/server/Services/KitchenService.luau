@@ -16,6 +16,7 @@ local Kitchen = require(Shared.Config.Kitchen)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Mastery = require(Shared.Utilities.Mastery)
+local InventoryMath = require(Shared.Utilities.InventoryMath)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
@@ -32,6 +33,11 @@ local CafeService: any
 local AnalyticsService: any
 local GoalService: any
 local AssetLibraryService: any
+local StaffService: any
+
+local nextAutomaticServeAt: { [number]: number } = {}
+local setCookVisuals: (Player, string, string, string?) -> ()
+local refreshCounterDisplay: (Player) -> ()
 
 local cookLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -41,7 +47,7 @@ local cookLimiter =
 local function kitchenOf(data: Types.PlayerData): Types.KitchenState
 	-- Reconcile only fills top-level keys; heal older saves' nested shape.
 	if typeof(data.kitchen) ~= "table" then
-		(data :: any).kitchen = { cooks = {}, stock = {} }
+		(data :: any).kitchen = {}
 	end
 	if typeof(data.kitchen.cooks) ~= "table" then
 		data.kitchen.cooks = {}
@@ -49,7 +55,53 @@ local function kitchenOf(data: Types.PlayerData): Types.KitchenState
 	if typeof(data.kitchen.stock) ~= "table" then
 		data.kitchen.stock = {}
 	end
+	if typeof(data.kitchen.lots) ~= "table" then
+		data.kitchen.lots = {}
+	end
+	if typeof(data.kitchen.reservations) ~= "table" then
+		data.kitchen.reservations = {}
+	end
+	if typeof(data.kitchen.jobs) ~= "table" then
+		data.kitchen.jobs = {}
+	end
+	if typeof(data.kitchen.menu) ~= "table" then
+		data.kitchen.menu = {}
+	end
+	if typeof(data.kitchen.targetStock) ~= "table" then
+		data.kitchen.targetStock = {}
+	end
+	if typeof(data.kitchen.priorities) ~= "table" then
+		data.kitchen.priorities = {}
+	end
+	if typeof(data.kitchen.stats) ~= "table" then
+		data.kitchen.stats = { produced = 0, served = 0, spoiled = 0 }
+	end
+	data.kitchen.stats.produced = math.max(0, tonumber(data.kitchen.stats.produced) or 0)
+	data.kitchen.stats.served = math.max(0, tonumber(data.kitchen.stats.served) or 0)
+	data.kitchen.stats.spoiled = math.max(0, tonumber(data.kitchen.stats.spoiled) or 0)
+	data.kitchen.lastActiveAt = tonumber(data.kitchen.lastActiveAt) or os.time()
+	data.kitchen.nextLotId = math.max(0, tonumber(data.kitchen.nextLotId) or 0)
+	data.kitchen.nextReservationId = math.max(0, tonumber(data.kitchen.nextReservationId) or 0)
+	data.kitchen.nextJobId = math.max(0, tonumber(data.kitchen.nextJobId) or 0)
 	return data.kitchen
+end
+
+local function syncStock(kitchen: Types.KitchenState, now: number)
+	for recipeId in kitchen.stock do
+		kitchen.stock[recipeId] = nil
+	end
+	for recipeId in Recipes do
+		local _, available = InventoryMath.count(kitchen, recipeId, now)
+		kitchen.stock[recipeId] = available
+	end
+end
+
+function KitchenService.GetKitchen(_self: any, data: Types.PlayerData): Types.KitchenState
+	return kitchenOf(data)
+end
+
+function KitchenService.SyncStock(_self: any, data: Types.PlayerData, now: number?)
+	syncStock(kitchenOf(data), now or os.time())
 end
 
 local function findPlacedAppliance(
@@ -122,9 +174,156 @@ function KitchenService.servingPayout(_self: any, recipe: Types.RecipeDefinition
 	return math.max(1, math.floor(recipe.basePrice * Kitchen.servingPayoutFraction))
 end
 
+function KitchenService.IsOnMenu(_self: any, data: Types.PlayerData, recipeId: string): boolean
+	return kitchenOf(data).menu[recipeId] == true and data.unlockedRecipes[recipeId] == true
+end
+
+function KitchenService.UpdateApplianceVisual(
+	_self: any,
+	player: Player,
+	instanceId: string,
+	state: string,
+	text: string?
+)
+	setCookVisuals(player, instanceId, state, text)
+end
+
+function KitchenService.GetStockCounts(
+	_self: any,
+	data: Types.PlayerData,
+	recipeId: string,
+	now: number?
+): (number, number, number)
+	return InventoryMath.count(kitchenOf(data), recipeId, now or os.time())
+end
+
+function KitchenService.CompleteProduction(
+	_self: any,
+	player: Player,
+	recipeId: string,
+	quantity: number,
+	producedAt: number?
+): number
+	local data = DataService:GetProfile(player)
+	local recipe = Recipes[recipeId]
+	if not data or not recipe then
+		return 0
+	end
+	local now = producedAt or os.time()
+	local kitchen = kitchenOf(data)
+	local total = InventoryMath.count(kitchen, recipeId, now)
+	local added = math.clamp(math.floor(quantity), 0, Kitchen.maxStockPerRecipe - total)
+	if added <= 0 then
+		return 0
+	end
+	InventoryMath.addLot(kitchen, recipeId, added, now, now + recipe.spoilTime)
+	kitchen.stats.produced += added
+	syncStock(kitchen, now)
+
+	local entry = masteryOf(data, recipeId)
+	entry.timesCooked += 1
+	local previousLevel = entry.masteryLevel
+	entry.masteryLevel = Mastery.levelFor(recipe.masteryThresholds, entry.timesCooked)
+	if entry.masteryLevel > previousLevel then
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "mastery_up",
+			recipe = recipe.displayName,
+			stars = entry.masteryLevel,
+		})
+	end
+	data.stats.recipesCooked += 1
+	EconomyService:AddExperience(player, Kitchen.xpPerCollect)
+	DataService:Push(player)
+	refreshCounterDisplay(player)
+	if GoalService then
+		GoalService:Bump(player, "collect_batches", 1)
+	end
+	if AnalyticsService then
+		AnalyticsService:Track(
+			player,
+			"production_completed",
+			{ recipe = recipeId, quantity = added }
+		)
+	end
+	return added
+end
+
+function KitchenService.AddEmergencyServing(_self: any, player: Player, recipeId: string): boolean
+	local data = DataService:GetProfile(player)
+	local recipe = Recipes[recipeId]
+	if not data or not recipe or data.unlockedRecipes[recipeId] ~= true then
+		return false
+	end
+	local hasAppliance = false
+	for _, placed in data.placedFurniture do
+		if placed.catalogId == recipe.applianceId then
+			hasAppliance = true
+			break
+		end
+	end
+	if not hasAppliance or not EconomyService:TrySpendCoins(player, recipe.ingredientCost) then
+		return false
+	end
+	local now = os.time()
+	local kitchen = kitchenOf(data)
+	InventoryMath.addLot(
+		kitchen,
+		recipeId,
+		1,
+		now,
+		now + math.min(recipe.spoilTime, Kitchen.manualServingShelfLife)
+	)
+	kitchen.stats.produced += 1
+	syncStock(kitchen, now)
+	DataService:Push(player)
+	refreshCounterDisplay(player)
+	return true
+end
+
+function KitchenService.ExpireStock(_self: any, player: Player, now: number): number
+	local data = DataService:GetProfile(player)
+	if not data then
+		return 0
+	end
+	local kitchen = kitchenOf(data)
+	local spoiledByRecipe = InventoryMath.expire(kitchen, now)
+	local spoiled = 0
+	for recipeId, quantity in spoiledByRecipe do
+		spoiled += quantity
+		if AnalyticsService and quantity > 0 then
+			AnalyticsService:Track(
+				player,
+				"stock_spoiled",
+				{ recipe = recipeId, quantity = quantity }
+			)
+		end
+	end
+	if spoiled > 0 then
+		kitchen.stats.spoiled += spoiled
+		syncStock(kitchen, now)
+		DataService:Push(player)
+		refreshCounterDisplay(player)
+	end
+	return spoiled
+end
+
+function KitchenService.ResumeAfterOffline(_self: any, data: Types.PlayerData, now: number)
+	local kitchen = kitchenOf(data)
+	local offlineSeconds = math.max(0, now - (tonumber(kitchen.lastActiveAt) or now))
+	if offlineSeconds > 2 then
+		InventoryMath.shiftExpiry(kitchen, offlineSeconds)
+	end
+	kitchen.lastActiveAt = now
+	syncStock(kitchen, now)
+end
+
+function KitchenService.TouchActive(_self: any, data: Types.PlayerData, now: number)
+	kitchenOf(data).lastActiveAt = now
+end
+
 -- ————— stove visuals (server-side; replicate to everyone) —————
 
-local function setCookVisuals(player: Player, instanceId: string, state: string, text: string?)
+setCookVisuals = function(player: Player, instanceId: string, state: string, text: string?)
 	local model = applianceModel(player, instanceId)
 	if not model then
 		return
@@ -203,7 +402,7 @@ local FOOD_COLORS: { [string]: Color3 } = {
 -- loaded Creator Store model, else the original coloured cylinder.
 local function placeFoodMarker(display: Folder, slotCf: CFrame, recipe: Types.RecipeDefinition)
 	local prop: Model? = if AssetLibraryService
-		then AssetLibraryService:GetProp(recipe.category)
+		then AssetLibraryService:GetProp(recipe.category, recipe.id)
 		else nil
 	if prop then
 		prop.Name = "Food_" .. recipe.id
@@ -233,7 +432,7 @@ end
 
 -- Rebuild the little food stacks on the player's first counter so counter
 -- stock is something you can SEE filling up and emptying.
-local function refreshCounterDisplay(player: Player)
+refreshCounterDisplay = function(player: Player)
 	local data = DataService:GetProfile(player)
 	local folder = CafeService:GetFurnitureFolder(player)
 	if not data or not folder then
@@ -307,6 +506,29 @@ function KitchenService.GetBuzz(_self: any, player: Player): number
 	return if data then (tonumber(data.buzz) or Kitchen.buzzStart) else Kitchen.buzzStart
 end
 
+function KitchenService.GetDemandRate(_self: any, player: Player): number
+	local data = DataService:GetProfile(player)
+	if not data then
+		return Kitchen.spawnRateBasePerMinute
+	end
+	local seats = 0
+	for _, placed in data.placedFurniture do
+		local definition = Furniture[placed.catalogId]
+		if definition then
+			seats += definition.seatCount
+		end
+	end
+	local buzz = math.clamp(tonumber(data.buzz) or Kitchen.buzzStart, 0, Kitchen.buzzMax)
+	local rate = Kitchen.spawnRateBasePerMinute
+		+ (Kitchen.spawnRateBestPerMinute - Kitchen.spawnRateBasePerMinute) * (buzz / Kitchen.buzzMax)
+		+ math.max(0, seats - 4) * Kitchen.spawnRatePerExtraSeat
+	local waiterCount = if StaffService then StaffService:CountRole(data, "Waiter") else 0
+	local capacity = if waiterCount > 0
+		then waiterCount * Kitchen.spawnRatePerWaiterCap
+		else Kitchen.spawnRateNoWaiterCap
+	return math.clamp(rate, 0.2, math.max(0.2, capacity))
+end
+
 -- ————— consumption (CustomerService calls this at the window) —————
 
 -- Shared grant path for one consumed serving (both consume flavours).
@@ -317,11 +539,11 @@ local function grantConsumption(
 	recipeId: string
 ): number
 	local recipe = Recipes[recipeId]
-	kitchen.stock[recipeId] = (kitchen.stock[recipeId] or 1) - 1
 	local payout = KitchenService:servingPayout(recipe)
 	EconomyService:AddCoins(player, payout)
 	EconomyService:AddReputation(player, EconomyConfig.reputationPerServe)
 	data.stats.customersServed += 1
+	kitchen.stats.served += 1
 	KitchenService:AddBuzz(player, Kitchen.buzzPerFedCustomer)
 	DataService:Push(player)
 	if AnalyticsService then
@@ -334,6 +556,48 @@ local function grantConsumption(
 	return payout
 end
 
+local function claimAutomaticServe(
+	player: Player,
+	data: Types.PlayerData,
+	recipe: Types.RecipeDefinition
+): boolean
+	if not StaffService or not StaffService:HasRole(data, "Waiter") then
+		return false
+	end
+	local userId = player.UserId
+	if os.clock() < (nextAutomaticServeAt[userId] or 0) then
+		return false
+	end
+	local speed = StaffService:GetRoleSpeed(data, "Waiter")
+	nextAutomaticServeAt[userId] = os.clock() + recipe.serveTime / math.max(0.1, speed)
+	return true
+end
+
+local function consumeRecipe(
+	player: Player,
+	data: Types.PlayerData,
+	kitchen: Types.KitchenState,
+	recipeId: string,
+	manualServe: boolean
+): number?
+	local recipe = Recipes[recipeId]
+	local now = os.time()
+	local _, available = InventoryMath.count(kitchen, recipeId, now)
+	if not recipe or available <= 0 then
+		return nil
+	end
+	if not manualServe and not claimAutomaticServe(player, data, recipe) then
+		return nil
+	end
+	local reservationId =
+		InventoryMath.reserve(kitchen, recipeId, 1, now, Kitchen.reservationSeconds)
+	if not reservationId or InventoryMath.commit(kitchen, reservationId, now) ~= recipeId then
+		return nil
+	end
+	syncStock(kitchen, now)
+	return grantConsumption(player, data, kitchen, recipeId)
+end
+
 -- Try to feed one customer from counter stock. Returns recipeId + payout,
 -- or nil when nothing is stocked (caller falls back to a manual order).
 function KitchenService.TryConsume(_self: any, player: Player): (string?, number?)
@@ -342,6 +606,7 @@ function KitchenService.TryConsume(_self: any, player: Player): (string?, number
 		return nil, nil
 	end
 	local kitchen = kitchenOf(data)
+	syncStock(kitchen, os.time())
 
 	local bestId: string? = nil
 	local bestCount = 0
@@ -354,24 +619,30 @@ function KitchenService.TryConsume(_self: any, player: Player): (string?, number
 	if bestId == nil then
 		return nil, nil
 	end
-	return bestId, grantConsumption(player, data, kitchen, bestId)
+	local payout = consumeRecipe(player, data, kitchen, bestId, false)
+	if payout == nil then
+		return nil, nil
+	end
+	return bestId, payout
 end
 
 -- Feed a specific dish (a waiting customer's order) if it's in stock.
 function KitchenService.ConsumeSpecific(
 	_self: any,
 	player: Player,
-	recipeId: string
+	recipeId: string,
+	manualServe: boolean?
 ): (boolean, number?)
 	local data = DataService:GetProfile(player)
 	if not data or not Recipes[recipeId] then
 		return false, nil
 	end
 	local kitchen = kitchenOf(data)
-	if (kitchen.stock[recipeId] or 0) <= 0 then
+	local payout = consumeRecipe(player, data, kitchen, recipeId, manualServe == true)
+	if payout == nil then
 		return false, nil
 	end
-	return true, grantConsumption(player, data, kitchen, recipeId)
+	return true, payout
 end
 
 function KitchenService.IsCooking(_self: any, player: Player, instanceId: string): boolean
@@ -379,7 +650,8 @@ function KitchenService.IsCooking(_self: any, player: Player, instanceId: string
 	if not data then
 		return false
 	end
-	return kitchenOf(data).cooks[instanceId] ~= nil
+	local kitchen = kitchenOf(data)
+	return kitchen.cooks[instanceId] ~= nil or kitchen.jobs[instanceId] ~= nil
 end
 
 -- ————— remote handlers —————
@@ -405,7 +677,7 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		return
 	end
 	local kitchen = kitchenOf(data)
-	if kitchen.cooks[instanceId] ~= nil then
+	if kitchen.cooks[instanceId] ~= nil or kitchen.jobs[instanceId] ~= nil then
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "stove_busy" })
 		return
 	end
@@ -473,9 +745,12 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 	local entry = masteryOf(data, cook.recipeId)
 	local servings =
 		Mastery.servings(recipe.servings, entry.masteryLevel, Kitchen.masteryBonusServingAt)
-	local newStock =
-		math.min(Kitchen.maxStockPerRecipe, (kitchen.stock[cook.recipeId] or 0) + servings)
-	kitchen.stock[cook.recipeId] = newStock
+	local now = os.time()
+	local total = InventoryMath.count(kitchen, cook.recipeId, now)
+	local added = math.clamp(servings, 0, Kitchen.maxStockPerRecipe - total)
+	InventoryMath.addLot(kitchen, cook.recipeId, added, now, now + recipe.spoilTime)
+	kitchen.stats.produced += added
+	syncStock(kitchen, now)
 
 	local fresh = elapsed <= duration * Kitchen.freshWindowMultiplier
 	local bonus = 0
@@ -596,6 +871,7 @@ function KitchenService.Init(_self: any)
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 	GoalService = ServiceRegistry.get("GoalService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	StaffService = ServiceRegistry.get("StaffService")
 end
 
 function KitchenService.Start(_self: any)
@@ -635,6 +911,7 @@ function KitchenService.Start(_self: any)
 
 	Players.PlayerRemoving:Connect(function(player)
 		cookLimiter:clear(player.UserId)
+		nextAutomaticServeAt[player.UserId] = nil
 	end)
 
 	Log.info("KitchenService ready (cook-ahead loop)")

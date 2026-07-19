@@ -102,14 +102,9 @@ end
 
 -- ————— build templates per kind —————
 
--- Props: one anchored, scaled, floor-friendly template. Scaled so the longest
+-- Props: anchored, scaled, floor-friendly templates. Scale so the longest
 -- horizontal axis matches `fit` (small tabletop items).
-local function buildPropTemplate(assetId: number, fit: number): Model?
-	local container = loadAndSanitise(assetId)
-	if not container then
-		return nil
-	end
-	local model = unwrap(container)
+local function normalisePropModel(model: Model, fit: number): Model?
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
@@ -132,6 +127,48 @@ local function buildPropTemplate(assetId: number, fit: number): Model?
 		end)
 	end
 	return model
+end
+
+local function buildPropTemplate(assetId: number, fit: number): Model?
+	local container = loadAndSanitise(assetId)
+	if not container then
+		return nil
+	end
+	return normalisePropModel(unwrap(container), fit)
+end
+
+-- The retro food Store item is a model pack rather than UI artwork. Load it
+-- once, after sanitisation, and clone only the explicitly approved food meshes.
+local function buildRetroPropTemplates(entry: any): { [string]: Model }
+	local result: { [string]: Model } = {}
+	local container = loadAndSanitise(entry.assetId)
+	if not container then
+		return result
+	end
+	local pack = unwrap(container)
+	for recipeId, selection in entry.recipes do
+		local source = pack:FindFirstChild(selection.sourceName, true)
+		local model: Model? = nil
+		if source and source:IsA("Model") then
+			model = source:Clone()
+		elseif source and source:IsA("BasePart") then
+			model = Instance.new("Model")
+			local clone = source:Clone()
+			clone.Parent = model
+		end
+		if model then
+			local ready = normalisePropModel(model, selection.fit)
+			if ready then
+				ready:SetAttribute("sourceAssetId", entry.assetId)
+				ready:SetAttribute("sourceMeshName", selection.sourceName)
+				result[recipeId] = ready
+			end
+		else
+			Log.warn("AssetLibrary: retro food mesh missing", recipeId, selection.sourceName)
+		end
+	end
+	pack:Destroy()
+	return result
 end
 
 -- Furniture: scale by TARGET HEIGHT to keep real-world proportions (fit-to-
@@ -174,14 +211,21 @@ local function buildFurnitureTemplate(
 			end)
 		end
 	end
+	-- Keep the import correction as placement metadata. Baking it into the
+	-- model's world pivot is ineffective because SpawnFurniture later replaces
+	-- that pivot; applying it in the final placement CFrame preserves it.
 	if yaw and yaw ~= 0 then
-		model:PivotTo(model:GetPivot() * CFrame.Angles(0, math.rad(yaw), 0))
+		model:SetAttribute("assetYaw", yaw)
 	end
 	return model
 end
 
 local function cache(key: string, template: Model?)
 	if template then
+		local previous = templates[key]
+		if previous then
+			previous:Destroy()
+		end
 		template.Name = key
 		template.Parent = cacheFolder
 		templates[key] = template
@@ -346,7 +390,13 @@ function AssetLibraryService.GetFurniture(_self: any, catalogId: string): Model?
 	return cloneOf("furniture:" .. catalogId)
 end
 
-function AssetLibraryService.GetProp(_self: any, category: string): Model?
+function AssetLibraryService.GetProp(_self: any, category: string, recipeId: string?): Model?
+	if recipeId then
+		local recipeSpecific = cloneOf("recipeProp:" .. recipeId)
+		if recipeSpecific then
+			return recipeSpecific
+		end
+	end
 	return cloneOf("prop:" .. category)
 end
 
@@ -415,6 +465,13 @@ function AssetLibraryService.Start(_self: any)
 		for category, entry in AssetManifest.props do
 			local t = buildPropTemplate(entry.assetId, entry.fit)
 			cache("prop:" .. category, t)
+			tally(t ~= nil)
+		end
+		local retroEntry = AssetManifest.retroPropPack
+		local retroTemplates = buildRetroPropTemplates(retroEntry)
+		for recipeId in retroEntry.recipes do
+			local t = retroTemplates[recipeId]
+			cache("recipeProp:" .. recipeId, t)
 			tally(t ~= nil)
 		end
 		for role, entry in AssetManifest.staff do

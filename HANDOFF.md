@@ -1,6 +1,6 @@
 # PROJECT HANDOFF — Social Café City (working title)
 
-_Last updated: 2026-07-15. This is the single source of truth for picking the
+_Last updated: 2026-07-19. This is the single source of truth for picking the
 project up — by the owner, a new developer, or a fresh AI session. Read this
 before touching anything._
 
@@ -22,10 +22,10 @@ strategy (see `docs/ART_DIRECTION.md` and `docs/ASSET_LICENSES.md`; the rule
 is absolute: analyse references into abstract principles, rebuild originally;
 discontinued games are still copyrighted).
 
-**Ethics rails (owner-approved, from the master plan):** no spoilage or
-missed-day punishment (fresh *bonuses*, trophy shelf never empties), no loot
-boxes, no pay-to-win, no fake urgency, no free-text between players
-(whitelisted compliments only).
+**Ethics rails (owner-approved, from the master plan):** spoilage is transparent,
+controllable, and pauses completely while offline; there is no missed-day
+punishment. No loot boxes, pay-to-win, fake urgency, or free-text between
+players (whitelisted compliments only).
 
 ## 2. Where everything lives
 
@@ -55,7 +55,8 @@ src/server/   Main + ServiceRegistry (two-phase Init/Start over Services/)
               Services: Data, Economy, Cafe, Build, Order, Customer, Kitchen,
               Recipe, Progression, Goal, Staff, Social, Analytics, Monetization(stub)
               Fx.luau (module, not a service): coin bursts + floating text
-src/client/   Main + Controllers/: UI (HUD/shop/toasts/level-up), Build,
+src/client/   Main + Controllers/: UI (compact HUD/shop/toasts/level-up),
+              Inventory (active-stock pill + pantry/production drawer), Build,
               Camera (fixed ¾ café-sim cam + touch controls), Cooking (brew
               minigame), Kitchen (cook/collect prompts + picker), Cookbook,
               Goals, Interaction (visits/compliments), Tutorial, Audio
@@ -82,12 +83,18 @@ server-validated) → brew minigame → serve → earn coins/rep/XP → shop →
 **real DataStore persistence verified end-to-end** (place → leave → rejoin)
 → visits → tutorial (server-owned, strictly ordered) → published private.
 
-**Phase 1 — cook-ahead loop (the pivot):** stoves cook batches on wall-clock
-(8h Overnight Roast exists), collect fills counter stock, customers eat from
-stock automatically, waiting order-customers get auto-fed when a batch lands,
-fresh-collect bonus (never spoilage), **Buzz 0–105** on the café sign drives
-spawn cadence. *Verified live: exact economics (−12 batch, +12 servings,
-+10 fresh), busy/early rejections, 7 customers fed from one batch.*
+**Idle/tycoon kitchen loop:** placed appliances continuously produce enabled
+menu products toward player-set stock targets. Baristas/cooks gate production,
+waiters cap service throughput, FIFO lots spoil only while online, and the
+always-visible inventory rail exposes stock, incoming batches, freshness, and
+bottlenecks. The 8h Overnight Roast remains the appointment batch.
+
+**Compact tycoon UI:** the permanent screen footprint is one resource capsule,
+one dynamic 226–344px active-stock pill, a contextual order ticket, and a
+collapsed action menu. Landscape phones/short windows open 41–44% edge drawers;
+desktop drawers preserve at least 62% world visibility. All full panels share
+`CafeModals` at DisplayOrder 20. `Theme.Images` intentionally stays blank until
+the owner approves specific Creator Store icon assets.
 
 **Phase 2 — alive café:** customers queue (3-deep line), walk with a chibi
 waddle, **sit on your placed chairs** (verified at the exact grid cell), eat

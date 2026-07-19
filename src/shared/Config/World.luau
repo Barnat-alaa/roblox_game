@@ -21,10 +21,22 @@ local World = {
 	-- 12x12 floor area. Buying land (S4) moves the back wall into the garden.
 	interiorDepthTiers = { 24, 28, 32 },
 
+	-- The front-right corner (from the player's view while entering) is a
+	-- staff-only open kitchen. A low L-shaped service counter keeps dining NPCs
+	-- out while leaving the preparation theatre visible to the room.
+	kitchenWidthCells = 8,
+	kitchenDepthCells = 4,
+	kitchenDividerHeight = 4.2,
+
 	gardenMinDepth = 40, -- studs of private garden that remain even at max tier
-	-- Tall enough that even jumping FROM FURNITURE (counter 3.8 + jump 7.2)
-	-- can't clear it — the DOOR is the only way in and out (owner request).
-	wallHeight = 14,
+	-- Human-scale walls, paired with an indoor-only jump cap so the room stays
+	-- visually open without letting players vault out from tall furniture.
+	wallHeight = 12,
+	indoorJumpHeight = 3,
+	indoorJumpPower = 28,
+	-- Keep the decorative pickets friendly-sized, but put a real boundary
+	-- behind them so the private garden cannot be used to jump out of the plot.
+	gardenBoundaryHeight = 14,
 	doorWidth = 6, -- front door gap (wide enough for NPC pathfinding)
 	doorHeight = 7,
 	gateWidth = 4, -- garden gate gap in the back wall

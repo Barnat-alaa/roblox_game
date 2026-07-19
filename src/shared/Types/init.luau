@@ -55,9 +55,58 @@ export type ActiveCook = {
 	duration: number?, -- effective cook seconds (mastery applied at start)
 }
 
+export type StockLot = {
+	lotId: string,
+	quantity: number,
+	reserved: number,
+	producedAt: number,
+	expiresAt: number,
+}
+
+export type StockAllocation = {
+	lotId: string,
+	quantity: number,
+}
+
+export type StockReservation = {
+	reservationId: string,
+	recipeId: string,
+	allocations: { StockAllocation },
+	createdAt: number,
+	expiresAt: number,
+}
+
+export type ProductionJob = {
+	jobId: string,
+	recipeId: string,
+	applianceInstanceId: string,
+	startedAt: number,
+	completesAt: number,
+	duration: number,
+	yield: number,
+	staffRole: string,
+}
+
+export type KitchenStats = {
+	produced: number,
+	served: number,
+	spoiled: number,
+}
+
 export type KitchenState = {
 	cooks: { [string]: ActiveCook }, -- keyed by appliance instanceId
-	stock: { [string]: number }, -- counter servings per recipeId
+	stock: { [string]: number }, -- derived available servings per recipeId (UI compatibility)
+	lots: { [string]: { StockLot } }, -- FIFO perishable lots keyed by recipeId
+	reservations: { [string]: StockReservation },
+	jobs: { [string]: ProductionJob }, -- continuous jobs keyed by appliance instanceId
+	menu: { [string]: boolean },
+	targetStock: { [string]: number },
+	priorities: { [string]: number },
+	stats: KitchenStats,
+	lastActiveAt: number,
+	nextLotId: number,
+	nextReservationId: number,
+	nextJobId: number,
 }
 
 export type GoalState = {
@@ -115,6 +164,11 @@ export type RecipeDefinition = {
 	masteryThresholds: { number },
 	cookTime: number, -- seconds on the stove (cook-ahead loop)
 	servings: number, -- counter stock added per collected batch
+	productionTime: number, -- seconds per automatic staff batch at level 1
+	productionYield: number, -- servings created by one automatic batch
+	spoilTime: number, -- shelf life in seconds while the cafe is online
+	serveTime: number, -- waiter service cycle in seconds at level 1
+	staffRole: string, -- Barista for drinks, Cook for food
 	icon: string?, -- emoji shown in order/prep bubbles (assigned in Config/Recipes)
 }
 

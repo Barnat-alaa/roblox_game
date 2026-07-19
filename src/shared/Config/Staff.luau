@@ -15,15 +15,29 @@ local Staff: { [string]: StaffDefinition } = {
 		id = "barista_mia",
 		displayName = "Mia",
 		role = "Barista",
-		baseSpeed = 1.2,
+		baseSpeed = 1,
 		baseSalary = 20,
 	},
-	waiter_leo = {
-		id = "waiter_leo",
-		displayName = "Leo",
+	cook_sam = {
+		id = "cook_sam",
+		displayName = "Sam",
+		role = "Cook",
+		baseSpeed = 1,
+		baseSalary = 22,
+	},
+	waiter_noah = {
+		id = "waiter_noah",
+		displayName = "Noah",
 		role = "Waiter",
-		baseSpeed = 0.9,
+		baseSpeed = 1,
 		baseSalary = 18,
+	},
+	cleaner_pia = {
+		id = "cleaner_pia",
+		displayName = "Pia",
+		role = "Cleaner",
+		baseSpeed = 1,
+		baseSalary = 16,
 	},
 }
 

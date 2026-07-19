@@ -19,6 +19,7 @@ secrets/
 
 # Local machine-specific MCP config (contains an absolute path to Studio's bridge)
 .mcp.json
+.codex/
 
 # Studio lock files for open places
 *.rbxlx.lock

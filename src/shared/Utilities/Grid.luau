@@ -67,6 +67,18 @@ function Grid.rectsOverlap(
 	return ax < bx + bw and bx < ax + aw and ay < by + bd and by < ay + ad
 end
 
+-- Rotation for a seat whose local LookVector should point toward a target.
+-- Grid rotations map as: 0 = -Z, 1 = -X, 2 = +Z, 3 = +X.
+function Grid.rotationFacingDelta(dx: number, dz: number): number?
+	if math.abs(dx) < 0.001 and math.abs(dz) < 0.001 then
+		return nil
+	end
+	if math.abs(dx) >= math.abs(dz) then
+		return if dx > 0 then 3 else 1
+	end
+	return if dz > 0 then 2 else 0
+end
+
 function Grid.occupiedCells(
 	gridX: number,
 	gridY: number,

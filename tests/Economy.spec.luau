@@ -34,6 +34,13 @@ return function()
 				requiredReputation = 0,
 				baseQuality = 1,
 				masteryThresholds = {},
+				cookTime = 1,
+				servings = 1,
+				productionTime = 1,
+				productionYield = 1,
+				spoilTime = 1,
+				serveTime = 1,
+				staffRole = "Cook",
 			}
 			expect(RewardMath.orderPayout(fake, false)).to.equal(0)
 		end)

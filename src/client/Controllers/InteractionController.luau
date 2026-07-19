@@ -1,7 +1,5 @@
 --!strict
--- Neighbourhood interactions (Day 5): "Visit Café" prompts on other players'
--- door pads, a compliment panel while visiting, and a Home button. All of it
--- is presentation — SocialService validates every request server-side.
+-- Neighbour visits and compliments in a small contextual card.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
 
+local Components = require(script.Parent.Parent.UI.Components)
+local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
+local Theme = require(script.Parent.Parent.UI.Theme)
 local UIController = require(script.Parent.UIController)
 
 local player = Players.LocalPlayer
@@ -17,104 +18,119 @@ local InteractionController = {}
 InteractionController.Name = "InteractionController"
 
 local COMPLIMENT_BUTTONS = {
-	{ id = "nice_cafe", label = "💖 Lovely café!" },
-	{ id = "great_coffee", label = "☕ Great coffee!" },
-	{ id = "cozy_vibes", label = "✨ Cosy vibes!" },
+	{ id = "nice_cafe", label = "Lovely cafe" },
+	{ id = "great_coffee", label = "Great coffee" },
+	{ id = "cozy_vibes", label = "Cosy vibes" },
 }
 
 local ui: { [string]: any } = {}
 local currentVisitPlot: number? = nil
 
-local function buildPanel()
-	local gui = Instance.new("ScreenGui")
-	gui.Name = "VisitGui"
-	gui.ResetOnSpawn = false
-	gui.Parent = player:WaitForChild("PlayerGui")
+local function goHome()
+	Remotes.event("VisitCafe"):FireServer({ home = true })
+	currentVisitPlot = nil
+	UIController.closePanel(ui.panel)
+end
 
-	local panel = Instance.new("Frame")
-	panel.Name = "VisitPanel"
+local function buildPanel()
+	local panel = Components.Panel(UIController.modalRoot(), "VisitPanel")
 	panel.AnchorPoint = Vector2.new(1, 0.5)
 	panel.Position = UDim2.new(1, -12, 0.5, 0)
-	panel.Size = UDim2.fromOffset(210, 236)
-	panel.BackgroundColor3 = Color3.fromRGB(55, 42, 38)
-	panel.BackgroundTransparency = 0.05
+	panel.Size = UDim2.fromOffset(286, 310)
 	panel.Visible = false
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 14)
-	corner.Parent = panel
-	panel.Parent = gui
+	local _, close = Components.PanelHeader(
+		panel,
+		"NEIGHBOUR VISIT",
+		"Leave a compliment before you go",
+		Theme.Colors.Blue
+	)
+	close.Activated:Connect(goHome)
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -16, 0, 40)
-	title.Position = UDim2.fromOffset(8, 6)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.GothamBold
-	title.TextSize = 15
+	local title = Components.Label(panel, "Visiting a neighbour", 14, true)
+	title.Size = UDim2.new(1, -24, 0, 34)
+	title.Position = UDim2.fromOffset(12, 76)
+	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.TextWrapped = true
-	title.TextColor3 = Color3.fromRGB(255, 246, 232)
-	title.Text = "You're visiting ☕"
-	title.Parent = panel
+	title.ZIndex = 21
 	ui.title = title
 
-	local function button(text: string, order: number, color: Color3): TextButton
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1, -20, 0, 36)
-		btn.Position = UDim2.new(0, 10, 0, 46 + (order - 1) * 44)
-		btn.BackgroundColor3 = color
-		btn.Font = Enum.Font.GothamBold
-		btn.TextSize = 15
-		btn.TextColor3 = Color3.fromRGB(255, 250, 242)
-		btn.Text = text
-		local c = Instance.new("UICorner")
-		c.CornerRadius = UDim.new(0, 10)
-		c.Parent = btn
-		btn.Parent = panel
-		return btn
-	end
-
+	local list = Instance.new("Frame")
+	list.Size = UDim2.new(1, -24, 0, 132)
+	list.Position = UDim2.fromOffset(12, 112)
+	list.BackgroundTransparency = 1
+	list.ZIndex = 21
+	list.Parent = panel
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
 	ui.complimentButtons = {}
-	for i, def in COMPLIMENT_BUTTONS do
-		local btn = button(def.label, i, Color3.fromRGB(120, 95, 160))
-		btn.Activated:Connect(function()
+	for order, definition in COMPLIMENT_BUTTONS do
+		local button = Components.Button(
+			list,
+			definition.label,
+			Theme.Colors.Roast,
+			UDim2.new(1, 0, 0, 40),
+			"+"
+		)
+		button.LayoutOrder = order
+		button.ZIndex = 22
+		button.Activated:Connect(function()
 			if currentVisitPlot then
 				Remotes.event("VisitCafe"):FireServer({
 					plotIndex = currentVisitPlot,
-					compliment = def.id,
+					compliment = definition.id,
 				})
 				for _, other in ui.complimentButtons do
-					other.AutoButtonColor = false
+					other.Active = false
 					other.BackgroundTransparency = 0.5
 				end
 			end
 		end)
-		table.insert(ui.complimentButtons, btn)
+		table.insert(ui.complimentButtons, button)
 	end
 
-	local home = button("🏠 Go home", 4, Color3.fromRGB(200, 100, 70))
-	home.Activated:Connect(function()
-		Remotes.event("VisitCafe"):FireServer({ home = true })
-		currentVisitPlot = nil
-		panel.Visible = false
-	end)
-
+	local home = Components.Button(
+		panel,
+		"RETURN HOME",
+		Theme.Colors.Coral,
+		UDim2.new(1, -24, 0, 44),
+		"HOME"
+	)
+	home.Position = UDim2.new(0, 12, 1, -54)
+	home.ZIndex = 22
+	home.Activated:Connect(goHome)
 	ui.panel = panel
+	ResponsiveLayout.watch(function(mode)
+		if mode == "Phone" then
+			panel.AnchorPoint = Vector2.new(0.5, 1)
+			panel.Position = UDim2.new(0.5, 0, 1, -8)
+			panel.Size = UDim2.new(1, -16, 0, 310)
+		else
+			panel.AnchorPoint = Vector2.new(1, 0.5)
+			panel.Position = UDim2.new(1, -12, 0.5, 0)
+			panel.Size = UDim2.fromOffset(286, 310)
+		end
+	end)
 end
 
 local function attachPadPrompt(plotModel: Instance, pad: BasePart)
+	if pad:FindFirstChild("VisitPrompt") then
+		return
+	end
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText = "Visit Café"
+	prompt.Name = "VisitPrompt"
+	prompt.ActionText = "Visit Cafe"
 	prompt.ObjectText = "Neighbour"
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
 	prompt.RequiresLineOfSight = false
-
 	local function refresh()
 		local ownerUserId = plotModel:GetAttribute("ownerUserId")
 		prompt.Enabled = typeof(ownerUserId) == "number" and ownerUserId ~= player.UserId
 	end
 	refresh()
 	plotModel:GetAttributeChangedSignal("ownerUserId"):Connect(refresh)
-
 	prompt.Triggered:Connect(function()
 		local plotIndex = plotModel:GetAttribute("plotIndex")
 		if typeof(plotIndex) == "number" then
@@ -146,22 +162,21 @@ end
 function InteractionController.Start(_self: any)
 	buildPanel()
 	task.spawn(watchPlots)
-
 	Remotes.event("Notify").OnClientEvent:Connect(function(msg: any)
 		if typeof(msg) ~= "table" then
 			return
 		end
 		if msg.kind == "visited" then
 			currentVisitPlot = if typeof(msg.plotIndex) == "number" then msg.plotIndex else nil
-			ui.title.Text = "Visiting " .. tostring(msg.owner) .. "'s café ☕"
-			for _, btn in ui.complimentButtons do
-				btn.AutoButtonColor = true
-				btn.BackgroundTransparency = 0
+			ui.title.Text = "Visiting " .. tostring(msg.owner) .. "'s cafe"
+			for _, button in ui.complimentButtons do
+				button.Active = true
+				button.BackgroundTransparency = 0
 			end
-			ui.panel.Visible = true
-			UIController.toast("☕ Welcome to " .. tostring(msg.owner) .. "'s café!")
+			UIController.togglePanel(ui.panel)
+			UIController.toast("Welcome to " .. tostring(msg.owner) .. "'s cafe")
 		elseif msg.kind == "complimented" then
-			UIController.toast("💌 Compliment sent!")
+			UIController.toast("Compliment sent")
 		end
 	end)
 end

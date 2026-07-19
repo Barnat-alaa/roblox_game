@@ -55,7 +55,7 @@ session roadmap (ROADMAP.md).
 | A4 | Multi-click prep animation (chop → stir → cook) | ❌ **[S3]** | 2–3 tap prep gestures before the timer starts; makes "preparing" feel manual |
 | A5 | Cook timers from minutes to 2 days; overnight dishes | ✅ | 30s → 8h Overnight Roast, wall-clock |
 | A6 | Collect → counter holds N servings | ✅ | Counter stock, visible food stacks |
-| A7 | Food **spoils** if collected late | 🚫 | Ethics rail §35: we pay a **fresh bonus** instead; late food never rots |
+| A7 | Food **spoils** if overproduced | ✅ | Timestamped FIFO lots age only while online; the permanent HUD warns players and target-stock controls prevent waste |
 | A8 | Spices: boost servings (+5/10%), skip time (1h/6h/instant), rescue spoiled | ❌ **[S3]** | Original "Pantry Boosters", earnable only (goals/gifts) — never sold for real money at this stage |
 | A9 | Appliance families gate dish families (Coffee Machine → coffees, Drink Bar → drinks, Pastry Station, Pizza Oven, Deep Fryer, Ice Cream Cart, BBQ, Bread Oven, Toaster) | 🟡 **[S3]** | We have coffee machine / stone oven / prep station; add **Drink Bar** + **Pastry Display** first (store models — S1), each unlocking its recipe family |
 | A10 | Upgraded stoves (Super/Lightning: one-click, −10–50% time) | ❌ | Later (Phase 6 economy) — upgrade tiers per appliance |

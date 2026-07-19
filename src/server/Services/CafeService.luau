@@ -22,6 +22,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
+local Graphics = require(Shared.Config.Graphics)
 local World = require(Shared.Config.World)
 local Log = require(Shared.Utilities.Log)
 
@@ -43,6 +44,18 @@ local WALL_H = World.wallHeight
 local DOOR_W = World.doorWidth
 local DOOR_H = World.doorHeight
 local GATE_W = World.gateWidth
+local KITCHEN_W = World.kitchenWidthCells * Grid.CELL_SIZE
+local KITCHEN_D = World.kitchenDepthCells * Grid.CELL_SIZE
+local KITCHEN_DIVIDER_H = World.kitchenDividerHeight
+local KITCHEN_PASS_W = 3 * Grid.CELL_SIZE
+
+-- Saturated, sunny cafe palette shared by the shell and facade.
+local CORAL = Color3.fromRGB(232, 82, 67)
+local CORAL_DARK = Color3.fromRGB(214, 63, 55)
+local HONEY_OAK = Color3.fromRGB(212, 151, 76)
+local CREAM = Color3.fromRGB(255, 244, 216)
+local TEAL = Color3.fromRGB(48, 151, 143)
+local GOLD = Color3.fromRGB(243, 174, 55)
 
 -- Total plot depth in studs: max interior + the garden strip that always remains.
 local TOTAL_DEPTH = Grid.PLOT_DEPTH * Grid.CELL_SIZE + World.gardenMinDepth
@@ -198,6 +211,72 @@ local function tickDoors()
 	end
 end
 
+-- ————— indoor movement —————
+
+type JumpState = {
+	humanoid: Humanoid,
+	jumpHeight: number,
+	jumpPower: number,
+	limited: boolean,
+}
+
+local jumpStates: { [Player]: JumpState } = {}
+
+local function isInsideRestaurant(position: Vector3): boolean
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	for _, plot in plots do
+		local localPosition = plot.origin:PointToObjectSpace(position)
+		local depth = tierDepthCells(math.max(plot.tier, 0)) * Grid.CELL_SIZE
+		if
+			localPosition.X > 0.5
+			and localPosition.X < width - 0.5
+			and localPosition.Z > 0.5
+			and localPosition.Z < depth - 0.5
+			and localPosition.Y > -2
+			and localPosition.Y < WALL_H + 8
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Keep normal street movement, but use a gentler jump while a player is in
+-- any restaurant. This lets the walls stay at a welcoming human scale while
+-- preventing counter/shelf-assisted vaults over them.
+local function tickIndoorJumpLimits()
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if humanoid and root and root:IsA("BasePart") then
+			local state = jumpStates[player]
+			if not state or state.humanoid ~= humanoid then
+				state = {
+					humanoid = humanoid,
+					jumpHeight = humanoid.JumpHeight,
+					jumpPower = humanoid.JumpPower,
+					limited = false,
+				}
+				jumpStates[player] = state
+			end
+
+			local inside = isInsideRestaurant(root.Position)
+			if inside and not state.limited then
+				humanoid.JumpHeight = World.indoorJumpHeight
+				humanoid.JumpPower = World.indoorJumpPower
+				humanoid:SetAttribute("CafeIndoorJumpLimited", true)
+				state.limited = true
+			elseif not inside and state.limited then
+				humanoid.JumpHeight = state.jumpHeight
+				humanoid.JumpPower = state.jumpPower
+				humanoid:SetAttribute("CafeIndoorJumpLimited", nil)
+				state.limited = false
+			end
+		end
+	end
+end
+
 -- ————— part helper —————
 
 local function makePart(
@@ -219,8 +298,18 @@ local function makePart(
 	return part
 end
 
+local function applyTopTexture(part: BasePart, content: string, tileU: number, tileV: number)
+	local texture = Instance.new("Texture")
+	texture.Name = "ApprovedSurface"
+	texture.Face = Enum.NormalId.Top
+	texture.Texture = content
+	texture.StudsPerTileU = tileU
+	texture.StudsPerTileV = tileV
+	texture.Parent = part
+end
+
 local function makeWindow(parent: Instance, cf: CFrame)
-	makePart("WindowFrame", Vector3.new(5, 3.6, 0.4), cf, Color3.fromRGB(245, 242, 235), parent)
+	makePart("WindowFrame", Vector3.new(5, 3.6, 0.4), cf, CREAM, parent)
 	local glass = makePart(
 		"WindowGlass",
 		Vector3.new(4.2, 2.8, 0.3),
@@ -248,14 +337,15 @@ local function rebuildShell(plot: Plot, tier: number)
 	shell.Name = "Shell"
 
 	-- Warm oak interior floor (tier-sized), grass garden behind it.
-	makePart(
+	local floor = makePart(
 		"Floor",
 		Vector3.new(width, 1, depth),
 		origin * CFrame.new(width / 2, -0.5, depth / 2),
-		Color3.fromRGB(176, 132, 90),
+		HONEY_OAK,
 		shell,
 		Enum.Material.WoodPlanks
 	)
+	applyTopTexture(floor, Graphics.Surfaces.WoodFloor, 16, 16)
 	makePart(
 		"GardenFloor",
 		Vector3.new(width, 1, TOTAL_DEPTH - depth),
@@ -265,19 +355,66 @@ local function rebuildShell(plot: Plot, tier: number)
 		Enum.Material.Grass
 	)
 
+	-- Front-right open kitchen: an L-shaped waist-high counter closes the
+	-- former empty shortcut off from dining traffic. The final 3-cell section
+	-- is the dish pass used by the cook/barista and waiter choreography.
+	local dividerColor = CREAM
+	local counterColor = GOLD
+	local function divider(name: string, size: Vector3, cf: CFrame)
+		makePart(name, size, cf, dividerColor, shell)
+		makePart(
+			name .. "Top",
+			Vector3.new(size.X + 0.35, 0.35, size.Z + 0.35),
+			cf * CFrame.new(0, size.Y / 2 + 0.175, 0),
+			counterColor,
+			shell,
+			Enum.Material.Wood
+		)
+	end
+	divider(
+		"KitchenDivider",
+		Vector3.new(0.8, KITCHEN_DIVIDER_H, KITCHEN_D),
+		origin * CFrame.new(KITCHEN_W, KITCHEN_DIVIDER_H / 2, KITCHEN_D / 2)
+	)
+	local backDividerW = KITCHEN_W - KITCHEN_PASS_W
+	divider(
+		"KitchenDivider",
+		Vector3.new(backDividerW, KITCHEN_DIVIDER_H, 0.8),
+		origin * CFrame.new(backDividerW / 2, KITCHEN_DIVIDER_H / 2, KITCHEN_D)
+	)
+	divider(
+		"KitchenPass",
+		Vector3.new(KITCHEN_PASS_W, KITCHEN_DIVIDER_H, 0.8),
+		origin * CFrame.new(KITCHEN_W - KITCHEN_PASS_W / 2, KITCHEN_DIVIDER_H / 2, KITCHEN_D)
+	)
+	for _, plateX in { KITCHEN_W - KITCHEN_PASS_W + 2, KITCHEN_W - 2 } do
+		local plate = makePart(
+			"PassPlate",
+			Vector3.new(0.18, 1.5, 1.5),
+			origin
+				* CFrame.new(plateX, KITCHEN_DIVIDER_H + 0.35, KITCHEN_D)
+				* CFrame.Angles(0, 0, math.rad(90)),
+			Color3.fromRGB(250, 248, 240),
+			shell,
+			Enum.Material.SmoothPlastic
+		)
+		plate.Shape = Enum.PartType.Cylinder
+		plate.CanCollide = false
+	end
+
 	-- Side walls run the interior only; the garden gets picket fences.
 	makePart(
 		"WallLeft",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(0, WALL_H / 2, depth / 2),
-		Color3.fromRGB(158, 70, 58),
+		CORAL,
 		shell
 	)
 	makePart(
 		"WallRight",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(width, WALL_H / 2, depth / 2),
-		Color3.fromRGB(158, 70, 58),
+		CORAL,
 		shell
 	)
 
@@ -288,21 +425,21 @@ local function rebuildShell(plot: Plot, tier: number)
 		"WallBack",
 		Vector3.new(gateL, WALL_H, 1),
 		origin * CFrame.new(gateL / 2, WALL_H / 2, depth),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(width - gateR, WALL_H, 1),
 		origin * CFrame.new(gateR + (width - gateR) / 2, WALL_H / 2, depth),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(GATE_W, WALL_H - 6.5, 1),
 		origin * CFrame.new(width / 2, 6.5 + (WALL_H - 6.5) / 2, depth),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		shell
 	)
 	for _, fx in { 0.22, 0.78 } do
@@ -321,7 +458,7 @@ local function rebuildShell(plot: Plot, tier: number)
 	)
 
 	-- Picket fence around the garden (low — players can hop it, NPCs won't path over).
-	local fenceColor = Color3.fromRGB(235, 228, 212)
+	local fenceColor = CREAM
 	local gardenDepth = TOTAL_DEPTH - depth
 	local function fenceRun(centerCf: CFrame, length: number, alongX: boolean)
 		for _, y in { 0.9, 2 } do
@@ -346,6 +483,18 @@ local function rebuildShell(plot: Plot, tier: number)
 				Enum.Material.Wood
 			)
 		end
+		local boundary = makePart(
+			"GardenBoundary",
+			if alongX
+				then Vector3.new(length, World.gardenBoundaryHeight, 0.35)
+				else Vector3.new(0.35, World.gardenBoundaryHeight, length),
+			centerCf * CFrame.new(0, World.gardenBoundaryHeight / 2, 0),
+			fenceColor,
+			shell
+		)
+		boundary.Transparency = 1
+		boundary.CanQuery = false
+		boundary.CanTouch = false
 	end
 	fenceRun(origin * CFrame.new(0, 0, depth + gardenDepth / 2), gardenDepth, false)
 	fenceRun(origin * CFrame.new(width, 0, depth + gardenDepth / 2), gardenDepth, false)
@@ -466,21 +615,21 @@ local function buildPlot(index: number, parent: Instance): Plot
 		"WallFront",
 		Vector3.new(gapL, WALL_H, 1),
 		origin * CFrame.new(gapL / 2, WALL_H / 2, 0),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(width - gapR, WALL_H, 1),
 		origin * CFrame.new(gapR + (width - gapR) / 2, WALL_H / 2, 0),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(DOOR_W, WALL_H - DOOR_H, 1),
 		origin * CFrame.new(width / 2, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
-		Color3.fromRGB(150, 60, 50),
+		CORAL_DARK,
 		model
 	)
 	for _, wx in { 15, width - 15 } do
@@ -503,7 +652,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 		"Sign",
 		Vector3.new(width, 2, 0.5),
 		origin * CFrame.new(width / 2, WALL_H + 1, 0),
-		Color3.fromRGB(120, 90, 70),
+		TEAL,
 		model
 	)
 	local gui = Instance.new("BillboardGui")
@@ -534,7 +683,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 			origin
 				* CFrame.new(width / 16 + i * (width / 8), DOOR_H + 1.5, -0.9)
 				* CFrame.Angles(math.rad(-12), 0, 0),
-			if i % 2 == 0 then Color3.fromRGB(196, 60, 50) else Color3.fromRGB(245, 242, 235),
+			if i % 2 == 0 then CORAL else CREAM,
 			model,
 			Enum.Material.Fabric
 		)
@@ -562,7 +711,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 		"VisitPad",
 		Vector3.new(6, 0.3, 3),
 		origin * CFrame.new(width / 2, 0.15, -2.5),
-		Color3.fromRGB(196, 152, 112),
+		TEAL,
 		model,
 		Enum.Material.Fabric
 	)
@@ -599,6 +748,14 @@ local function applyLighting()
 	Lighting.EnvironmentDiffuseScale = 0.6
 	Lighting.EnvironmentSpecularScale = 0.6
 
+	-- The approved Store sky is one square decal, not a six-face cubemap. A
+	-- single decal cannot be assigned to Skybox* without producing gray faces;
+	-- buildSkyBackdrop uses it on distant tiled scenery instead.
+	local brokenSky = Lighting:FindFirstChild("ApprovedCafeSky")
+	if brokenSky then
+		brokenSky:Destroy()
+	end
+
 	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmo.Density = 0.35
 	atmo.Offset = 0.4
@@ -618,6 +775,137 @@ local function applyLighting()
 	rays.Intensity = 0.08
 	rays.Spread = 0.6
 	rays.Parent = Lighting
+end
+
+local function buildSkyBackdrop(parent: Instance)
+	local old = parent:FindFirstChild("SkyBackdrop")
+	if old then
+		old:Destroy()
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "SkyBackdrop"
+	folder.Parent = parent
+
+	local plotWidth = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local streetLength = (PLOTS_PER_ROW - 1) * PLOT_SPACING + plotWidth
+	local centreX = streetLength / 2
+	local centreZ = -World.boulevardWidth / 2
+	-- Keep the approved cloud image close enough to read from the isometric
+	-- gameplay camera. It remains beyond every playable plot and is non-solid.
+	local spanX = streetLength + 500
+	local spanZ = World.boulevardWidth + 2 * TOTAL_DEPTH + 500
+	local height = 500
+	local image = Graphics.Surfaces.Sky
+
+	local function backdrop(name: string, size: Vector3, cf: CFrame, face: Enum.NormalId)
+		local wall = makePart(
+			name,
+			size,
+			cf,
+			Color3.fromRGB(110, 190, 225),
+			folder,
+			Enum.Material.SmoothPlastic
+		)
+		wall.CanCollide = false
+		wall.CanQuery = false
+		wall.CanTouch = false
+		wall.CastShadow = false
+		local texture = Instance.new("Texture")
+		texture.Name = "ApprovedClouds"
+		texture.Face = face
+		texture.Texture = image
+		texture.StudsPerTileU = 420
+		texture.StudsPerTileV = 420
+		texture.Parent = wall
+	end
+
+	local northZ = centreZ + spanZ / 2
+	local southZ = centreZ - spanZ / 2
+	local eastX = centreX + spanX / 2
+	local westX = centreX - spanX / 2
+	backdrop(
+		"CloudsNorth",
+		Vector3.new(spanX, height, 2),
+		CFrame.new(centreX, height / 2 - 60, northZ),
+		Enum.NormalId.Front
+	)
+	backdrop(
+		"CloudsSouth",
+		Vector3.new(spanX, height, 2),
+		CFrame.new(centreX, height / 2 - 60, southZ),
+		Enum.NormalId.Back
+	)
+	backdrop(
+		"CloudsEast",
+		Vector3.new(2, height, spanZ),
+		CFrame.new(eastX, height / 2 - 60, centreZ),
+		Enum.NormalId.Left
+	)
+	backdrop(
+		"CloudsWest",
+		Vector3.new(2, height, spanZ),
+		CFrame.new(westX, height / 2 - 60, centreZ),
+		Enum.NormalId.Right
+	)
+end
+
+-- A real two-lane boulevard with tiled sidewalks. The Store road images are
+-- square modules, so each road tile is rotated as a part to align the painted
+-- lane with the long X axis. Turn modules bookend the street.
+local function buildRoadNetwork(parent: Instance)
+	local old = parent:FindFirstChild("RoadNetwork")
+	if old then
+		old:Destroy()
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "RoadNetwork"
+	folder.Parent = parent
+
+	local plotWidth = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local streetLength = (PLOTS_PER_ROW - 1) * PLOT_SPACING + plotWidth
+	local tileSize = 24
+	local firstX = -48
+	local lastX = streetLength + 48
+	local tileCount = math.floor((lastX - firstX) / tileSize) + 1
+	for index = 0, tileCount - 1 do
+		local image = if index == 0
+			then Graphics.Surfaces.RoadLeft
+			elseif index == tileCount - 1 then Graphics.Surfaces.RoadRight
+			else Graphics.Surfaces.RoadStraight
+		local road = makePart(
+			if index == 0
+				then "RoadTurnLeft"
+				elseif index == tileCount - 1 then "RoadTurnRight"
+				else "RoadStraight",
+			Vector3.new(tileSize, 0.24, tileSize),
+			CFrame.new(firstX + index * tileSize, -0.34, -World.boulevardWidth / 2)
+				* CFrame.Angles(0, math.rad(90), 0),
+			Color3.fromRGB(255, 255, 255),
+			folder,
+			Enum.Material.SmoothPlastic
+		)
+		applyTopTexture(road, image, tileSize, tileSize)
+	end
+
+	local sidewalkWidth = (World.boulevardWidth - tileSize) / 2
+	local totalLength = lastX - firstX + tileSize
+	local centreX = (firstX + lastX) / 2
+	for _, z in
+		{
+			-sidewalkWidth / 2,
+			-World.boulevardWidth + sidewalkWidth / 2,
+		}
+	do
+		local sidewalk = makePart(
+			"Sidewalk",
+			Vector3.new(totalLength, 0.3, sidewalkWidth),
+			CFrame.new(centreX, -0.28, z),
+			Color3.fromRGB(205, 205, 200),
+			folder,
+			Enum.Material.Concrete
+		)
+		applyTopTexture(sidewalk, Graphics.Surfaces.Sidewalk, 10, 10)
+	end
 end
 
 -- Street furniture: the owner's Creator Store picks when loaded (lampposts,
@@ -922,6 +1210,20 @@ function CafeService.GetPlotOrigin(_self: any, player: Player): CFrame?
 	return if plot then plot.origin else nil
 end
 
+-- Shared service-pass geometry. Kitchen staff use the inside point, while the
+-- waiter stays in the dining room and collects the finished dish outside.
+function CafeService.GetKitchenPass(_self: any, player: Player): (CFrame?, Vector3?, Vector3?)
+	local plot = plotByUser[player.UserId]
+	if not plot then
+		return nil, nil, nil
+	end
+	local passX = KITCHEN_W - KITCHEN_PASS_W / 2
+	local surface = plot.origin * CFrame.new(passX, KITCHEN_DIVIDER_H + 0.55, KITCHEN_D + 0.15)
+	local kitchenSide = (plot.origin * CFrame.new(passX, 2, KITCHEN_D - 3.5)).Position
+	local diningSide = (plot.origin * CFrame.new(passX, 2, KITCHEN_D + 3.5)).Position
+	return surface, kitchenSide, diningSide
+end
+
 function CafeService.GetFurnitureFolder(_self: any, player: Player): Folder?
 	local plot = plotByUser[player.UserId]
 	return if plot then plot.furnitureFolder else nil
@@ -1033,6 +1335,7 @@ local function onPlayerAdded(player: Player)
 end
 
 local function onPlayerRemoving(player: Player)
+	jumpStates[player] = nil
 	local plot = plotByUser[player.UserId]
 	if plot then
 		plot.ownerUserId = nil
@@ -1079,6 +1382,8 @@ function CafeService.Start(_self: any)
 	ground.Parent = workspace
 
 	applyLighting()
+	buildSkyBackdrop(workspace)
+	buildRoadNetwork(workspace)
 	buildStreetDecor(workspace)
 	buildPlaza(workspace)
 
@@ -1089,6 +1394,10 @@ function CafeService.Start(_self: any)
 			local ok, err = pcall(tickDoors)
 			if not ok then
 				Log.warn("Door tick failed:", err)
+			end
+			local jumpOk, jumpErr = pcall(tickIndoorJumpLimits)
+			if not jumpOk then
+				Log.warn("Indoor jump tick failed:", jumpErr)
 			end
 		end
 	end)
