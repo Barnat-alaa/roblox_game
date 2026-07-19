@@ -237,25 +237,10 @@ local function makeDirt(player: Player, position: Vector3): Model
 		blob.Parent = model
 	end
 
-	local marker = Instance.new("BillboardGui")
-	marker.Name = "CleanMarker"
-	marker.Size = UDim2.fromOffset(150, 40)
-	marker.StudsOffset = Vector3.new(0, 1.6, 0)
-	marker.AlwaysOnTop = true
-	marker.MaxDistance = 80
-	marker.Parent = splat
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.fromRGB(82, 50, 38)
-	label.BackgroundTransparency = 0.08
-	label.Text = "DIRT!  CLEAN ME"
-	label.TextColor3 = Color3.fromRGB(255, 226, 120)
-	label.TextScaled = true
-	label.Font = Enum.Font.GothamBold
-	label.Parent = marker
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = label
+	-- No floating "DIRT! CLEAN ME" label: the splat IS the signal (owner
+	-- request 2026-07-19). The proximity prompt below still shows "Scrub clean"
+	-- only when you walk up to it. Swap the splat for a real mess model when
+	-- one is shopped (docs/ASSET_SHOPPING_LIST.md).
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "CleanDirt"
