@@ -221,6 +221,8 @@ type JumpState = {
 }
 
 local jumpStates: { [Player]: JumpState } = {}
+local worldSafetyCenter: Vector3? = nil
+local worldSafetySize: Vector3? = nil
 
 local function isInsideRestaurant(position: Vector3): boolean
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
@@ -272,6 +274,35 @@ local function tickIndoorJumpLimits()
 				humanoid.JumpPower = state.jumpPower
 				humanoid:SetAttribute("CafeIndoorJumpLimited", nil)
 				state.limited = false
+			end
+		end
+	end
+end
+
+-- Invisible city walls plus a recovery watchdog keep players in the playable
+-- neighbourhood. Falling or somehow crossing a wall returns them safely to
+-- their own front door instead of killing or resetting their character.
+local function tickWorldSafety()
+	local centre = worldSafetyCenter
+	local size = worldSafetySize
+	if not centre or not size then
+		return
+	end
+	for _, player in Players:GetPlayers() do
+		local plot = plotByUser[player.UserId]
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if plot and root and root:IsA("BasePart") then
+			local outside = math.abs(root.Position.X - centre.X)
+					> size.X / 2 + World.mapSafetyMargin
+				or math.abs(root.Position.Z - centre.Z) > size.Z / 2 + World.mapSafetyMargin
+				or root.Position.Y < -18
+			if outside then
+				local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+				local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
+				local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.CFrame = CFrame.lookAt(standAt, lookAt)
 			end
 		end
 	end
@@ -1380,6 +1411,58 @@ function CafeService.Start(_self: any)
 	ground.Color = Color3.fromRGB(158, 158, 148)
 	ground.Material = Enum.Material.Concrete
 	ground.Parent = workspace
+	worldSafetyCenter = ground.Position
+	worldSafetySize = ground.Size
+
+	local boundary = Instance.new("Folder")
+	boundary.Name = "WorldBoundary"
+	boundary.Parent = workspace
+	local height = World.mapBoundaryHeight
+	local thickness = 4
+	for _, wall in
+		{
+			{
+				name = "West",
+				size = Vector3.new(thickness, height, ground.Size.Z + thickness * 2),
+				cf = CFrame.new(
+					ground.Position.X - ground.Size.X / 2,
+					height / 2 - 1,
+					ground.Position.Z
+				),
+			},
+			{
+				name = "East",
+				size = Vector3.new(thickness, height, ground.Size.Z + thickness * 2),
+				cf = CFrame.new(
+					ground.Position.X + ground.Size.X / 2,
+					height / 2 - 1,
+					ground.Position.Z
+				),
+			},
+			{
+				name = "North",
+				size = Vector3.new(ground.Size.X + thickness * 2, height, thickness),
+				cf = CFrame.new(
+					ground.Position.X,
+					height / 2 - 1,
+					ground.Position.Z - ground.Size.Z / 2
+				),
+			},
+			{
+				name = "South",
+				size = Vector3.new(ground.Size.X + thickness * 2, height, thickness),
+				cf = CFrame.new(
+					ground.Position.X,
+					height / 2 - 1,
+					ground.Position.Z + ground.Size.Z / 2
+				),
+			},
+		}
+	do
+		local part = makePart(wall.name, wall.size, wall.cf, Color3.new(), boundary)
+		part.Transparency = 1
+		part.CanCollide = true
+	end
 
 	applyLighting()
 	buildSkyBackdrop(workspace)
@@ -1398,6 +1481,10 @@ function CafeService.Start(_self: any)
 			local jumpOk, jumpErr = pcall(tickIndoorJumpLimits)
 			if not jumpOk then
 				Log.warn("Indoor jump tick failed:", jumpErr)
+			end
+			local safetyOk, safetyErr = pcall(tickWorldSafety)
+			if not safetyOk then
+				Log.warn("World safety tick failed:", safetyErr)
 			end
 		end
 	end)

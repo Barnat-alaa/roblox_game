@@ -5,6 +5,35 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-19 — active café shift loop (idle → hands-on tycoon)
+Turns unlimited automation into a finite, active-play loop where the owner is
+the fastest way to keep the café healthy. (Built on the `codex` branch; dead
+code cleaned, all gates + 51 TestEZ cases verified, runtime smoke-checked.)
+- **Finite staff shift capacity** (`Config/Operations`, `CafeOperationsService`):
+  Barista/Cook/Waiter/Cleaner each spend capacity while working and only
+  recover while the owner is in-game; hands-on work restores a little. Offline
+  automation drains capacity instead of running forever.
+- **Persistent satisfaction + cleanliness**: a compact HUD health card (SAT /
+  CLEAN / BARISTA / WAITER). Satisfaction decays while away; low cleanliness
+  cuts patience and can make arrivals reject the café outright.
+- **Visible dirt**: splats spawn on the floor (~18 s) with a "CLEAN ME" prompt;
+  the owner can scrub for satisfaction, or Pia takes it after a grace window.
+- **Angry emoji walkouts**: customers leave with a readable reason — long line,
+  no empty chair, café too dirty, or order never came — each denting Buzz +
+  satisfaction.
+- **Physical order delivery** (`OrderService` rewrite): pick an order up at the
+  kitchen pass, the plate visibly follows your hand, you can only carry one,
+  and only the matching table completes the sale ("PERFECT DELIVERY!"); wrong
+  table is corrected, not silently served.
+- **Street approach**: customers spawn on the distant sidewalk and walk in
+  along a real road network, not popping in at the door.
+- **Sealed map**: a perimeter boundary plus a fall-watchdog that returns a
+  strayed player to their own door instead of killing them; indoor jump cap.
+- **Explicit economy** (`OperationsMath`, `OperationsController`, production
+  menu): per-recipe batch time, production/min, waiter serve-capacity/min, the
+  real bottleneck, and net coins/min after ingredients. Offline runs at 20×
+  time for 1/20 earnings, shown clearly with an on-return summary.
+
 ### Added — 2026-07-19 — owner-approved graphics pack
 - Replaced HUD letter badges with approved coin, reputation, level, Buzz,
   goals, cookbook, build, shop, and pantry images from the Simulator Icon Pack;

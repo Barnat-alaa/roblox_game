@@ -37,6 +37,8 @@ local World = {
 	-- Keep the decorative pickets friendly-sized, but put a real boundary
 	-- behind them so the private garden cannot be used to jump out of the plot.
 	gardenBoundaryHeight = 14,
+	mapBoundaryHeight = 42,
+	mapSafetyMargin = 6,
 	doorWidth = 6, -- front door gap (wide enough for NPC pathfinding)
 	doorHeight = 7,
 	gateWidth = 4, -- garden gate gap in the back wall

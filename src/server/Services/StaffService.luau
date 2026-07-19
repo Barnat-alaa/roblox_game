@@ -23,6 +23,7 @@ local Recipes = require(Shared.Config.Recipes)
 local World = require(Shared.Config.World)
 local StaffDefinitions = require(Shared.Config.Staff)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -39,6 +40,7 @@ local OrderService: any
 local CafeService: any
 local KitchenService: any
 local AssetLibraryService: any
+local CafeOperationsService: any
 
 local CHECK_INTERVAL = 5
 local STAFF_WALK_SPEED = 11
@@ -590,12 +592,15 @@ function StaffService.NotifyMess(_self: any, player: Player, mess: Model)
 		messQueues[player.UserId] = queue
 	end
 	table.insert(queue, mess)
-	-- Failsafe despawn so a missing cleaner never litters forever.
-	task.delay(180, function()
-		if mess.Parent ~= nil then
-			mess:Destroy()
-		end
-	end)
+	-- Empty dishes eventually despawn; floor dirt deliberately remains visible
+	-- until the owner or a cleaner actually deals with it.
+	if mess:GetAttribute("CafeDirt") ~= true then
+		task.delay(180, function()
+			if mess.Parent ~= nil then
+				mess:Destroy()
+			end
+		end)
+	end
 end
 
 -- Pia collects the empty plate and carries it off to be washed (+1 Buzz).
@@ -608,6 +613,17 @@ local function runCleaner(player: Player)
 	end
 	local mess = table.remove(queue, 1)
 	if not mess or mess.Parent == nil then
+		return
+	end
+	if
+		not CafeOperationsService:TryUseCapacity(
+			player,
+			"Cleaner",
+			Operations.cleanerCapacityPerMess
+		)
+	then
+		cleaner.bubble.Text = "SHIFT EMPTY - OWNER CLEAN"
+		table.insert(queue, 1, mess)
 		return
 	end
 	if not claimStaff(cleaner, 0.1) then
@@ -631,7 +647,11 @@ local function runCleaner(player: Player)
 			cleaner.bubble.Text = "🧼 Washing…"
 			task.wait(1.4)
 			if mess.Parent ~= nil then
-				mess:Destroy()
+				if mess:GetAttribute("CafeDirt") == true then
+					CafeOperationsService:CleanMess(player, mess, false)
+				else
+					mess:Destroy()
+				end
 			end
 		else
 			staffWalk(cleaner, cleaner.home.Position)
@@ -727,6 +747,7 @@ function StaffService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function StaffService.Start(_self: any)
