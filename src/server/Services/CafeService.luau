@@ -51,7 +51,9 @@ local KITCHEN_PASS_W = 3 * Grid.CELL_SIZE
 
 -- Saturated, sunny cafe palette shared by the shell and facade.
 local CORAL = Color3.fromRGB(232, 82, 67)
-local CORAL_DARK = Color3.fromRGB(214, 63, 55)
+-- Warm plaster for every wall (interior + facade) — replaces the harsh orange
+-- the owner disliked (2026-07-19). CORAL stays for the red awning accent only.
+local WALL = Color3.fromRGB(224, 206, 176)
 local HONEY_OAK = Color3.fromRGB(212, 151, 76)
 local CREAM = Color3.fromRGB(255, 244, 216)
 local TEAL = Color3.fromRGB(48, 151, 143)
@@ -438,14 +440,14 @@ local function rebuildShell(plot: Plot, tier: number)
 		"WallLeft",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(0, WALL_H / 2, depth / 2),
-		CORAL,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallRight",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(width, WALL_H / 2, depth / 2),
-		CORAL,
+		WALL,
 		shell
 	)
 
@@ -456,21 +458,21 @@ local function rebuildShell(plot: Plot, tier: number)
 		"WallBack",
 		Vector3.new(gateL, WALL_H, 1),
 		origin * CFrame.new(gateL / 2, WALL_H / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(width - gateR, WALL_H, 1),
 		origin * CFrame.new(gateR + (width - gateR) / 2, WALL_H / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(GATE_W, WALL_H - 6.5, 1),
 		origin * CFrame.new(width / 2, 6.5 + (WALL_H - 6.5) / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	for _, fx in { 0.22, 0.78 } do
@@ -646,21 +648,21 @@ local function buildPlot(index: number, parent: Instance): Plot
 		"WallFront",
 		Vector3.new(gapL, WALL_H, 1),
 		origin * CFrame.new(gapL / 2, WALL_H / 2, 0),
-		CORAL_DARK,
+		WALL,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(width - gapR, WALL_H, 1),
 		origin * CFrame.new(gapR + (width - gapR) / 2, WALL_H / 2, 0),
-		CORAL_DARK,
+		WALL,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(DOOR_W, WALL_H - DOOR_H, 1),
 		origin * CFrame.new(width / 2, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
-		CORAL_DARK,
+		WALL,
 		model
 	)
 	for _, wx in { 15, width - 15 } do
@@ -1380,6 +1382,37 @@ local function onPlayerRemoving(player: Player)
 	end
 end
 
+-- Hang the neon "Coffee Cup" sign on the café's exterior facade, above the
+-- door, facing the street. Called from the OnReady redress (the mesh isn't
+-- loaded when the static facade first builds).
+local function placeCafeSign(plot: Plot)
+	if not AssetLibraryService then
+		return
+	end
+	local existing = plot.model:FindFirstChild("CafeSign")
+	if existing then
+		existing:Destroy()
+	end
+	local sign = AssetLibraryService:GetDecor("cafe_sign")
+	if not sign then
+		return
+	end
+	sign.Name = "CafeSign"
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	for _, d in sign:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		end
+	end
+	-- Native sign is flat (thin Y); stand it upright on the wall facing -Z.
+	sign:PivotTo(
+		plot.origin * CFrame.new(width / 2, DOOR_H + 3, -0.7) * CFrame.Angles(math.rad(90), 0, 0)
+	)
+	sign.Parent = plot.model
+end
+
 function CafeService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	BuildService = ServiceRegistry.get("BuildService")
@@ -1505,6 +1538,7 @@ function CafeService.Start(_self: any)
 			buildPlaza(workspace)
 			for _, plot in plots do
 				rebuildShell(plot, math.max(plot.tier, 0))
+				placeCafeSign(plot)
 			end
 		end)
 	end

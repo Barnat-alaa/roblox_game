@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-19 — graphics haul: last greybox items, real dirt, maid, warm walls
+- **The 5 remaining greybox shop items now use real models**: Prep Station,
+  Round Table (glass), Potted Plant, Floor Lamp, Round Rug.
+- **Pivot normalization** (AssetLibraryService): furniture templates now get an
+  axis-aligned pivot at their centre, so the loaded upright pose survives
+  placement instead of inheriting a random part's rotation — this fixed the
+  floor lamp (was lying down) and the rug (was standing on edge). Flat items
+  (`flat = true`) rotate their thinnest axis vertical and scale by span.
+  Verified live: every furniture piece upright/flat and sitting on the floor,
+  no regressions to coffee machine / counter / chair / oven.
+- **Dirt is a real spill mesh** now (owner pick), not the procedural brown
+  splat, and the "DIRT! CLEAN ME" text is gone — the mesh is the signal.
+- **Pia the cleaner uses the owner's maid rig** (14466134917). Re-verified: R15
+  with 13/15 joints (only the ankles missing), which walks cleanly — so the
+  walk gate was relaxed from 15 to 13 for R15. Live movement check: 4.1
+  studs/step, no teleporting.
+- **Warm plaster walls** replace the harsh orange (interior + facade); the red
+  awning accent stays. **Neon "Coffee Cup" café sign** mounted on each café's
+  exterior facade. Coffee drinks use the new coffee-cup prop.
+- Rejected: the barista rig (4646109032 — no HumanoidRootPart/Head, 8 scripts);
+  the wallpaper asset (13010827217 — "not authorized", won't load); the food
+  mesh pack (mostly raw ingredients, poor café fit — kept the Retro pack).
+
 ### Added — 2026-07-19 — active café shift loop (idle → hands-on tycoon)
 Turns unlimited automation into a finite, active-play loop where the owner is
 the fastest way to keep the café healthy. (Built on the `codex` branch; dead

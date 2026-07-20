@@ -26,6 +26,7 @@ local DataService: any
 local EconomyService: any
 local CafeService: any
 local StaffService: any
+local AssetLibraryService: any
 
 local resumed: { [number]: boolean } = {}
 local dirtByUser: { [number]: { Model } } = {}
@@ -204,43 +205,64 @@ local function makeDirt(player: Player, position: Vector3): Model
 	model:SetAttribute("CafeDirt", true)
 	model:SetAttribute("OwnerUserId", player.UserId)
 
-	local splat = Instance.new("Part")
-	splat.Name = "Splat"
-	splat.Shape = Enum.PartType.Cylinder
-	splat.Size = Vector3.new(0.12, 3.6, 3.6)
-	splat.CFrame = CFrame.new(position + Vector3.new(0, 0.08, 0))
-		* CFrame.Angles(0, 0, math.rad(90))
-	splat.Color = Color3.fromRGB(119, 70, 45)
-	splat.Material = Enum.Material.SmoothPlastic
-	splat.Anchored = true
-	splat.CanCollide = false
-	splat.CanQuery = false
-	splat.CanTouch = false
-	splat.Parent = model
-	model.PrimaryPart = splat
+	-- Prefer the real spill/dirt mesh (owner pick, 2026-07-19); fall back to a
+	-- procedural brown splat + blobs. Either way the mesh IS the signal — no
+	-- floating "clean me" label (owner request); the prompt shows on approach.
+	local anchor: BasePart
+	local dirtMesh: Model? = if AssetLibraryService
+		then AssetLibraryService:GetDecor("dirt")
+		else nil
+	if dirtMesh then
+		for _, d in dirtMesh:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+				d.CanCollide = false
+				d.CanQuery = false
+				d.CanTouch = false
+			end
+		end
+		dirtMesh:PivotTo(CFrame.new(position + Vector3.new(0, 0.06, 0)))
+		dirtMesh.Parent = model
+		anchor = dirtMesh.PrimaryPart
+			or dirtMesh:FindFirstChildWhichIsA("BasePart", true) :: BasePart
+		model.PrimaryPart = anchor
+	else
+		local splat = Instance.new("Part")
+		splat.Name = "Splat"
+		splat.Shape = Enum.PartType.Cylinder
+		splat.Size = Vector3.new(0.12, 3.6, 3.6)
+		splat.CFrame = CFrame.new(position + Vector3.new(0, 0.08, 0))
+			* CFrame.Angles(0, 0, math.rad(90))
+		splat.Color = Color3.fromRGB(119, 70, 45)
+		splat.Material = Enum.Material.SmoothPlastic
+		splat.Anchored = true
+		splat.CanCollide = false
+		splat.CanQuery = false
+		splat.CanTouch = false
+		splat.Parent = model
+		model.PrimaryPart = splat
+		anchor = splat
 
-	for index = 1, 4 do
-		local blob = Instance.new("Part")
-		blob.Name = "Blob"
-		blob.Shape = Enum.PartType.Ball
-		blob.Size = Vector3.new(0.16, 0.7, 0.7) * rng:NextNumber(0.7, 1.25)
-		local angle = index * math.pi / 2 + rng:NextNumber(-0.4, 0.4)
-		blob.CFrame = CFrame.new(
-			position + Vector3.new(math.cos(angle), 0.1, math.sin(angle)) * rng:NextNumber(1.3, 2.1)
-		)
-		blob.Color = splat.Color
-		blob.Material = Enum.Material.SmoothPlastic
-		blob.Anchored = true
-		blob.CanCollide = false
-		blob.CanQuery = false
-		blob.CanTouch = false
-		blob.Parent = model
+		for index = 1, 4 do
+			local blob = Instance.new("Part")
+			blob.Name = "Blob"
+			blob.Shape = Enum.PartType.Ball
+			blob.Size = Vector3.new(0.16, 0.7, 0.7) * rng:NextNumber(0.7, 1.25)
+			local angle = index * math.pi / 2 + rng:NextNumber(-0.4, 0.4)
+			blob.CFrame = CFrame.new(
+				position
+					+ Vector3.new(math.cos(angle), 0.1, math.sin(angle))
+						* rng:NextNumber(1.3, 2.1)
+			)
+			blob.Color = splat.Color
+			blob.Material = Enum.Material.SmoothPlastic
+			blob.Anchored = true
+			blob.CanCollide = false
+			blob.CanQuery = false
+			blob.CanTouch = false
+			blob.Parent = model
+		end
 	end
-
-	-- No floating "DIRT! CLEAN ME" label: the splat IS the signal (owner
-	-- request 2026-07-19). The proximity prompt below still shows "Scrub clean"
-	-- only when you walk up to it. Swap the splat for a real mess model when
-	-- one is shopped (docs/ASSET_SHOPPING_LIST.md).
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "CleanDirt"
@@ -249,7 +271,7 @@ local function makeDirt(player: Player, position: Vector3): Model
 	prompt.HoldDuration = 0.65
 	prompt.MaxActivationDistance = 11
 	prompt.RequiresLineOfSight = false
-	prompt.Parent = splat
+	prompt.Parent = anchor
 	prompt.Triggered:Connect(function(who)
 		if who == player then
 			CafeOperationsService:CleanMess(player, model, true)
@@ -420,6 +442,7 @@ function CafeOperationsService.Init(_self: any)
 	EconomyService = ServiceRegistry.get("EconomyService")
 	CafeService = ServiceRegistry.get("CafeService")
 	StaffService = ServiceRegistry.get("StaffService")
+	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 end
 
 function CafeOperationsService.Start(_self: any)

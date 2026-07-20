@@ -59,13 +59,13 @@ cinnamon roll, club sandwich, quiche) — search terms in section E._
 | Bar Stool | AssetManifest ✅ | ✅ |
 | Coat Rack | AssetManifest ✅ | ✅ |
 | Cake Display | AssetManifest ✅ | ✅ |
-| **Prep Station** | procedural greybox | ❌ **BUY** |
-| **Round Table** | procedural greybox | ❌ **BUY** |
-| **Potted Plant** | procedural greybox | ❌ **BUY** |
-| **Floor Lamp** | procedural greybox | ❌ **BUY** |
-| **Round Rug** | procedural greybox | ❌ **BUY** |
+| Prep Station | AssetManifest ✅ (2026-07-19) | ✅ |
+| Round Table | AssetManifest ✅ (glass table) | ✅ |
+| Potted Plant | AssetManifest ✅ | ✅ |
+| Floor Lamp | AssetManifest ✅ | ✅ |
+| Round Rug | AssetManifest ✅ (flat-scaled) | ✅ |
 
-**5 shop items still greybox** → section E.
+**All 20 shop items now use real models** (the last 5 filled 2026-07-19).
 
 ---
 
@@ -76,11 +76,12 @@ cinnamon roll, club sandwich, quiche) — search terms in section E._
 | Customers (4 looks) | walking rigs ✅ | ✅ |
 | Cook (Sam) | Chef NPC rig ✅ | ✅ |
 | Waiter (Noah) | Butler rig ✅ | ✅ |
+| Cleaner (Pia) | **Maid rig ✅ (2026-07-19)** | ✅ |
 | Barista (Mia) | walking base + apron | 🟡 (no dedicated barista rig) |
-| Cleaner (Pia) | Mom base + apron | 🟡 (no dedicated maid rig) |
 
-_Optional buy: a dedicated **barista** and **maid/cleaner** rig (must have a
-HumanoidRootPart or the walk gate rejects it) — section E._
+_The barista rig the owner tried (4646109032) was rejected: no HumanoidRootPart/
+Head, 8 scripts — a glasses-avatar prop, not a rig. Optional: a real barista/
+waitress rig with a HumanoidRootPart._
 
 ---
 
@@ -102,8 +103,8 @@ HumanoidRootPart or the walk gate rejects it) — section E._
 
 | Feature | Now | Status |
 |---|---|---|
-| **Dirt / mess** | procedural brown splat (the "DIRT! CLEAN ME" text was REMOVED 2026-07-19) | ❌ **BUY** a real mess model |
-| Café building (facade, walls, door, awning, sign) | procedural greybox + wood-floor texture | 🟡 (themed, works) — optional building kit |
+| **Dirt / mess** | **real spill mesh ✅ (2026-07-19)**, no text label | ✅ |
+| Café building (facade, walls, door, awning, sign) | warm-plaster walls + **neon café sign ✅** + wood-floor texture | ✅ (optional building kit later) |
 | Tip drop | procedural gold coin cylinder | 🟡 — optional coin mesh |
 | Order pickup marker | neon pad + text | 🟡 (a marker, fine as-is) |
 | Kitchen pass / divider | procedural counter | 🟡 (fine as-is) |
