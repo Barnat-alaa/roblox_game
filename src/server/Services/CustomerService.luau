@@ -948,9 +948,10 @@ end
 local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 	local side = if rng:NextNumber() < 0.5 then -1 else 1
-	local doorStreetPos = (origin * CFrame.new(width / 2, 2, -14)).Position
-	local streetStart = (origin * CFrame.new(width / 2 + side * rng:NextNumber(50, 95), 2, -14)).Position
-	local streetExit = (origin * CFrame.new(width / 2 - side * rng:NextNumber(55, 105), 2, -14)).Position
+	local doorX = width * World.doorCenterFrac
+	local doorStreetPos = (origin * CFrame.new(doorX, 2, -14)).Position
+	local streetStart = (origin * CFrame.new(doorX + side * rng:NextNumber(50, 95), 2, -14)).Position
+	local streetExit = (origin * CFrame.new(doorX - side * rng:NextNumber(55, 105), 2, -14)).Position
 	local streetLength = (World.plotsPerRow - 1) * (width + World.plotGap) + width
 	streetStart = Vector3.new(math.clamp(streetStart.X, -30, streetLength + 30), 2, streetStart.Z)
 	streetExit = Vector3.new(math.clamp(streetExit.X, -30, streetLength + 30), 2, streetExit.Z)

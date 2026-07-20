@@ -41,6 +41,7 @@ local World = {
 	mapSafetyMargin = 6,
 	doorWidth = 6, -- front door gap (wide enough for NPC pathfinding)
 	doorHeight = 7,
+	doorCenterFrac = 0.7, -- front-door centre as a fraction of width (owner-facing "more to the left")
 	gateWidth = 4, -- garden gate gap in the back wall
 }
 

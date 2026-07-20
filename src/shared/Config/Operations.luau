@@ -23,8 +23,8 @@ local Operations = {
 	cleanerCapacityPerMess = 3,
 	manualCapacityRestore = 1.25,
 
-	dirtSpawnSeconds = 18,
-	maxDirt = 8,
+	dirtSpawnSeconds = 55, -- much less frequent (owner: dirt was appearing too often)
+	maxDirt = 4,
 	cleanlinessLossPerDirt = 11,
 	cleanlinessGainPerClean = 13,
 	dirtyRejectThreshold = 30,

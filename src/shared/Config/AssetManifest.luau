@@ -16,6 +16,7 @@ export type FurnitureAsset = {
 	yaw: number?, -- degrees added at placement to align the imported model's visible front
 	liftY: number?, -- studs above the floor (wall art, clocks, hanging lamps)
 	flat: boolean?, -- rugs/mats: scale by SPAN (not height) and lay the thin axis down
+	widen: number?, -- non-uniform stretch of the LONGEST horizontal axis (wider counter)
 }
 
 export type WorldAsset = {
@@ -58,8 +59,9 @@ local AssetManifest = {
 			assetId = 8509855137,
 			name = "Counter and Cash Register (oceanicwavss)",
 			height = 3.8,
-			maxSpan = 12,
-			yaw = 90, -- native long axis is on Z; rotate it onto the 3-cell X span
+			maxSpan = 24,
+			yaw = 90, -- native long axis is on Z; rotate it onto the wide X span
+			widen = 2.1, -- stretch it wider without making it taller (owner request)
 		},
 		chair_wood = {
 			assetId = 14269301866,
@@ -268,10 +270,10 @@ local AssetManifest = {
 		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
 		-- Butler: R15, complete 15/15 skeleton, zero scripts — Noah's real look.
 		Waiter = { assetId = 3230955000, name = "Butler (Verdonis)" },
-		-- The maid rig (14466134917) is R15 with 13/15 joints — only the two
-		-- ankles are missing, so hips+knees still drive a clean walk. Accepted
-		-- 2026-07-19 (the walk gate was relaxed to allow missing ankles).
-		Cleaner = { assetId = 14466134917, name = "Black Maid (owner pick)" },
+		-- The maid rig (14466134917) walked/looked worse in play than the Mom
+		-- base — owner reverted it 2026-07-20. Pia is back on the verified Mom
+		-- base + green apron.
+		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },
 	},
 }
 

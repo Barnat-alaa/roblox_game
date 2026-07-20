@@ -301,7 +301,7 @@ local function tickWorldSafety()
 				or root.Position.Y < -18
 			if outside then
 				local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-				local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
+				local standAt = (plot.origin * CFrame.new(width * World.doorCenterFrac, 4, -8)).Position
 				local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
 				root.AssemblyLinearVelocity = Vector3.zero
 				root.CFrame = CFrame.lookAt(standAt, lookAt)
@@ -641,9 +641,11 @@ local function buildPlot(index: number, parent: Instance): Plot
 	-- (the camera only x-rays the café you are actually in).
 	model:SetAttribute("origin", origin)
 
-	-- FRONT FACADE: two wall segments + lintel around a centred door gap.
-	local gapL = width / 2 - DOOR_W / 2
-	local gapR = width / 2 + DOOR_W / 2
+	-- FRONT FACADE: two wall segments + lintel around the door gap. The door
+	-- centre sits left of middle (owner request) via World.doorCenterFrac.
+	local doorCx = width * World.doorCenterFrac
+	local gapL = doorCx - DOOR_W / 2
+	local gapR = doorCx + DOOR_W / 2
 	makePart(
 		"WallFront",
 		Vector3.new(gapL, WALL_H, 1),
@@ -661,11 +663,11 @@ local function buildPlot(index: number, parent: Instance): Plot
 	makePart(
 		"WallFront",
 		Vector3.new(DOOR_W, WALL_H - DOOR_H, 1),
-		origin * CFrame.new(width / 2, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
+		origin * CFrame.new(doorCx, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
 		WALL,
 		model
 	)
-	for _, wx in { 15, width - 15 } do
+	for _, wx in { doorCx + 14, width - 12 } do
 		makeWindow(model, origin * CFrame.new(wx, 4.6, -0.55))
 	end
 
@@ -673,7 +675,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	makeDoor(
 		"F" .. index,
 		model,
-		origin * CFrame.new(width / 2, DOOR_H / 2 - 0.05, 0),
+		origin * CFrame.new(doorCx, DOOR_H / 2 - 0.05, 0),
 		DOOR_W - 0.4,
 		DOOR_H - 0.25,
 		Color3.fromRGB(112, 78, 55),
@@ -743,7 +745,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	local pad = makePart(
 		"VisitPad",
 		Vector3.new(6, 0.3, 3),
-		origin * CFrame.new(width / 2, 0.15, -2.5),
+		origin * CFrame.new(doorCx, 0.15, -2.5),
 		TEAL,
 		model,
 		Enum.Material.Fabric
@@ -1333,7 +1335,7 @@ local function teleportOnto(plot: Plot, character: Model)
 		-- Arrive on the street IN FRONT of your own café, facing the door —
 		-- the "this is my restaurant" moment (owner request).
 		local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-		local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
+		local standAt = (plot.origin * CFrame.new(width * World.doorCenterFrac, 4, -8)).Position
 		local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
 		hrp.CFrame = CFrame.lookAt(standAt, lookAt)
 	end
@@ -1408,7 +1410,9 @@ local function placeCafeSign(plot: Plot)
 	end
 	-- Native sign is flat (thin Y); stand it upright on the wall facing -Z.
 	sign:PivotTo(
-		plot.origin * CFrame.new(width / 2, DOOR_H + 3, -0.7) * CFrame.Angles(math.rad(90), 0, 0)
+		plot.origin
+			* CFrame.new(width * World.doorCenterFrac, DOOR_H + 3, -0.7)
+			* CFrame.Angles(math.rad(90), 0, 0)
 	)
 	sign.Parent = plot.model
 end

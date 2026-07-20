@@ -632,24 +632,35 @@ local function runCleaner(player: Player)
 	end
 	task.spawn(function()
 		cleaner.bubble.Text = "🧹 On it!"
-		staffWalk(cleaner, mess:GetPivot().Position)
+		local messPos = mess:GetPivot().Position
+		staffWalk(cleaner, messPos + Vector3.new(0, 0, 1.6))
 		if mess.Parent ~= nil then
-			Fx.floatText(
-				mess:GetPivot().Position + Vector3.new(0, 1.2, 0),
-				"+1 🔥",
-				Color3.fromRGB(255, 180, 120)
-			)
+			Fx.floatText(messPos + Vector3.new(0, 1.2, 0), "+1 🔥", Color3.fromRGB(255, 180, 120))
 			KitchenService:AddBuzz(player, 1)
-			-- Carry the dirty plate back to the kitchen and wash it.
-			local release = carryPlate(cleaner, mess)
-			staffWalk(cleaner, cleaner.home.Position)
-			release()
-			cleaner.bubble.Text = "🧼 Washing…"
-			task.wait(1.4)
-			if mess.Parent ~= nil then
-				if mess:GetAttribute("CafeDirt") == true then
+			if mess:GetAttribute("CafeDirt") == true then
+				-- SCRUB the spill in place with a broom — no carrying it around
+				-- (owner request). Hold position while the broom sweeps.
+				local root = cleaner.root
+				if root then
+					root.Anchored = true
+				end
+				Fx.scrub(messPos, 1.5)
+				task.wait(1.5)
+				if root and root.Parent ~= nil then
+					root.Anchored = false
+				end
+				if mess.Parent ~= nil then
 					CafeOperationsService:CleanMess(player, mess, false)
-				else
+				end
+				staffWalk(cleaner, cleaner.home.Position)
+			else
+				-- A dirty PLATE still gets carried back to the kitchen and washed.
+				local release = carryPlate(cleaner, mess)
+				staffWalk(cleaner, cleaner.home.Position)
+				release()
+				cleaner.bubble.Text = "🧼 Washing…"
+				task.wait(1.4)
+				if mess.Parent ~= nil then
 					mess:Destroy()
 				end
 			end

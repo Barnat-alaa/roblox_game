@@ -107,20 +107,24 @@ local function defaultProfile(): Types.PlayerData
 		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {
 			{
-				instanceId = "seed_coffee",
-				catalogId = "coffee_machine",
-				gridX = 2,
+				-- Wide service counter (5 cells) across the kitchen front.
+				instanceId = "seed_counter",
+				catalogId = "counter",
+				gridX = 4,
 				gridY = 3,
 				floor = 0,
 				rotation = 0,
 			},
 			{
-				instanceId = "seed_counter",
-				catalogId = "counter",
-				gridX = 5,
+				-- Espresso machine sits ON the counter toward the owner-facing
+				-- RIGHT end (low local X), rotated to face the room.
+				instanceId = "seed_coffee",
+				catalogId = "coffee_machine",
+				gridX = 4,
 				gridY = 3,
 				floor = 0,
-				rotation = 0,
+				rotation = 1,
+				liftY = 3.5,
 			},
 		},
 		unlockedRecipes = { espresso = true, tea = true },

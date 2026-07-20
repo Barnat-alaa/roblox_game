@@ -190,6 +190,10 @@ function CafeOperationsService.CleanMess(
 	end
 	local position = mess:GetPivot().Position
 	mess:Destroy()
+	if manual then
+		-- Show the broom scrubbing when the OWNER cleans, too.
+		Fx.scrub(position, 1)
+	end
 	Fx.floatText(
 		position + Vector3.new(0, 2.5, 0),
 		if manual then "SPARKLING!  +SAT" else "CLEAN",

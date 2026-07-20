@@ -468,10 +468,12 @@ refreshCounterDisplay = function(player: Player)
 	if topPart then
 		topCf = topPart.CFrame * CFrame.new(0, topPart.Size.Y / 2, 0)
 	else
-		local counterBody = counter:FindFirstChild("Counter")
-		local support = if counterBody and counterBody:IsA("Model") then counterBody else counter
-		local pivot, size = support:GetBoundingBox()
-		topCf = pivot * CFrame.new(0, size.Y / 2, 0)
+		-- Imported counter: its bounding box includes the tall cash register,
+		-- so the mugs floated. Place them on a fixed WORKTOP height above the
+		-- floor instead, keeping the counter's yaw.
+		local pivot, size = counter:GetBoundingBox()
+		local floorY = pivot.Position.Y - size.Y / 2
+		topCf = pivot * CFrame.new(0, (floorY + 3.3) - pivot.Position.Y, 0)
 	end
 
 	local display = Instance.new("Folder")

@@ -13,6 +13,7 @@ export type PlacedFurniture = {
 	floor: number,
 	rotation: number, -- 0..3 (multiples of 90 degrees)
 	variant: string?,
+	liftY: number?, -- extra studs above the floor (e.g. an appliance ON a counter)
 }
 
 export type RecipeMasteryEntry = {

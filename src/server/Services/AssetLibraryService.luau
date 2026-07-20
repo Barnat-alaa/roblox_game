@@ -105,17 +105,23 @@ end
 -- Props: anchored, scaled, floor-friendly templates. Scale so the longest
 -- horizontal axis matches `fit` (small tabletop items).
 local function normalisePropModel(model: Model, fit: number): Model?
+	local hasPart = false
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			d.CanCollide = false
 			d.CanQuery = false
+			hasPart = true
 		end
 	end
-	if not ensurePrimary(model) then
+	if not hasPart then
 		model:Destroy()
 		return nil
 	end
+	-- Upright, axis-aligned pivot at the centre so props (mugs, plates, food)
+	-- sit flat and unrotated instead of inheriting a random part's tilt.
+	model.PrimaryPart = nil
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
 	local _, size = model:GetBoundingBox()
 	local longest = math.max(size.X, size.Z, 0.01)
 	local scale = fit / longest
@@ -126,6 +132,7 @@ local function normalisePropModel(model: Model, fit: number): Model?
 			model:ScaleTo(model:GetScale() * scale)
 		end)
 	end
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
 	return model
 end
 
@@ -179,7 +186,8 @@ local function buildFurnitureTemplate(
 	height: number,
 	maxSpan: number,
 	yaw: number?,
-	flat: boolean?
+	flat: boolean?,
+	widen: number?
 ): Model?
 	local container = loadAndSanitise(assetId)
 	if not container then
@@ -246,8 +254,29 @@ local function buildFurnitureTemplate(
 			end
 		end
 	end
-	-- Re-centre the pivot after scaling (ScaleTo can shift the box).
 	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	-- Non-uniform WIDEN: stretch the model's longer horizontal axis (imported
+	-- models only scale uniformly, so a "wider counter" would also get taller —
+	-- this keeps the height). Parts here are axis-aligned after normalisation.
+	if widen and widen ~= 1 then
+		local cf, size = model:GetBoundingBox()
+		local centre = cf.Position
+		local stretchZ = size.Z >= size.X
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local rel = d.Position - centre
+				if stretchZ then
+					d.Size = Vector3.new(d.Size.X, d.Size.Y, d.Size.Z * widen)
+					d.Position = centre + Vector3.new(rel.X, rel.Y, rel.Z * widen)
+				else
+					d.Size = Vector3.new(d.Size.X * widen, d.Size.Y, d.Size.Z)
+					d.Position = centre + Vector3.new(rel.X * widen, rel.Y, rel.Z)
+				end
+			end
+		end
+		model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	end
+	-- Re-centre the pivot after scaling (ScaleTo can shift the box).
 	-- Facing correction applied at placement time (SpawnFurniture) so the grid
 	-- rotation and this offset compose.
 	if yaw and yaw ~= 0 then
@@ -500,7 +529,8 @@ function AssetLibraryService.Start(_self: any)
 				entry.height,
 				entry.maxSpan,
 				entry.yaw,
-				entry.flat
+				entry.flat,
+				entry.widen
 			)
 			if t and entry.liftY then
 				t:SetAttribute("liftY", entry.liftY)
