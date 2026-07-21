@@ -3,17 +3,18 @@
 _Last updated 2026-07-21._ Ordered. Items marked **[you]** need your
 account/machine; the rest Claude does.
 
-## 1. Verify what shipped unverified **[Claude, needs Studio open]**
-Three things merged on 2026-07-21 have **never actually run**. Do this before
-building anything on top of them:
-- the **10-café street** (geometry was recomputed, not playtested),
-- **`PedestrianService`** (lane math proven with probe NPCs; the service itself
-  has never started),
-- the **`saveBlocked`** path (needs a store whose `GetAsync` fails).
+## 1. HUD/menu rework **[Claude]** — the main build task
+Full spec in [docs/HUD_REDESIGN.md](docs/HUD_REDESIGN.md): bottom-left stat
+pills, bottom-centre chunky icon dock with hover names and 1–5 shortcuts,
+right-hand rail with letter shortcuts. **Claude sources the icons himself** —
+verified CC0 packs are named in §4 (Nieobie for glyphs, Kenney UI Pack for the
+plates, Kenney Food Kit for menu items). Panels themselves come later — the
+owner will send a screenshot per menu.
 
-→ **You:** close Studio without saving, reopen `SocialCafe.rbxlx` from Récents,
-press **F7** (Test → Commencer la session de test → Serveur et clients; set the
-👤 count *before* starting). Then say "running" and Claude measures it.
+_Verification status: the 10-café street and the ambient crowd were playtested
+and confirmed by the owner on 2026-07-21. The only thing still untested by
+execution is the `saveBlocked` path, which needs a DataStore whose `GetAsync`
+fails and cannot be forced from Studio._
 
 ## 2. Dashboard Max Players → 10 **[you]** — real blocker
 `World.plotCount` is now 10 but the dashboard is recorded at **30**. Until this
@@ -29,18 +30,10 @@ Studio — it uploads whatever is *open*, not what is on disk).
 `0.0.0.0/0` → copy the key (shown once).
 → Then: `$env:ROBLOX_API_KEY = "<key>"` and `./scripts/publish.ps1`.
 
-## 4. HUD icons **[you]**
-The menu rework needs a cohesive icon set — see
-[docs/HUD_REDESIGN.md](docs/HUD_REDESIGN.md) §4. Missing slots: **Staff,
-Upgrades, Trophy, Map, Music, Settings**. Send Creator Store asset ids/links
-(one pack preferred so the HUD reads as one system). Each gets recorded in
-`docs/ASSET_LICENSES.md` before use.
-
-## 5. HUD/menu rework **[Claude]** — the main build task
-Full spec in [docs/HUD_REDESIGN.md](docs/HUD_REDESIGN.md): bottom-left stat
-pills, bottom-centre chunky icon dock with hover names and 1–5 shortcuts,
-right-hand rail with letter shortcuts. Panels themselves come later — you will
-send a screenshot per menu.
+## 4. Menu panel screenshots **[you, when convenient]**
+The HUD pass covers the dock, stat chips and right rail only. For each panel
+behind a button (Build, Cookbook, Staff, Upgrades, Shop) send a reference
+screenshot and it gets specced and rebuilt the same way.
 
 ## Hardening backlog (before public launch)
 - **ProfileStore swap** for session locking — `saveAsync` is currently a blind
