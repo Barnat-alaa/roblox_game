@@ -15,6 +15,11 @@ local World = {
 	plotsPerRow = 15, -- cafés per street side
 	boulevardWidth = 60, -- studs between the two facing rows
 	plotGap = 12, -- studs between neighbouring plots
+	-- Width of the tiled road running down the middle of the boulevard. What is
+	-- left of boulevardWidth after the road is split into the two sidewalks, so
+	-- this is the single source of truth for both the road tiles CafeService
+	-- lays down and the pedestrian lanes in Utilities/StreetMath.
+	roadWidth = 24,
 
 	-- Interior depth per expansion tier, in grid cells (width is fixed at
 	-- Grid.PLOT_WIDTH). Tier 0 = 18x24 cells = exactly 3x the original

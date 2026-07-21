@@ -168,7 +168,8 @@ local function setDoorOpen(door: Door, open: boolean)
 	):Play()
 end
 
--- Anyone near a door opens it: players, customers, staff.
+-- Anyone near a door opens it: players, customers, staff, and the ambient
+-- street pedestrians (otherwise a passer-by walks into a shut door).
 local function collectCharacterPositions(): { Vector3 }
 	local positions: { Vector3 } = {}
 	for _, player in Players:GetPlayers() do
@@ -177,7 +178,7 @@ local function collectCharacterPositions(): { Vector3 }
 			table.insert(positions, hrp.Position)
 		end
 	end
-	for _, folderName in { "Customers", "Staff" } do
+	for _, folderName in { "Customers", "Staff", "Pedestrians" } do
 		local folder = workspace:FindFirstChild(folderName)
 		if folder then
 			for _, npc in folder:GetChildren() do
@@ -898,7 +899,9 @@ local function buildRoadNetwork(parent: Instance)
 
 	local plotWidth = Grid.PLOT_WIDTH * Grid.CELL_SIZE
 	local streetLength = (PLOTS_PER_ROW - 1) * PLOT_SPACING + plotWidth
-	local tileSize = 24
+	-- Shared with Utilities/StreetMath, which derives the sidewalk (and so the
+	-- pedestrian lanes) from whatever the road leaves over.
+	local tileSize = World.roadWidth
 	local firstX = -48
 	local lastX = streetLength + 48
 	local tileCount = math.floor((lastX - firstX) / tileSize) + 1

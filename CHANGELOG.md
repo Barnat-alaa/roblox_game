@@ -5,6 +5,39 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-21 — permanent street crowd: ambient pedestrians on the sidewalks
+The boulevard now has a standing cast of NPCs so the neighbourhood reads as
+alive instead of empty, and some of them wander into **any** open café — every
+claimed plot, not just the local player's.
+- **`PedestrianService`** keeps `Pedestrians.count` (16) walkers alive for the
+  whole server session, split across the two sidewalks, in their own
+  `workspace.Pedestrians` folder. They are pure set dressing: they never queue,
+  order, tip, or touch satisfaction/Buzz, and nothing that scans
+  `Customers`/`Staff` sees them.
+- **Sidewalks only, by construction.** Street movement uses a direct
+  `Humanoid:MoveTo` along a fixed lane — deliberately NOT PathfindingService,
+  which happily routes an NPC diagonally across the road. Pathfinding is used
+  only once a pedestrian is inside a café, where it has to route around
+  furniture. A per-tick clamp snaps anyone shoved off the paving back into lane.
+- **`Utilities/StreetMath`** holds the geometry as pure numbers so it is
+  unit-testable: sidewalk A is Z [-18, 0], the road is Z [-42, -18], sidewalk B
+  is Z [-60, -42]. The walkable lanes are Z [-10.5, -3.5] and [-56.5, -49.5] —
+  inset to clear the café fronts AND the street decor, since CafeService puts
+  mailboxes at Z -14 and hydrants/trees at Z -46/-44, right where a naive
+  "walk down the middle of the pavement" would collide. Verified against the
+  built world: measured sidewalks/road/decor match these numbers exactly.
+- **`tests/StreetMath.spec.luau`** asserts the containment contract — lanes are
+  strictly inside the paving, never overlap the road, and keep ≥3.5 studs from
+  every café wall and decor prop.
+- Cafés count as OPEN when the plot is claimed (unowned plots are shuttered and
+  read CLOSED). Pedestrians only consider cafés fronting their own sidewalk, so
+  a visit never means crossing the road, and `maxVisitorsPerCafe` (3) stops one
+  café swallowing the crowd.
+- `World.roadWidth` is now the single source of truth for the road/sidewalk
+  split, shared by CafeService's tiling and StreetMath's lanes.
+- `CafeService` door proximity now also counts the `Pedestrians` folder, so a
+  passer-by no longer walks into a shut door.
+
 ### Fixed — 2026-07-21 — kitchen layout VERIFIED in Studio; counter fills its footprint, machine sits flush
 Closes the one open item from the 2026-07-20 handoff, which had been set blind
 and never visually confirmed. Measured live in Studio against the real assets
