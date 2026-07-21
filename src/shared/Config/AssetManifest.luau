@@ -61,7 +61,13 @@ local AssetManifest = {
 			height = 3.8,
 			maxSpan = 24,
 			yaw = 90, -- native long axis is on Z; rotate it onto the wide X span
-			widen = 2.1, -- stretch it wider without making it taller (owner request)
+			-- Stretch wider without making it taller (owner request). Measured in
+			-- Studio: the normalised counter body is 9.38 studs long before this
+			-- multiplier, and the seed counter's 6-cell footprint is 24 studs, so
+			-- 24 / 9.38 = 2.56 makes the body actually FILL its footprint. At the
+			-- old 2.1 it spanned only 19.7 studs, which left the espresso machine
+			-- (placed at the footprint's right edge) hanging off the counter end.
+			widen = 2.56,
 		},
 		chair_wood = {
 			assetId = 14269301866,

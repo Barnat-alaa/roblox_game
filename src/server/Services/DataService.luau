@@ -117,14 +117,19 @@ local function defaultProfile(): Types.PlayerData
 			},
 			{
 				-- Espresso machine sits ON the counter toward the owner-facing
-				-- RIGHT end (low local X), rotated to face the room.
+				-- RIGHT end (low local X), rotated to face the room. Verified in
+				-- Studio: facing into the café the player's right IS low local X,
+				-- so gridX = 4 (local X 18) is correct — do not "flip" it.
+				-- liftY is the machine's BOTTOM height above the floor; the
+				-- counter's worktop measures 2.43 studs, so 2.43 rests it flush.
+				-- (At the old 3.5 it floated 1.07 studs above the surface.)
 				instanceId = "seed_coffee",
 				catalogId = "coffee_machine",
 				gridX = 4,
 				gridY = 3,
 				floor = 0,
 				rotation = 1,
-				liftY = 3.5,
+				liftY = 2.43,
 			},
 		},
 		unlockedRecipes = { espresso = true, tea = true },

@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-21 — kitchen layout VERIFIED in Studio; counter fills its footprint, machine sits flush
+Closes the one open item from the 2026-07-20 handoff, which had been set blind
+and never visually confirmed. Measured live in Studio against the real assets
+rather than reasoned about, since the previous pass was burned by mirrored
+left/right intuition.
+- **Left/right layout was already correct — no flip needed.** Ground truth: the
+  player enters facing local +Z, and with Up = +Y that puts their RIGHT at LOW
+  local X. Measured positions: espresso machine pivot at local X 18 (owner's
+  RIGHT ✓), front door at local X 50.4 (owner's LEFT ✓), kitchen at cells 0-7
+  (front-RIGHT corner ✓). `World.doorCenterFrac` and the seed `gridX` are now
+  commented with this result so a future pass does not "fix" it backwards.
+- **Counter now fills its 6-cell footprint** (`AssetManifest.counter.widen`
+  2.1 → 2.56). The normalised body is 9.38 studs before the multiplier and the
+  footprint is 24 studs, so 2.1 left it spanning only 19.7 — measured 24.02
+  after the change.
+- **Espresso machine no longer floats** (`DataService` seed `seed_coffee.liftY`
+  3.5 → 2.43). `liftY` is the model's BOTTOM height and the counter worktop
+  measures 2.43, so the machine had been hanging 1.07 studs in mid-air. The
+  earlier 3.5 was derived from a bounding box polluted by the StockDisplay
+  (top 5.28) rather than the worktop itself. Verified live: flush gap −0.004.
+- Together these also fix the machine hanging off the counter's right end — it
+  sat at the footprint edge (X 15.7) while the short counter only began at 18.1.
+
 ### Added — 2026-07-19 — graphics haul: last greybox items, real dirt, maid, warm walls
 - **The 5 remaining greybox shop items now use real models**: Prep Station,
   Round Table (glass), Potted Plant, Floor Lamp, Round Rug.
