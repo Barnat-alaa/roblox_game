@@ -1356,10 +1356,28 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 
-	local tries = 0
-	while not DataService:IsLoaded(player) and tries < 200 do
-		task.wait(0.1)
-		tries += 1
+	-- Render only once the profile has actually loaded. Rendering early draws an
+	-- EMPTY café even though the player has saved furniture, so keep waiting
+	-- while they are still in the server instead of giving up on a fixed
+	-- deadline and silently showing them a blank shop.
+	local ticks = 0
+	while not DataService:IsLoaded(player) and player.Parent ~= nil do
+		task.wait(0.2)
+		ticks += 1
+		if ticks % 50 == 0 then -- every 10s
+			Log.warn(
+				"Still waiting on profile for",
+				player.Name,
+				string.format("(%ds)", ticks // 5)
+			)
+		end
+		if ticks > 900 then -- 3 minutes: something is badly wrong upstream
+			Log.warn("Giving up waiting on profile for", player.Name, "- café left unrendered")
+			return
+		end
+	end
+	if player.Parent == nil then
+		return -- left while we were waiting
 	end
 	CafeService:RefreshTier(player)
 	BuildService:RenderProfile(player)
@@ -1434,6 +1452,32 @@ function CafeService.Start(_self: any)
 	for i = 1, NUM_PLOTS do
 		plots[i] = buildPlot(i, plotsFolder)
 		setPlotClosed(plots[i]) -- every café starts shuttered until claimed
+	end
+
+	-- Capacity guard rail. One plot per player is the whole premise, so a server
+	-- that can admit more players than there are cafés strands the surplus with
+	-- nowhere to play. MaxPlayers comes from the Roblox dashboard and can be
+	-- changed without touching this code, so assert the invariant out loud at
+	-- boot rather than discovering it when the 31st player joins.
+	if Players.MaxPlayers > NUM_PLOTS then
+		Log.warn(
+			string.format(
+				"CAPACITY: MaxPlayers (%d) exceeds cafés (%d) - %d player(s) could join with NO café. "
+					.. "Lower MaxPlayers on the dashboard to %d, or raise World.plotCount.",
+				Players.MaxPlayers,
+				NUM_PLOTS,
+				Players.MaxPlayers - NUM_PLOTS,
+				NUM_PLOTS
+			)
+		)
+	else
+		Log.info(
+			string.format(
+				"CafeService capacity OK: %d cafés for up to %d players",
+				NUM_PLOTS,
+				Players.MaxPlayers
+			)
+		)
 	end
 
 	-- Shared street ground so nobody falls into the void: spans both rows

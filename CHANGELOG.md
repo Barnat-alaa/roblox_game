@@ -5,6 +5,35 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-21 — persistence safety: a failed load no longer wipes the account
+Found while verifying "does a returning player get their progress back".
+- **A transient DataStore outage permanently erased accounts.** When all three
+  `GetAsync` attempts failed, `loadAsync` returned a blank `defaultProfile()`
+  and logged "NOT persisted this session" — but **nothing enforced that**.
+  `saveAsync` had no idea the load had failed, so the next 60s autosave (or
+  save-on-leave) wrote that blank straight over the player's real save. One
+  DataStore blip = a wiped café, irreversibly. `loadAsync` now returns
+  `(profile, safeToSave)` and users whose save could not be read are added to
+  `saveBlocked`, which every write path skips. They can still play on the blank
+  profile; it just never persists.
+- **The DataStore name is now resolved at boot instead of hardcoded to `DEV`.**
+  Two bugs in one: publishing would have filed live players into the DEV store,
+  and — worse — once the place was published a Studio playtest would have read
+  and overwritten PRODUCTION saves. Studio and unpublished servers are pinned to
+  `DEV`; a live server resolves to `PROD`; an `Environment` attribute on the
+  place overrides both (e.g. `STAGING`). Verified: Studio resolves to
+  `DEV_PlayerProfiles_v1`.
+- **Join no longer renders an empty café on a slow load.** `CafeService` waited
+  a fixed 20s for the profile and then rendered regardless, which would draw a
+  blank shop for a player who actually had saved furniture. It now waits while
+  the player is still in the server (logging every 10s, hard cap 3 min) and
+  bails without rendering rather than showing a wrong, empty café.
+- **Capacity guard rail.** One café per player is the whole premise, but
+  `MaxPlayers` lives on the Roblox dashboard and can be changed without touching
+  this code. `CafeService.Start` now asserts the invariant out loud at boot,
+  naming the exact numbers, instead of the surplus players silently arriving
+  with nowhere to play.
+
 ### Added — 2026-07-21 — permanent street crowd: ambient pedestrians on the sidewalks
 The boulevard now has a standing cast of NPCs so the neighbourhood reads as
 alive instead of empty, and some of them wander into **any** open café — every

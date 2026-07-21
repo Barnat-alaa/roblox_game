@@ -28,8 +28,29 @@ local Remotes = require(Shared.Network.Remotes)
 local SCHEMA_VERSION = 3
 
 -- Environment prefix keeps DEV / STAGING / PROD data strictly separate.
--- TODO: drive this from a per-place attribute during the publish step.
-local ENV_PREFIX = "DEV"
+-- Resolved at boot instead of hardcoded, for two reasons that both bite the
+-- moment this place is published:
+--   • a hardcoded "DEV" would file real, live players into the DEV store;
+--   • worse, once the place IS published, a Studio playtest would otherwise
+--     read and OVERWRITE production saves. Studio is therefore pinned to DEV.
+local function environmentPrefix(): string
+	-- Explicit override wins: set a string "Environment" attribute on the place
+	-- (e.g. "STAGING") to point one build at its own store.
+	local override = game:GetAttribute("Environment")
+	if typeof(override) == "string" and override ~= "" then
+		return string.upper(override)
+	end
+	if RunService:IsStudio() then
+		return "DEV"
+	end
+	-- An unpublished server has no DataStore access at all; treat it as DEV.
+	if game.PlaceId == 0 then
+		return "DEV"
+	end
+	return "PROD"
+end
+
+local ENV_PREFIX = environmentPrefix()
 local STORE_NAME = ENV_PREFIX .. "_PlayerProfiles_v1"
 
 local DataService = {}
@@ -39,6 +60,11 @@ local store: DataStore? = nil
 local profiles: { [number]: Types.PlayerData } = {}
 local loaded: { [number]: boolean } = {}
 local loading: { [number]: boolean } = {}
+-- Users whose save could NOT be read back from the DataStore. Their in-memory
+-- profile is a blank default rather than their real progress, so every write
+-- path must skip them — otherwise one failed GetAsync permanently erases an
+-- account at the next autosave.
+local saveBlocked: { [number]: boolean } = {}
 
 local function starterStaff(): { Types.StaffMember }
 	return {
@@ -284,10 +310,19 @@ local function keyFor(userId: number): string
 	return "user_" .. userId
 end
 
-local function loadAsync(userId: number): Types.PlayerData
+-- Returns the profile plus whether it is SAFE TO SAVE.
+--
+-- The second return is the important one. When a GetAsync never succeeds we
+-- hand back a default profile so the player can still play, but that default is
+-- NOT their save — it is a blank. Writing it back would destroy a real account
+-- on nothing worse than a transient DataStore blip, so the caller marks the
+-- user save-blocked for the rest of the session instead.
+local function loadAsync(userId: number): (Types.PlayerData, boolean)
 	local activeStore = store
 	if not activeStore then
-		return defaultProfile()
+		-- No DataStore at all (unpublished place, or API access off). There is
+		-- nothing on disk to clobber, so in-memory play is safe.
+		return defaultProfile(), true
 	end
 	local attempts = 0
 	while attempts < 3 do
@@ -297,21 +332,30 @@ local function loadAsync(userId: number): Types.PlayerData
 		end)
 		if ok then
 			if result == nil then
-				return defaultProfile()
+				return defaultProfile(), true -- genuinely a first-time player
 			end
-			return migrate(reconcile(result))
+			return migrate(reconcile(result)), true
 		end
 		Log.warn("Load attempt", attempts, "failed for", userId, result)
 		task.wait(2)
 	end
-	Log.warn("All load attempts failed for", userId, "- fresh profile (NOT persisted this session)")
-	return defaultProfile()
+	Log.warn(
+		"All load attempts failed for",
+		userId,
+		"- SAVING DISABLED for this session so the existing save is not overwritten"
+	)
+	return defaultProfile(), false
 end
 
 local function saveAsync(userId: number)
 	local activeStore = store
 	local data = profiles[userId]
 	if not activeStore or not data then
+		return
+	end
+	if saveBlocked[userId] then
+		-- We never managed to read this user's real save, so `data` is a blank
+		-- default. Writing it would wipe their account.
 		return
 	end
 	local ok, err = pcall(function()
@@ -346,10 +390,19 @@ local function onPlayerAdded(player: Player)
 		return
 	end
 	loading[player.UserId] = true
-	local data = loadAsync(player.UserId)
+	local data, safeToSave = loadAsync(player.UserId)
 	profiles[player.UserId] = data
+	saveBlocked[player.UserId] = not safeToSave
 	loaded[player.UserId] = true
-	Log.info("Profile ready for", player.Name)
+	if safeToSave then
+		Log.info("Profile ready for", player.Name)
+	else
+		Log.warn(
+			"Profile UNREADABLE for",
+			player.Name,
+			"- playing on a blank profile, saving is OFF"
+		)
+	end
 	Remotes.event("ProfileUpdated"):FireClient(player, data)
 end
 
@@ -365,6 +418,7 @@ local function onPlayerRemoving(player: Player)
 	profiles[player.UserId] = nil
 	loaded[player.UserId] = nil
 	loading[player.UserId] = nil
+	saveBlocked[player.UserId] = nil
 end
 
 function DataService.Init(_self: any)
