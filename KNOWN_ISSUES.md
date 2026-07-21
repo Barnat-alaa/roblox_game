@@ -11,10 +11,17 @@ on an average laptop and iPhone 16 Pro Max landscape. The phone uses narrow edge
 drawers with 55% world visibility instead of full-width sheets; desktop keeps
 62%. Studio was reset to its default viewport.
 
-- Production currently completes at most one queued batch per appliance while
-  the owner is offline. It intentionally does not simulate hours of unattended
-  repeat production yet; adding capped offline production/earnings remains a
-  later idle-progression feature.
+- ~~Production currently completes at most one queued batch per appliance while
+  the owner is offline … adding capped offline production/earnings remains a
+  later idle-progression feature.~~ **CORRECTED 2026-07-21 — this shipped.**
+  `CafeOperationsService:ResumeAfterOffline` settles offline earnings on rejoin:
+  `earningSeconds = min(now - lastSeenAt, 8h)`, `effectiveMinutes =
+  earningSeconds / 60 / 20`, `earnings = netPerMinute * effectiveMinutes *
+  waiterCapacityScale`, paid through `EconomyService:AddCoins` and reported by a
+  toast. Two real gaps remain, both tracked in NEXT_ACTIONS: `capacityScale`
+  uses **Waiter only** (Barista/Cook can be at 0 and the claim still pays in
+  full), and `onPlayerRemoving` stamps `lastSeenAt` unconditionally, so a player
+  who quits before the settlement tick runs forfeits that window.
 - Pizza and cakes are not current recipes. The scheduler is data-driven, so they
   can be added later with their own oven/display requirement without changing
   the inventory architecture.

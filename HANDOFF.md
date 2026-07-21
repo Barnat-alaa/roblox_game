@@ -9,7 +9,9 @@ before touching anything._
 ## 1. What this project is
 
 A **Roblox café-management social sim**: every player owns a café on a shared
-two-row boulevard (30 plots/server), cooks dishes ahead of time on stoves,
+two-row boulevard (**10 plots/server** since 2026-07-21 — scale comes from
+Roblox spawning more servers, not bigger ones), cooks dishes ahead of time on
+stoves,
 keeps counters stocked while chibi customers queue, sit, eat and tip, grows a
 **Buzz** rating that drives customer flow, masters recipes for stars, chases
 daily goals and streak trophies, and visits neighbours' cafés.
