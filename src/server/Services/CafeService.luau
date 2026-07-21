@@ -51,7 +51,9 @@ local KITCHEN_PASS_W = 3 * Grid.CELL_SIZE
 
 -- Saturated, sunny cafe palette shared by the shell and facade.
 local CORAL = Color3.fromRGB(232, 82, 67)
-local CORAL_DARK = Color3.fromRGB(214, 63, 55)
+-- Warm plaster for every wall (interior + facade) — replaces the harsh orange
+-- the owner disliked (2026-07-19). CORAL stays for the red awning accent only.
+local WALL = Color3.fromRGB(224, 206, 176)
 local HONEY_OAK = Color3.fromRGB(212, 151, 76)
 local CREAM = Color3.fromRGB(255, 244, 216)
 local TEAL = Color3.fromRGB(48, 151, 143)
@@ -221,6 +223,8 @@ type JumpState = {
 }
 
 local jumpStates: { [Player]: JumpState } = {}
+local worldSafetyCenter: Vector3? = nil
+local worldSafetySize: Vector3? = nil
 
 local function isInsideRestaurant(position: Vector3): boolean
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
@@ -272,6 +276,35 @@ local function tickIndoorJumpLimits()
 				humanoid.JumpPower = state.jumpPower
 				humanoid:SetAttribute("CafeIndoorJumpLimited", nil)
 				state.limited = false
+			end
+		end
+	end
+end
+
+-- Invisible city walls plus a recovery watchdog keep players in the playable
+-- neighbourhood. Falling or somehow crossing a wall returns them safely to
+-- their own front door instead of killing or resetting their character.
+local function tickWorldSafety()
+	local centre = worldSafetyCenter
+	local size = worldSafetySize
+	if not centre or not size then
+		return
+	end
+	for _, player in Players:GetPlayers() do
+		local plot = plotByUser[player.UserId]
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if plot and root and root:IsA("BasePart") then
+			local outside = math.abs(root.Position.X - centre.X)
+					> size.X / 2 + World.mapSafetyMargin
+				or math.abs(root.Position.Z - centre.Z) > size.Z / 2 + World.mapSafetyMargin
+				or root.Position.Y < -18
+			if outside then
+				local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+				local standAt = (plot.origin * CFrame.new(width * World.doorCenterFrac, 4, -8)).Position
+				local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.CFrame = CFrame.lookAt(standAt, lookAt)
 			end
 		end
 	end
@@ -407,14 +440,14 @@ local function rebuildShell(plot: Plot, tier: number)
 		"WallLeft",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(0, WALL_H / 2, depth / 2),
-		CORAL,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallRight",
 		Vector3.new(1, WALL_H, depth),
 		origin * CFrame.new(width, WALL_H / 2, depth / 2),
-		CORAL,
+		WALL,
 		shell
 	)
 
@@ -425,21 +458,21 @@ local function rebuildShell(plot: Plot, tier: number)
 		"WallBack",
 		Vector3.new(gateL, WALL_H, 1),
 		origin * CFrame.new(gateL / 2, WALL_H / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(width - gateR, WALL_H, 1),
 		origin * CFrame.new(gateR + (width - gateR) / 2, WALL_H / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	makePart(
 		"WallBack",
 		Vector3.new(GATE_W, WALL_H - 6.5, 1),
 		origin * CFrame.new(width / 2, 6.5 + (WALL_H - 6.5) / 2, depth),
-		CORAL_DARK,
+		WALL,
 		shell
 	)
 	for _, fx in { 0.22, 0.78 } do
@@ -608,31 +641,33 @@ local function buildPlot(index: number, parent: Instance): Plot
 	-- (the camera only x-rays the café you are actually in).
 	model:SetAttribute("origin", origin)
 
-	-- FRONT FACADE: two wall segments + lintel around a centred door gap.
-	local gapL = width / 2 - DOOR_W / 2
-	local gapR = width / 2 + DOOR_W / 2
+	-- FRONT FACADE: two wall segments + lintel around the door gap. The door
+	-- centre sits left of middle (owner request) via World.doorCenterFrac.
+	local doorCx = width * World.doorCenterFrac
+	local gapL = doorCx - DOOR_W / 2
+	local gapR = doorCx + DOOR_W / 2
 	makePart(
 		"WallFront",
 		Vector3.new(gapL, WALL_H, 1),
 		origin * CFrame.new(gapL / 2, WALL_H / 2, 0),
-		CORAL_DARK,
+		WALL,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(width - gapR, WALL_H, 1),
 		origin * CFrame.new(gapR + (width - gapR) / 2, WALL_H / 2, 0),
-		CORAL_DARK,
+		WALL,
 		model
 	)
 	makePart(
 		"WallFront",
 		Vector3.new(DOOR_W, WALL_H - DOOR_H, 1),
-		origin * CFrame.new(width / 2, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
-		CORAL_DARK,
+		origin * CFrame.new(doorCx, DOOR_H + (WALL_H - DOOR_H) / 2, 0),
+		WALL,
 		model
 	)
-	for _, wx in { 15, width - 15 } do
+	for _, wx in { doorCx + 14, width - 12 } do
 		makeWindow(model, origin * CFrame.new(wx, 4.6, -0.55))
 	end
 
@@ -640,7 +675,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	makeDoor(
 		"F" .. index,
 		model,
-		origin * CFrame.new(width / 2, DOOR_H / 2 - 0.05, 0),
+		origin * CFrame.new(doorCx, DOOR_H / 2 - 0.05, 0),
 		DOOR_W - 0.4,
 		DOOR_H - 0.25,
 		Color3.fromRGB(112, 78, 55),
@@ -710,7 +745,7 @@ local function buildPlot(index: number, parent: Instance): Plot
 	local pad = makePart(
 		"VisitPad",
 		Vector3.new(6, 0.3, 3),
-		origin * CFrame.new(width / 2, 0.15, -2.5),
+		origin * CFrame.new(doorCx, 0.15, -2.5),
 		TEAL,
 		model,
 		Enum.Material.Fabric
@@ -1300,7 +1335,7 @@ local function teleportOnto(plot: Plot, character: Model)
 		-- Arrive on the street IN FRONT of your own café, facing the door —
 		-- the "this is my restaurant" moment (owner request).
 		local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-		local standAt = (plot.origin * CFrame.new(width / 2, 4, -8)).Position
+		local standAt = (plot.origin * CFrame.new(width * World.doorCenterFrac, 4, -8)).Position
 		local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
 		hrp.CFrame = CFrame.lookAt(standAt, lookAt)
 	end
@@ -1349,6 +1384,39 @@ local function onPlayerRemoving(player: Player)
 	end
 end
 
+-- Hang the neon "Coffee Cup" sign on the café's exterior facade, above the
+-- door, facing the street. Called from the OnReady redress (the mesh isn't
+-- loaded when the static facade first builds).
+local function placeCafeSign(plot: Plot)
+	if not AssetLibraryService then
+		return
+	end
+	local existing = plot.model:FindFirstChild("CafeSign")
+	if existing then
+		existing:Destroy()
+	end
+	local sign = AssetLibraryService:GetDecor("cafe_sign")
+	if not sign then
+		return
+	end
+	sign.Name = "CafeSign"
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	for _, d in sign:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		end
+	end
+	-- Native sign is flat (thin Y); stand it upright on the wall facing -Z.
+	sign:PivotTo(
+		plot.origin
+			* CFrame.new(width * World.doorCenterFrac, DOOR_H + 3, -0.7)
+			* CFrame.Angles(math.rad(90), 0, 0)
+	)
+	sign.Parent = plot.model
+end
+
 function CafeService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	BuildService = ServiceRegistry.get("BuildService")
@@ -1380,6 +1448,58 @@ function CafeService.Start(_self: any)
 	ground.Color = Color3.fromRGB(158, 158, 148)
 	ground.Material = Enum.Material.Concrete
 	ground.Parent = workspace
+	worldSafetyCenter = ground.Position
+	worldSafetySize = ground.Size
+
+	local boundary = Instance.new("Folder")
+	boundary.Name = "WorldBoundary"
+	boundary.Parent = workspace
+	local height = World.mapBoundaryHeight
+	local thickness = 4
+	for _, wall in
+		{
+			{
+				name = "West",
+				size = Vector3.new(thickness, height, ground.Size.Z + thickness * 2),
+				cf = CFrame.new(
+					ground.Position.X - ground.Size.X / 2,
+					height / 2 - 1,
+					ground.Position.Z
+				),
+			},
+			{
+				name = "East",
+				size = Vector3.new(thickness, height, ground.Size.Z + thickness * 2),
+				cf = CFrame.new(
+					ground.Position.X + ground.Size.X / 2,
+					height / 2 - 1,
+					ground.Position.Z
+				),
+			},
+			{
+				name = "North",
+				size = Vector3.new(ground.Size.X + thickness * 2, height, thickness),
+				cf = CFrame.new(
+					ground.Position.X,
+					height / 2 - 1,
+					ground.Position.Z - ground.Size.Z / 2
+				),
+			},
+			{
+				name = "South",
+				size = Vector3.new(ground.Size.X + thickness * 2, height, thickness),
+				cf = CFrame.new(
+					ground.Position.X,
+					height / 2 - 1,
+					ground.Position.Z + ground.Size.Z / 2
+				),
+			},
+		}
+	do
+		local part = makePart(wall.name, wall.size, wall.cf, Color3.new(), boundary)
+		part.Transparency = 1
+		part.CanCollide = true
+	end
 
 	applyLighting()
 	buildSkyBackdrop(workspace)
@@ -1398,6 +1518,10 @@ function CafeService.Start(_self: any)
 			local jumpOk, jumpErr = pcall(tickIndoorJumpLimits)
 			if not jumpOk then
 				Log.warn("Indoor jump tick failed:", jumpErr)
+			end
+			local safetyOk, safetyErr = pcall(tickWorldSafety)
+			if not safetyOk then
+				Log.warn("World safety tick failed:", safetyErr)
 			end
 		end
 	end)
@@ -1418,6 +1542,7 @@ function CafeService.Start(_self: any)
 			buildPlaza(workspace)
 			for _, plot in plots do
 				rebuildShell(plot, math.max(plot.tier, 0))
+				placeCafeSign(plot)
 			end
 		end)
 	end

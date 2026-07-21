@@ -5,6 +5,81 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-21 — kitchen layout VERIFIED in Studio; counter fills its footprint, machine sits flush
+Closes the one open item from the 2026-07-20 handoff, which had been set blind
+and never visually confirmed. Measured live in Studio against the real assets
+rather than reasoned about, since the previous pass was burned by mirrored
+left/right intuition.
+- **Left/right layout was already correct — no flip needed.** Ground truth: the
+  player enters facing local +Z, and with Up = +Y that puts their RIGHT at LOW
+  local X. Measured positions: espresso machine pivot at local X 18 (owner's
+  RIGHT ✓), front door at local X 50.4 (owner's LEFT ✓), kitchen at cells 0-7
+  (front-RIGHT corner ✓). `World.doorCenterFrac` and the seed `gridX` are now
+  commented with this result so a future pass does not "fix" it backwards.
+- **Counter now fills its 6-cell footprint** (`AssetManifest.counter.widen`
+  2.1 → 2.56). The normalised body is 9.38 studs before the multiplier and the
+  footprint is 24 studs, so 2.1 left it spanning only 19.7 — measured 24.02
+  after the change.
+- **Espresso machine no longer floats** (`DataService` seed `seed_coffee.liftY`
+  3.5 → 2.43). `liftY` is the model's BOTTOM height and the counter worktop
+  measures 2.43, so the machine had been hanging 1.07 studs in mid-air. The
+  earlier 3.5 was derived from a bounding box polluted by the StockDisplay
+  (top 5.28) rather than the worktop itself. Verified live: flush gap −0.004.
+- Together these also fix the machine hanging off the counter's right end — it
+  sat at the footprint edge (X 15.7) while the short counter only began at 18.1.
+
+### Added — 2026-07-19 — graphics haul: last greybox items, real dirt, maid, warm walls
+- **The 5 remaining greybox shop items now use real models**: Prep Station,
+  Round Table (glass), Potted Plant, Floor Lamp, Round Rug.
+- **Pivot normalization** (AssetLibraryService): furniture templates now get an
+  axis-aligned pivot at their centre, so the loaded upright pose survives
+  placement instead of inheriting a random part's rotation — this fixed the
+  floor lamp (was lying down) and the rug (was standing on edge). Flat items
+  (`flat = true`) rotate their thinnest axis vertical and scale by span.
+  Verified live: every furniture piece upright/flat and sitting on the floor,
+  no regressions to coffee machine / counter / chair / oven.
+- **Dirt is a real spill mesh** now (owner pick), not the procedural brown
+  splat, and the "DIRT! CLEAN ME" text is gone — the mesh is the signal.
+- **Pia the cleaner uses the owner's maid rig** (14466134917). Re-verified: R15
+  with 13/15 joints (only the ankles missing), which walks cleanly — so the
+  walk gate was relaxed from 15 to 13 for R15. Live movement check: 4.1
+  studs/step, no teleporting.
+- **Warm plaster walls** replace the harsh orange (interior + facade); the red
+  awning accent stays. **Neon "Coffee Cup" café sign** mounted on each café's
+  exterior facade. Coffee drinks use the new coffee-cup prop.
+- Rejected: the barista rig (4646109032 — no HumanoidRootPart/Head, 8 scripts);
+  the wallpaper asset (13010827217 — "not authorized", won't load); the food
+  mesh pack (mostly raw ingredients, poor café fit — kept the Retro pack).
+
+### Added — 2026-07-19 — active café shift loop (idle → hands-on tycoon)
+Turns unlimited automation into a finite, active-play loop where the owner is
+the fastest way to keep the café healthy. (Built on the `codex` branch; dead
+code cleaned, all gates + 51 TestEZ cases verified, runtime smoke-checked.)
+- **Finite staff shift capacity** (`Config/Operations`, `CafeOperationsService`):
+  Barista/Cook/Waiter/Cleaner each spend capacity while working and only
+  recover while the owner is in-game; hands-on work restores a little. Offline
+  automation drains capacity instead of running forever.
+- **Persistent satisfaction + cleanliness**: a compact HUD health card (SAT /
+  CLEAN / BARISTA / WAITER). Satisfaction decays while away; low cleanliness
+  cuts patience and can make arrivals reject the café outright.
+- **Visible dirt**: splats spawn on the floor (~18 s) with a "CLEAN ME" prompt;
+  the owner can scrub for satisfaction, or Pia takes it after a grace window.
+- **Angry emoji walkouts**: customers leave with a readable reason — long line,
+  no empty chair, café too dirty, or order never came — each denting Buzz +
+  satisfaction.
+- **Physical order delivery** (`OrderService` rewrite): pick an order up at the
+  kitchen pass, the plate visibly follows your hand, you can only carry one,
+  and only the matching table completes the sale ("PERFECT DELIVERY!"); wrong
+  table is corrected, not silently served.
+- **Street approach**: customers spawn on the distant sidewalk and walk in
+  along a real road network, not popping in at the door.
+- **Sealed map**: a perimeter boundary plus a fall-watchdog that returns a
+  strayed player to their own door instead of killing them; indoor jump cap.
+- **Explicit economy** (`OperationsMath`, `OperationsController`, production
+  menu): per-recipe batch time, production/min, waiter serve-capacity/min, the
+  real bottleneck, and net coins/min after ingredients. Offline runs at 20×
+  time for 1/20 earnings, shown clearly with an on-return summary.
+
 ### Added — 2026-07-19 — owner-approved graphics pack
 - Replaced HUD letter badges with approved coin, reputation, level, Buzz,
   goals, cookbook, build, shop, and pantry images from the Simulator Icon Pack;

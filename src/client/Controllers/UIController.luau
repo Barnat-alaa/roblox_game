@@ -33,6 +33,10 @@ local FRIENDLY_ERROR = {
 	wrong_appliance = "That recipe needs a different appliance.",
 	menu_full = "Your menu is full - switch one item off first.",
 	not_in_stock = "No fresh servings are ready.",
+	already_carrying = "Deliver the item in your hand before taking another.",
+	go_to_pass = "Walk to the glowing kitchen pass to pick this order up.",
+	pick_up_first = "Pick the order up from the kitchen pass first.",
+	wrong_table = "Wrong table - follow the table number on the order ticket.",
 }
 
 type ActionDefinition = {
@@ -51,6 +55,8 @@ UIController.onBuildToggle = nil :: (() -> ())?
 local profile: any = nil
 local lastLevel: number? = nil
 local currentOrderId: string? = nil
+local carriedOrderId: string? = nil
+local pendingOrders: { [string]: any } = {}
 local profileListeners: { (any) -> () } = {}
 local actions: { [string]: ActionDefinition } = {}
 local ui: { [string]: any } = {}
@@ -217,18 +223,62 @@ local function setProfile(newProfile: any)
 	end
 end
 
-local function showOrder(order: any)
-	currentOrderId = order.orderId
+local function displayOrder(order: any)
+	currentOrderId = tostring(order.orderId)
 	local recipe = Recipes[tostring(order.recipeId)]
-	ui.orderName.Text = if recipe then recipe.displayName else tostring(order.recipeId)
+	ui.orderName.Text = (tostring(order.tableLabel or "TABLE") .. "  •  ")
+		.. (if recipe then recipe.displayName else tostring(order.recipeId))
 	ui.orderTicket.Visible = true
 	ui.serve.Visible = true
+	ui.serve.Text = "PICK UP AT PASS"
 end
 
-local function clearOrder()
-	currentOrderId = nil
-	ui.orderTicket.Visible = false
-	ui.serve.Visible = false
+local function showNextOrder()
+	if carriedOrderId and pendingOrders[carriedOrderId] then
+		local carried = pendingOrders[carriedOrderId]
+		currentOrderId = carriedOrderId
+		ui.orderName.Text = "CARRY TO " .. tostring(carried.tableLabel or "THE TABLE")
+		ui.orderTicket.Visible = true
+		ui.serve.Visible = false
+		return
+	end
+	local best: any = nil
+	for _, order in pendingOrders do
+		if
+			best == nil
+			or (tonumber(order.createdAtClock) or 0) < (tonumber(best.createdAtClock) or 0)
+		then
+			best = order
+		end
+	end
+	if best then
+		displayOrder(best)
+	else
+		currentOrderId = nil
+		ui.orderTicket.Visible = false
+		ui.serve.Visible = false
+	end
+end
+
+local function showOrder(order: any)
+	if typeof(order) ~= "table" or typeof(order.orderId) ~= "string" then
+		return
+	end
+	pendingOrders[order.orderId] = order
+	showNextOrder()
+end
+
+local function clearOrder(orderId: string?)
+	if orderId then
+		pendingOrders[orderId] = nil
+		if carriedOrderId == orderId then
+			carriedOrderId = nil
+		end
+	else
+		pendingOrders = {}
+		carriedOrderId = nil
+	end
+	showNextOrder()
 end
 
 local function createStat(
@@ -587,8 +637,13 @@ function UIController.Start(_self: any)
 	Components.Corner(toast, Theme.Radius.Pill)
 	ui.toast = toast
 
-	local serve =
-		Components.Button(gui, "SERVE", Theme.Colors.Mint, UDim2.fromOffset(170, 50), "GO")
+	local serve = Components.Button(
+		gui,
+		"PICK UP AT PASS",
+		Theme.Colors.Mint,
+		UDim2.fromOffset(170, 50),
+		"GO"
+	)
 	serve.Name = "ServeAction"
 	serve.AnchorPoint = Vector2.new(0.5, 1)
 	serve.Position = UDim2.new(0.5, 0, 1, -14)
@@ -658,8 +713,21 @@ function UIController.Start(_self: any)
 			return
 		end
 		if msg.kind == "served" then
-			clearOrder()
+			clearOrder(if typeof(msg.orderId) == "string" then msg.orderId else nil)
 			UIController.toast("Sale complete  +$" .. tostring(msg.coins))
+		elseif msg.kind == "order_picked_up" then
+			carriedOrderId = tostring(msg.orderId)
+			showNextOrder()
+			UIController.toast("Order in hand - deliver it to " .. tostring(msg.tableLabel))
+		elseif msg.kind == "offline_summary" then
+			UIController.toast(
+				"While away: +$"
+					.. tostring(msg.earnings)
+					.. " at 1/"
+					.. tostring(msg.multiplier)
+					.. " speed  •  Satisfaction -"
+					.. tostring(msg.satisfactionLost)
+			)
 		elseif msg.kind == "recipe_unlocked" then
 			UIController.toast("New recipe unlocked: " .. tostring(msg.recipe))
 		elseif msg.kind == "mastery_up" then
@@ -673,10 +741,10 @@ function UIController.Start(_self: any)
 		elseif msg.kind == "purchased" then
 			UIController.toast("Purchased - open Build to place it")
 		elseif msg.kind == "order_cancelled" then
-			clearOrder()
+			clearOrder(if typeof(msg.orderId) == "string" then msg.orderId else nil)
 			UIController.toast("The customer left")
 		elseif msg.kind == "order_fed_from_stock" then
-			clearOrder()
+			clearOrder(if typeof(msg.orderId) == "string" then msg.orderId else nil)
 			UIController.toast("The waiter served from fresh stock")
 		elseif msg.kind == "visitor" then
 			UIController.toast(tostring(msg.name) .. " is visiting your cafe")

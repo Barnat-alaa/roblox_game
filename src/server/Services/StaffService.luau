@@ -23,6 +23,7 @@ local Recipes = require(Shared.Config.Recipes)
 local World = require(Shared.Config.World)
 local StaffDefinitions = require(Shared.Config.Staff)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -39,6 +40,7 @@ local OrderService: any
 local CafeService: any
 local KitchenService: any
 local AssetLibraryService: any
+local CafeOperationsService: any
 
 local CHECK_INTERVAL = 5
 local STAFF_WALK_SPEED = 11
@@ -590,12 +592,15 @@ function StaffService.NotifyMess(_self: any, player: Player, mess: Model)
 		messQueues[player.UserId] = queue
 	end
 	table.insert(queue, mess)
-	-- Failsafe despawn so a missing cleaner never litters forever.
-	task.delay(180, function()
-		if mess.Parent ~= nil then
-			mess:Destroy()
-		end
-	end)
+	-- Empty dishes eventually despawn; floor dirt deliberately remains visible
+	-- until the owner or a cleaner actually deals with it.
+	if mess:GetAttribute("CafeDirt") ~= true then
+		task.delay(180, function()
+			if mess.Parent ~= nil then
+				mess:Destroy()
+			end
+		end)
+	end
 end
 
 -- Pia collects the empty plate and carries it off to be washed (+1 Buzz).
@@ -610,28 +615,54 @@ local function runCleaner(player: Player)
 	if not mess or mess.Parent == nil then
 		return
 	end
+	if
+		not CafeOperationsService:TryUseCapacity(
+			player,
+			"Cleaner",
+			Operations.cleanerCapacityPerMess
+		)
+	then
+		cleaner.bubble.Text = "SHIFT EMPTY - OWNER CLEAN"
+		table.insert(queue, 1, mess)
+		return
+	end
 	if not claimStaff(cleaner, 0.1) then
 		table.insert(queue, 1, mess)
 		return
 	end
 	task.spawn(function()
 		cleaner.bubble.Text = "🧹 On it!"
-		staffWalk(cleaner, mess:GetPivot().Position)
+		local messPos = mess:GetPivot().Position
+		staffWalk(cleaner, messPos + Vector3.new(0, 0, 1.6))
 		if mess.Parent ~= nil then
-			Fx.floatText(
-				mess:GetPivot().Position + Vector3.new(0, 1.2, 0),
-				"+1 🔥",
-				Color3.fromRGB(255, 180, 120)
-			)
+			Fx.floatText(messPos + Vector3.new(0, 1.2, 0), "+1 🔥", Color3.fromRGB(255, 180, 120))
 			KitchenService:AddBuzz(player, 1)
-			-- Carry the dirty plate back to the kitchen and wash it.
-			local release = carryPlate(cleaner, mess)
-			staffWalk(cleaner, cleaner.home.Position)
-			release()
-			cleaner.bubble.Text = "🧼 Washing…"
-			task.wait(1.4)
-			if mess.Parent ~= nil then
-				mess:Destroy()
+			if mess:GetAttribute("CafeDirt") == true then
+				-- SCRUB the spill in place with a broom — no carrying it around
+				-- (owner request). Hold position while the broom sweeps.
+				local root = cleaner.root
+				if root then
+					root.Anchored = true
+				end
+				Fx.scrub(messPos, 1.5)
+				task.wait(1.5)
+				if root and root.Parent ~= nil then
+					root.Anchored = false
+				end
+				if mess.Parent ~= nil then
+					CafeOperationsService:CleanMess(player, mess, false)
+				end
+				staffWalk(cleaner, cleaner.home.Position)
+			else
+				-- A dirty PLATE still gets carried back to the kitchen and washed.
+				local release = carryPlate(cleaner, mess)
+				staffWalk(cleaner, cleaner.home.Position)
+				release()
+				cleaner.bubble.Text = "🧼 Washing…"
+				task.wait(1.4)
+				if mess.Parent ~= nil then
+					mess:Destroy()
+				end
 			end
 		else
 			staffWalk(cleaner, cleaner.home.Position)
@@ -727,6 +758,7 @@ function StaffService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function StaffService.Start(_self: any)

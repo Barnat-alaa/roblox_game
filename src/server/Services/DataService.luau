@@ -20,11 +20,12 @@ local Types = require(Shared.Types)
 local Economy = require(Shared.Config.Economy)
 local Recipes = require(Shared.Config.Recipes)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
 local Log = require(Shared.Utilities.Log)
 local Remotes = require(Shared.Network.Remotes)
 
-local SCHEMA_VERSION = 2
+local SCHEMA_VERSION = 3
 
 -- Environment prefix keeps DEV / STAGING / PROD data strictly separate.
 -- TODO: drive this from a per-place attribute during the publish step.
@@ -70,6 +71,23 @@ local function defaultKitchen(): Types.KitchenState
 	return kitchen
 end
 
+local function defaultOperations(): Types.OperationsState
+	local now = os.time()
+	return {
+		satisfaction = Operations.startingSatisfaction,
+		cleanliness = Operations.startingCleanliness,
+		staffCapacity = {
+			Barista = Operations.startingStaffCapacity,
+			Cook = Operations.startingStaffCapacity,
+			Waiter = Operations.startingStaffCapacity,
+			Cleaner = Operations.startingStaffCapacity,
+		},
+		lastSeenAt = now,
+		lastDirtAt = now,
+		lastOffline = nil,
+	}
+end
+
 local function defaultProfile(): Types.PlayerData
 	return {
 		schemaVersion = SCHEMA_VERSION,
@@ -89,25 +107,35 @@ local function defaultProfile(): Types.PlayerData
 		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {
 			{
-				instanceId = "seed_coffee",
-				catalogId = "coffee_machine",
-				gridX = 2,
+				-- Wide service counter (5 cells) across the kitchen front.
+				instanceId = "seed_counter",
+				catalogId = "counter",
+				gridX = 4,
 				gridY = 3,
 				floor = 0,
 				rotation = 0,
 			},
 			{
-				instanceId = "seed_counter",
-				catalogId = "counter",
-				gridX = 5,
+				-- Espresso machine sits ON the counter toward the owner-facing
+				-- RIGHT end (low local X), rotated to face the room. Verified in
+				-- Studio: facing into the café the player's right IS low local X,
+				-- so gridX = 4 (local X 18) is correct — do not "flip" it.
+				-- liftY is the machine's BOTTOM height above the floor; the
+				-- counter's worktop measures 2.43 studs, so 2.43 rests it flush.
+				-- (At the old 3.5 it floated 1.07 studs above the surface.)
+				instanceId = "seed_coffee",
+				catalogId = "coffee_machine",
+				gridX = 4,
 				gridY = 3,
 				floor = 0,
-				rotation = 0,
+				rotation = 1,
+				liftY = 2.43,
 			},
 		},
 		unlockedRecipes = { espresso = true, tea = true },
 		recipeMastery = {},
 		staff = starterStaff(),
+		operations = defaultOperations(),
 		settings = { musicVolume = 0.6, sfxVolume = 0.8, reducedEffects = false },
 		stats = {
 			customersServed = 0,
@@ -161,6 +189,35 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 	kitchen.nextLotId = math.max(0, tonumber(kitchen.nextLotId) or 0)
 	kitchen.nextReservationId = math.max(0, tonumber(kitchen.nextReservationId) or 0)
 	kitchen.nextJobId = math.max(0, tonumber(kitchen.nextJobId) or 0)
+
+	local operations = (data :: any).operations
+	if typeof(operations) ~= "table" then
+		operations = defaultOperations()
+		local mutableData: any = data
+		mutableData.operations = operations
+	end
+	operations.satisfaction = math.clamp(
+		tonumber(operations.satisfaction) or Operations.startingSatisfaction,
+		0,
+		Operations.maxSatisfaction
+	)
+	operations.cleanliness =
+		math.clamp(tonumber(operations.cleanliness) or Operations.startingCleanliness, 0, 100)
+	operations.staffCapacity = if typeof(operations.staffCapacity) == "table"
+		then operations.staffCapacity
+		else {}
+	for _, role in { "Barista", "Cook", "Waiter", "Cleaner" } do
+		operations.staffCapacity[role] = math.clamp(
+			tonumber(operations.staffCapacity[role]) or Operations.startingStaffCapacity,
+			0,
+			Operations.staffCapacityMax
+		)
+	end
+	operations.lastSeenAt = tonumber(operations.lastSeenAt) or now
+	operations.lastDirtAt = tonumber(operations.lastDirtAt) or now
+	if typeof(operations.lastOffline) ~= "table" then
+		operations.lastOffline = nil
+	end
 
 	-- Schema 1 stored only a number. Convert it into a fresh timestamped lot so
 	-- existing players keep every serving when the perishable system arrives.
@@ -300,6 +357,9 @@ local function onPlayerRemoving(player: Player)
 	local data = profiles[player.UserId]
 	if data and typeof(data.kitchen) == "table" then
 		data.kitchen.lastActiveAt = os.time()
+	end
+	if data and typeof((data :: any).operations) == "table" then
+		(data :: any).operations.lastSeenAt = os.time()
 	end
 	saveAsync(player.UserId)
 	profiles[player.UserId] = nil

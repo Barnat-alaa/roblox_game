@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage.Shared
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Mastery = require(Shared.Utilities.Mastery)
@@ -34,6 +35,7 @@ local AnalyticsService: any
 local GoalService: any
 local AssetLibraryService: any
 local StaffService: any
+local CafeOperationsService: any
 
 local nextAutomaticServeAt: { [number]: number } = {}
 local setCookVisuals: (Player, string, string, string?) -> ()
@@ -466,10 +468,12 @@ refreshCounterDisplay = function(player: Player)
 	if topPart then
 		topCf = topPart.CFrame * CFrame.new(0, topPart.Size.Y / 2, 0)
 	else
-		local counterBody = counter:FindFirstChild("Counter")
-		local support = if counterBody and counterBody:IsA("Model") then counterBody else counter
-		local pivot, size = support:GetBoundingBox()
-		topCf = pivot * CFrame.new(0, size.Y / 2, 0)
+		-- Imported counter: its bounding box includes the tall cash register,
+		-- so the mugs floated. Place them on a fixed WORKTOP height above the
+		-- floor instead, keeping the counter's yaw.
+		local pivot, size = counter:GetBoundingBox()
+		local floorY = pivot.Position.Y - size.Y / 2
+		topCf = pivot * CFrame.new(0, (floorY + 3.3) - pivot.Position.Y, 0)
 	end
 
 	local display = Instance.new("Folder")
@@ -545,7 +549,8 @@ local function grantConsumption(
 	player: Player,
 	data: Types.PlayerData,
 	kitchen: Types.KitchenState,
-	recipeId: string
+	recipeId: string,
+	manual: boolean
 ): number
 	local recipe = Recipes[recipeId]
 	local payout = KitchenService:servingPayout(recipe)
@@ -562,6 +567,9 @@ local function grantConsumption(
 		GoalService:Bump(player, "serve_customers", 1)
 	end
 	refreshCounterDisplay(player)
+	if CafeOperationsService then
+		CafeOperationsService:OnServed(player, manual)
+	end
 	return payout
 end
 
@@ -578,7 +586,12 @@ local function claimAutomaticServe(
 		return false
 	end
 	local speed = StaffService:GetRoleSpeed(data, "Waiter")
-	nextAutomaticServeAt[userId] = os.clock() + recipe.serveTime / math.max(0.1, speed)
+	local effectiveTime = recipe.serveTime / math.max(0.1, speed)
+	local capacityCost = effectiveTime / 60 * Operations.serviceCapacityPerWorkMinute
+	if not CafeOperationsService:TryUseCapacity(player, "Waiter", capacityCost) then
+		return false
+	end
+	nextAutomaticServeAt[userId] = os.clock() + effectiveTime
 	return true
 end
 
@@ -604,7 +617,41 @@ local function consumeRecipe(
 		return nil
 	end
 	syncStock(kitchen, now)
-	return grantConsumption(player, data, kitchen, recipeId)
+	return grantConsumption(player, data, kitchen, recipeId, manualServe)
+end
+
+-- Physical owner delivery is a two-step transaction. Pickup removes one
+-- serving from FIFO stock but grants nothing; only the correct table completes
+-- the sale. The carried order is server-owned by OrderService.
+function KitchenService.TakeServing(_self: any, player: Player, recipeId: string): boolean
+	local data = DataService:GetProfile(player)
+	local recipe = Recipes[recipeId]
+	if not data or not recipe then
+		return false
+	end
+	local kitchen = kitchenOf(data)
+	local now = os.time()
+	local _, available = InventoryMath.count(kitchen, recipeId, now)
+	if available <= 0 then
+		return false
+	end
+	local reservationId =
+		InventoryMath.reserve(kitchen, recipeId, 1, now, Kitchen.reservationSeconds)
+	if not reservationId or InventoryMath.commit(kitchen, reservationId, now) ~= recipeId then
+		return false
+	end
+	syncStock(kitchen, now)
+	DataService:Push(player)
+	refreshCounterDisplay(player)
+	return true
+end
+
+function KitchenService.CompleteTakenServing(_self: any, player: Player, recipeId: string): number?
+	local data = DataService:GetProfile(player)
+	if not data or not Recipes[recipeId] then
+		return nil
+	end
+	return grantConsumption(player, data, kitchenOf(data), recipeId, true)
 end
 
 -- Try to feed one customer from counter stock. Returns recipeId + payout,
@@ -806,6 +853,7 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 		end
 	end
 	EconomyService:AddExperience(player, Kitchen.xpPerCollect)
+	CafeOperationsService:RestoreFromManual(player, recipe.staffRole)
 	data.stats.recipesCooked += 1
 	DataService:Push(player)
 	setCookVisuals(player, instanceId :: string, "idle", nil)
@@ -881,6 +929,7 @@ function KitchenService.Init(_self: any)
 	GoalService = ServiceRegistry.get("GoalService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 	StaffService = ServiceRegistry.get("StaffService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function KitchenService.Start(_self: any)

@@ -37,8 +37,17 @@ local World = {
 	-- Keep the decorative pickets friendly-sized, but put a real boundary
 	-- behind them so the private garden cannot be used to jump out of the plot.
 	gardenBoundaryHeight = 14,
+	mapBoundaryHeight = 42,
+	mapSafetyMargin = 6,
 	doorWidth = 6, -- front door gap (wide enough for NPC pathfinding)
 	doorHeight = 7,
+	-- Front-door centre as a fraction of plot width. VERIFIED in Studio
+	-- (2026-07-21): the player enters facing local +Z, and with Up=+Y that puts
+	-- their RIGHT at LOW local X and their LEFT at HIGH local X. So 0.7 (local
+	-- X 50.4 of 72) is the owner-facing "door more to the LEFT" they asked for,
+	-- and the kitchen at cells 0-7 is correctly the front-RIGHT corner.
+	-- Do NOT flip this to 0.3 — that would move the door to the right.
+	doorCenterFrac = 0.7,
 	gateWidth = 4, -- garden gate gap in the back wall
 }
 

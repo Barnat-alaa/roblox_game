@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage.Shared
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local Mastery = require(Shared.Utilities.Mastery)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
@@ -26,6 +27,7 @@ local EconomyService: any
 local KitchenService: any
 local StaffService: any
 local AnalyticsService: any
+local CafeOperationsService: any
 
 local resumed: { [number]: boolean } = {}
 local settingsLimiter =
@@ -99,12 +101,27 @@ local function startJob(
 	local duration =
 		Mastery.cookTime(recipe.productionTime, masteryLevel, Kitchen.masteryTimeReductionPerStar)
 	duration /= math.max(0.1, StaffService:GetRoleSpeed(data, recipe.staffRole))
+	local capacityCost = duration / 60 * Operations.productionCapacityPerWorkMinute
+	if not CafeOperationsService:CanUseCapacity(player, recipe.staffRole, capacityCost) then
+		KitchenService:UpdateApplianceVisual(
+			player,
+			instanceId,
+			"resting",
+			recipe.staffRole .. " shift empty - owner needed"
+		)
+		return false
+	end
 	local cost = Mastery.batchCost(
 		recipe.ingredientCost * Kitchen.batchCostMultiplier,
 		masteryLevel,
 		Kitchen.masteryCostReductionPerStar
 	)
 	if not EconomyService:TrySpendCoins(player, cost) then
+		return false
+	end
+	if not CafeOperationsService:TryUseCapacity(player, recipe.staffRole, capacityCost) then
+		-- Capacity is server-owned and this path is single-threaded per appliance;
+		-- this is a defensive guard for future parallel schedulers.
 		return false
 	end
 	local quantity =
@@ -188,6 +205,7 @@ local function tickPlayer(player: Player)
 	end
 	local now = os.time()
 	if not resumed[player.UserId] then
+		CafeOperationsService:ResumeAfterOffline(player, now)
 		KitchenService:ResumeAfterOffline(data, now)
 		resumed[player.UserId] = true
 	end
@@ -268,6 +286,7 @@ function ProductionService.Init(_self: any)
 	KitchenService = ServiceRegistry.get("KitchenService")
 	StaffService = ServiceRegistry.get("StaffService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function ProductionService.Start(_self: any)

@@ -105,17 +105,23 @@ end
 -- Props: anchored, scaled, floor-friendly templates. Scale so the longest
 -- horizontal axis matches `fit` (small tabletop items).
 local function normalisePropModel(model: Model, fit: number): Model?
+	local hasPart = false
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			d.CanCollide = false
 			d.CanQuery = false
+			hasPart = true
 		end
 	end
-	if not ensurePrimary(model) then
+	if not hasPart then
 		model:Destroy()
 		return nil
 	end
+	-- Upright, axis-aligned pivot at the centre so props (mugs, plates, food)
+	-- sit flat and unrotated instead of inheriting a random part's tilt.
+	model.PrimaryPart = nil
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
 	local _, size = model:GetBoundingBox()
 	local longest = math.max(size.X, size.Z, 0.01)
 	local scale = fit / longest
@@ -126,6 +132,7 @@ local function normalisePropModel(model: Model, fit: number): Model?
 			model:ScaleTo(model:GetScale() * scale)
 		end)
 	end
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
 	return model
 end
 
@@ -178,7 +185,9 @@ local function buildFurnitureTemplate(
 	assetId: number,
 	height: number,
 	maxSpan: number,
-	yaw: number?
+	yaw: number?,
+	flat: boolean?,
+	widen: number?
 ): Model?
 	local container = loadAndSanitise(assetId)
 	if not container then
@@ -192,28 +201,84 @@ local function buildFurnitureTemplate(
 			d.CanQuery = false
 		end
 	end
-	if not ensurePrimary(model) then
+	local hasPart = false
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			hasPart = true
+			break
+		end
+	end
+	if not hasPart then
 		model:Destroy()
 		return nil
 	end
-	local _, size = model:GetBoundingBox()
-	if size.Y > 0.01 then
-		local scale = height / size.Y
-		local span = math.max(size.X, size.Z) * scale
-		if span > maxSpan then
-			scale = maxSpan / math.max(size.X, size.Z)
+	-- Normalize the pivot to an axis-aligned centre so the model's LOADED
+	-- (authored, upright) pose survives placement — instead of inheriting a
+	-- random part's rotation (which left the floor lamp lying down and the rug
+	-- standing on edge). With PrimaryPart cleared, GetPivot()==WorldPivot and
+	-- GetBoundingBox() reports true world extents.
+	model.PrimaryPart = nil
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+
+	if flat then
+		-- Lay the thinnest WORLD axis vertical, then scale by span (height would
+		-- blow up a paper-thin mesh); some rugs import edge-on.
+		local _, s = model:GetBoundingBox()
+		if s.X <= s.Y and s.X <= s.Z then
+			model:PivotTo(model:GetPivot() * CFrame.Angles(0, 0, math.rad(90)))
+		elseif s.Z <= s.Y and s.Z <= s.X then
+			model:PivotTo(model:GetPivot() * CFrame.Angles(math.rad(90), 0, 0))
 		end
-		if scale > 0 and scale == scale then
+		model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+		local _, s2 = model:GetBoundingBox()
+		local widest = math.max(s2.X, s2.Z)
+		if widest > 0.01 then
 			pcall(function()
-				-- Multiply the current scale (imported models can carry a
-				-- non-1 baked scale; ScaleTo is absolute, not relative).
-				model:ScaleTo(model:GetScale() * scale)
+				model:ScaleTo(model:GetScale() * (maxSpan / widest))
 			end)
 		end
+	else
+		local _, size = model:GetBoundingBox()
+		if size.Y > 0.01 then
+			local scale = height / size.Y
+			local span = math.max(size.X, size.Z) * scale
+			if span > maxSpan then
+				scale = maxSpan / math.max(size.X, size.Z)
+			end
+			if scale > 0 and scale == scale then
+				pcall(function()
+					-- Multiply the current scale (imported models can carry a
+					-- non-1 baked scale; ScaleTo is absolute, not relative).
+					model:ScaleTo(model:GetScale() * scale)
+				end)
+			end
+		end
 	end
-	-- Keep the import correction as placement metadata. Baking it into the
-	-- model's world pivot is ineffective because SpawnFurniture later replaces
-	-- that pivot; applying it in the final placement CFrame preserves it.
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	-- Non-uniform WIDEN: stretch the model's longer horizontal axis (imported
+	-- models only scale uniformly, so a "wider counter" would also get taller —
+	-- this keeps the height). Parts here are axis-aligned after normalisation.
+	if widen and widen ~= 1 then
+		local cf, size = model:GetBoundingBox()
+		local centre = cf.Position
+		local stretchZ = size.Z >= size.X
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local rel = d.Position - centre
+				if stretchZ then
+					d.Size = Vector3.new(d.Size.X, d.Size.Y, d.Size.Z * widen)
+					d.Position = centre + Vector3.new(rel.X, rel.Y, rel.Z * widen)
+				else
+					d.Size = Vector3.new(d.Size.X * widen, d.Size.Y, d.Size.Z)
+					d.Position = centre + Vector3.new(rel.X * widen, rel.Y, rel.Z)
+				end
+			end
+		end
+		model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	end
+	-- Re-centre the pivot after scaling (ScaleTo can shift the box).
+	-- Facing correction applied at placement time (SpawnFurniture) so the grid
+	-- rotation and this offset compose.
 	if yaw and yaw ~= 0 then
 		model:SetAttribute("assetYaw", yaw)
 	end
@@ -338,14 +403,16 @@ local function buildRigTemplate(assetId: number): Model?
 	end
 	-- Walk-capability gate: an INCOMPLETE Motor6D skeleton walks wrong (the
 	-- 5/6-joint barista kit limped and hopped — live-verified 2026-07-17).
-	-- Full skeleton required: R6 = 6 joints, R15 = 15.
+	-- R6 needs its full 6; R15 needs 13 — the hips/knees/shoulders/elbows that
+	-- drive the walk cycle. Missing only the two ANKLES (13/15) still walks
+	-- fine (feet stay flat), so the maid rig at 13 is accepted (2026-07-19).
 	local motors = 0
 	for _, d in rig:GetDescendants() do
 		if d:IsA("Motor6D") then
 			motors += 1
 		end
 	end
-	local required = if humanoid.RigType == Enum.HumanoidRigType.R15 then 15 else 6
+	local required = if humanoid.RigType == Enum.HumanoidRigType.R15 then 13 else 6
 	if motors < required then
 		Log.warn(
 			string.format(
@@ -404,6 +471,11 @@ function AssetLibraryService.GetStaff(_self: any, role: string): Model?
 	return cloneOf("staff:" .. role)
 end
 
+-- Single-instance feature decor (e.g. the dirt spill mesh).
+function AssetLibraryService.GetDecor(_self: any, key: string): Model?
+	return cloneOf("decor:" .. key)
+end
+
 function AssetLibraryService.GetCustomerRig(_self: any): Model?
 	if #customerRigKeys == 0 then
 		return nil
@@ -452,7 +524,14 @@ function AssetLibraryService.Start(_self: any)
 		end
 
 		for catalogId, entry in AssetManifest.furniture do
-			local t = buildFurnitureTemplate(entry.assetId, entry.height, entry.maxSpan, entry.yaw)
+			local t = buildFurnitureTemplate(
+				entry.assetId,
+				entry.height,
+				entry.maxSpan,
+				entry.yaw,
+				entry.flat,
+				entry.widen
+			)
 			if t and entry.liftY then
 				t:SetAttribute("liftY", entry.liftY)
 			end
@@ -465,6 +544,11 @@ function AssetLibraryService.Start(_self: any)
 		for category, entry in AssetManifest.props do
 			local t = buildPropTemplate(entry.assetId, entry.fit)
 			cache("prop:" .. category, t)
+			tally(t ~= nil)
+		end
+		for key, entry in AssetManifest.decor do
+			local t = buildPropTemplate(entry.assetId, entry.fit)
+			cache("decor:" .. key, t)
 			tally(t ~= nil)
 		end
 		local retroEntry = AssetManifest.retroPropPack

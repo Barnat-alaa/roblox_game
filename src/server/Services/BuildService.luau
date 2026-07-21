@@ -387,8 +387,10 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 		end
 		local _, size = template:GetBoundingBox()
 		local floorY = cf.Y - def.height / 2
-		-- Wall art / clocks / hanging lamps mount above the floor (liftY).
-		local lift = tonumber(template:GetAttribute("liftY")) or 0
+		-- Wall art / clocks / hanging lamps mount above the floor (template
+		-- liftY); a per-instance liftY (e.g. the seed espresso machine sitting
+		-- ON the counter) stacks on top of that.
+		local lift = (tonumber(template:GetAttribute("liftY")) or 0) + (tonumber(placed.liftY) or 0)
 		local assetYaw = tonumber(template:GetAttribute("assetYaw")) or 0
 		local pos = Vector3.new(cf.Position.X, floorY + lift + size.Y / 2, cf.Position.Z)
 		template:PivotTo(

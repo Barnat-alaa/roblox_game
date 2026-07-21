@@ -17,10 +17,10 @@ local Customers = require(Shared.Config.Customers)
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
 local World = require(Shared.Config.World)
 local Grid = require(Shared.Utilities.Grid)
 local RewardMath = require(Shared.Utilities.RewardMath)
-local Remotes = require(Shared.Network.Remotes)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -40,6 +40,7 @@ local EconomyService: any
 local StaffService: any
 local GoalService: any
 local AssetLibraryService: any
+local CafeOperationsService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -158,9 +159,16 @@ type ActiveCustomer = {
 	orderId: string?,
 	served: boolean,
 	leaving: boolean,
+	seatCf: CFrame?,
+	seatId: string?,
+	tableLabel: string?,
+	resolvedPay: number?,
+	resolvedManual: boolean?,
 }
 
 local queues: { [number]: { ActiveCustomer } } = {}
+local customersByOrder: { [string]: ActiveCustomer } = {}
+local allCustomers: { [ActiveCustomer]: boolean } = {}
 local rng = Random.new()
 local customersFolder: Folder
 
@@ -354,8 +362,8 @@ local function clearMood(cust: ActiveCustomer)
 end
 
 -- Angry walkout drama: the Buzz loss is something you SEE, not just a number.
-local function stormOut(cust: ActiveCustomer, buzzDelta: number)
-	cust.bubble.Text = "😠 Too slow…"
+local function stormOut(cust: ActiveCustomer, buzzDelta: number, reason: string?)
+	cust.bubble.Text = reason or "😠 Too slow…"
 	clearMood(cust)
 	cust.humanoid.WalkSpeed = WALK_SPEED + 5
 	Fx.floatText(
@@ -623,19 +631,23 @@ end
 local occupiedSeats: { [number]: { [string]: boolean } } = {}
 
 -- Pick a free placed chair; returns its world CFrame + instanceId.
-local function claimSeat(player: Player): (CFrame?, string?)
+local function claimSeat(player: Player): (CFrame?, string?, string?)
 	local data = DataService:GetProfile(player)
 	local origin = CafeService:GetPlotOrigin(player)
 	if not data or not origin then
-		return nil, nil
+		return nil, nil, nil
 	end
 	local taken = occupiedSeats[player.UserId]
 	if not taken then
 		taken = {}
 		occupiedSeats[player.UserId] = taken
 	end
+	local seatNumber = 0
 	for _, placed in data.placedFurniture do
 		local def = Furniture[placed.catalogId]
+		if def and def.seatCount > 0 then
+			seatNumber += 1
+		end
 		local w, d = 0, 0
 		if def then
 			w, d = Grid.footprintSize(def.width, def.depth, placed.rotation)
@@ -654,10 +666,10 @@ local function claimSeat(player: Player): (CFrame?, string?)
 				placed.rotation,
 				def.height
 			)
-			return cf, placed.instanceId
+			return cf, placed.instanceId, "TABLE " .. tostring(seatNumber)
 		end
 	end
-	return nil, nil
+	return nil, nil, nil
 end
 
 local function releaseSeat(player: Player, seatId: string?)
@@ -732,8 +744,7 @@ local function dropTip(player: Player, seatCf: CFrame, amount: number)
 	end)
 end
 
--- The full dining moment: leave the queue (line advances!), take a chair if
--- one is free, eat visibly, maybe leave a tip, then head out happy.
+-- The full dining moment after the correct table receives its dish.
 local function eatMeal(
 	player: Player,
 	cust: ActiveCustomer,
@@ -749,9 +760,11 @@ local function eatMeal(
 		)
 	end
 
-	local seatCf, seatId = claimSeat(player)
+	local seatCf, seatId = cust.seatCf, cust.seatId
 	if seatCf and not cust.leaving and cust.root.Parent ~= nil then
-		walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
+		if not cust.root.Anchored then
+			walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
+		end
 		if not cust.leaving and cust.root.Parent ~= nil then
 			-- Sit: lower onto the seat, face the chair's way, and lock in.
 			-- setSeated stops the walk cycle (anchored roots never fire
@@ -766,7 +779,7 @@ local function eatMeal(
 			-- S2 service theater: barista/cook prepares the dish (icon bubble),
 			-- the waiter carries the plate over and sets it on the table.
 			local plate: Model?, food: Instance?
-			if StaffService and StaffService.DeliverMeal then
+			if not cust.resolvedManual and StaffService and StaffService.DeliverMeal then
 				plate, food = StaffService:DeliverMeal(player, recipeId, seatCf)
 			end
 			if not plate then
@@ -903,6 +916,8 @@ local function eatMeal(
 		task.wait(2.2)
 	end
 	releaseSeat(player, seatId)
+	cust.seatCf = nil
+	cust.seatId = nil
 
 	if cust.root.Parent ~= nil then
 		cust.bubble.Text = if announcedPay ~= nil
@@ -918,29 +933,45 @@ end
 local function depart(cust: ActiveCustomer, streetPos: Vector3)
 	removeFromQueue(cust)
 	if cust.root.Parent ~= nil and not cust.leaving then
+		cust.root.Anchored = false
+		if cust.anim then
+			cust.anim.setSeated(false)
+		end
 		walkTo(cust, streetPos)
 	end
 	cust.model:Destroy()
 end
 
-local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
+-- Active table-service visit. Customers now enter from distant sidewalk
+-- points, claim a numbered seat, order there, and wait for either the finite
+-- waiter shift or the owner's physical pass-to-table delivery.
+local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local streetPos = (origin * CFrame.new(width / 2 + rng:NextNumber(-10, 10), 2, -14)).Position
+	local side = if rng:NextNumber() < 0.5 then -1 else 1
+	local doorX = width * World.doorCenterFrac
+	local doorStreetPos = (origin * CFrame.new(doorX, 2, -14)).Position
+	local streetStart = (origin * CFrame.new(doorX + side * rng:NextNumber(50, 95), 2, -14)).Position
+	local streetExit = (origin * CFrame.new(doorX - side * rng:NextNumber(55, 105), 2, -14)).Position
+	local streetLength = (World.plotsPerRow - 1) * (width + World.plotGap) + width
+	streetStart = Vector3.new(math.clamp(streetStart.X, -30, streetLength + 30), 2, streetStart.Z)
+	streetExit = Vector3.new(math.clamp(streetExit.X, -30, streetLength + 30), 2, streetExit.Z)
 
-	cust.model:PivotTo(CFrame.lookAt(streetPos, slotPosition(origin, 1)))
+	cust.model:PivotTo(CFrame.lookAt(streetStart, doorStreetPos))
 	cust.model.Parent = customersFolder
 	NpcNav.assignNpcGroup(cust.model)
 	pcall(function()
 		cust.root:SetNetworkOwner(nil)
 	end)
 	cust.anim = NpcAnimator.setup(cust.humanoid)
-	cust.bubble.Text = "…"
-
-	-- The feelings layer: mood face + patience bar for the whole visit, and a
-	-- little moment when a regular walks back in.
+	cust.bubble.Text = "Walking to café…"
 	local moodHead = cust.model:FindFirstChild("Head")
 	if moodHead and moodHead:IsA("BasePart") then
 		cust.mood = attachMood(moodHead)
+	end
+	walkTo(cust, doorStreetPos)
+	if cust.leaving or cust.root.Parent == nil then
+		cust.model:Destroy()
+		return
 	end
 	if cust.regular then
 		Fx.floatText(
@@ -950,7 +981,6 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 		)
 	end
 
-	-- Queue phase: walk to my slot; step forward whenever the line advances.
 	local lastSlot = -1
 	while not cust.leaving do
 		local slot = myIndex(cust)
@@ -959,167 +989,152 @@ local function runVisit(player: Player, cust: ActiveCustomer, origin: CFrame)
 			return
 		end
 		if slot == 1 then
-			break -- my turn at the window
+			break
 		end
 		if slot ~= lastSlot then
 			lastSlot = slot
-			cust.bubble.Text = "⏳"
+			cust.bubble.Text = "⏳ Waiting in line"
 			walkTo(cust, slotPosition(origin, slot))
 		end
 		setMood(cust, 1 - (os.clock() - cust.spawnClock) / LINE_PATIENCE_SECONDS)
 		if os.clock() - cust.spawnClock > LINE_PATIENCE_SECONDS then
-			-- Gave up in the LINE: same visible Buzz dent as a window walkout.
-			stormOut(cust, Kitchen.buzzPerWalkout)
+			stormOut(cust, Kitchen.buzzPerWalkout, "😡 THIS LINE IS TOO LONG!")
 			KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
-			task.wait(1)
-			depart(cust, streetPos)
+			CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionWalkoutLoss)
+			task.wait(1.2)
+			depart(cust, streetExit)
 			return
 		end
 		task.wait(0.3)
 	end
 	if cust.leaving then
-		depart(cust, streetPos)
+		depart(cust, streetExit)
 		return
 	end
 
-	-- Front of the line: step to the window and order.
-	cust.bubble.Text = "…"
 	walkTo(cust, slotPosition(origin, 1))
-	if cust.leaving then
-		depart(cust, streetPos)
+	local cleanliness = CafeOperationsService:GetCleanliness(player)
+	if cleanliness < Operations.dirtyRejectThreshold then
+		stormOut(cust, Kitchen.buzzPerWalkout, "🤢 TOO DIRTY! I'M LEAVING!")
+		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
+		CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionDirtyLoss)
+		task.wait(1.4)
+		depart(cust, streetExit)
 		return
 	end
 
-	-- Counter stock first (cook-ahead loop): if the café has food ready,
-	-- the customer eats immediately — no tap needed. Regulars reach for their
-	-- FAVOURITE first. Empty counters fall back to a manual order.
-	local menuData = DataService:GetProfile(player)
-	if cust.favourite and menuData and KitchenService:IsOnMenu(menuData, cust.favourite) then
-		local ateFav, paidFav = KitchenService:ConsumeSpecific(player, cust.favourite)
-		if ateFav then
-			clearMood(cust)
-			eatMeal(player, cust, streetPos, cust.favourite, paidFav)
-			return
-		end
-	end
-	local consumedId, paid = KitchenService:TryConsume(player)
-	if consumedId ~= nil then
-		clearMood(cust)
-		eatMeal(player, cust, streetPos, consumedId, paid)
+	local seatCf, seatId, tableLabel = claimSeat(player)
+	if not seatCf or not seatId then
+		stormOut(cust, Kitchen.buzzPerWalkout, "😡 NO EMPTY CHAIR!")
+		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
+		CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionNoSeatLoss)
+		task.wait(1.4)
+		depart(cust, streetExit)
 		return
+	end
+	removeFromQueue(cust)
+	cust.seatCf = seatCf
+	cust.seatId = seatId
+	cust.tableLabel = tableLabel
+	walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
+	if cust.leaving or cust.root.Parent == nil then
+		releaseSeat(player, seatId)
+		cust.model:Destroy()
+		return
+	end
+	local sitPos = Vector3.new(seatCf.Position.X, 2.05, seatCf.Position.Z)
+	cust.root.Anchored = true
+	cust.model:PivotTo(CFrame.lookAt(sitPos, sitPos + seatCf.LookVector))
+	if cust.anim then
+		cust.anim.setSeated(true)
 	end
 
 	local data = DataService:GetProfile(player)
 	local recipeId = if data then pickUnlockedRecipe(data) else nil
-	-- A regular always asks for their favourite when they know it.
 	if cust.favourite and data and KitchenService:IsOnMenu(data, cust.favourite) then
 		recipeId = cust.favourite
 	end
-	local orderId = if recipeId
-		then OrderService:CreateOrder(player, recipeId, cust.def.id)
-		else nil
+	if not recipeId then
+		releaseSeat(player, seatId)
+		cust.root.Anchored = false
+		depart(cust, streetExit)
+		return
+	end
+	local orderId =
+		OrderService:CreateOrder(player, recipeId, cust.def.id, seatId, tableLabel, cust.root)
 	if not orderId then
-		depart(cust, streetPos)
+		releaseSeat(player, seatId)
+		cust.root.Anchored = false
+		depart(cust, streetExit)
 		return
 	end
 	cust.orderId = orderId
-	local recipe = Recipes[recipeId :: string]
-	-- The want-bubble: dish icon + name, readable at a glance (Café World B7).
-	cust.bubble.Text = "🗨️ " .. (recipe.icon or "🍽️") .. " " .. recipe.displayName
+	customersByOrder[orderId] = cust
+	local recipe = Recipes[recipeId]
+	cust.bubble.Text = (tableLabel or "TABLE")
+		.. "  •  "
+		.. (recipe.icon or "🍽️")
+		.. " "
+		.. recipe.displayName
 
-	local deadline = os.clock() + PATIENCE_SECONDS
-	local nextStockCheck = 0
-	local fedPay: number? = nil
-	local servingLock = false
-
-	-- Owner participation (S2 gameplay): walk up and TAKE THE ORDER yourself.
-	-- Serving personally from stock pays a Buzz bonus over waiting for the
-	-- 2s auto-serve — working your own café should feel better than idling.
-	local takePrompt = Instance.new("ProximityPrompt")
-	takePrompt.Name = "TakeOrder"
-	takePrompt.ObjectText = "Order"
-	takePrompt.ActionText = "Serve " .. recipe.displayName
-	takePrompt.HoldDuration = 0.25
-	takePrompt.MaxActivationDistance = 12
-	takePrompt.RequiresLineOfSight = false
-	takePrompt.Parent = cust.root
-	takePrompt.Triggered:Connect(function(who)
-		-- Only the café owner serves their own customers.
-		if who ~= player or servingLock or cust.orderId == nil or cust.leaving then
-			return
-		end
-		servingLock = true
-		local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string, true)
-		if ate and cust.orderId ~= nil then
-			OrderService:CancelOrder(cust.orderId, true)
-			cust.orderId = nil
-			cust.served = true
-			fedPay = paidNow
-			KitchenService:AddBuzz(player, 2)
-			Fx.floatText(
-				cust.root.Position + Vector3.new(0, 4, 0),
-				"Personal service! +2 🔥",
-				Color3.fromRGB(255, 200, 120)
-			)
-			hearts(cust.root.Position)
-			bumpCombo(player, cust.root.Position)
-		else
-			Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_in_stock" })
-		end
-		servingLock = false
-	end)
-
-	while os.clock() < deadline and cust.orderId ~= nil and not cust.leaving do
-		setMood(cust, (deadline - os.clock()) / PATIENCE_SECONDS)
-		-- A batch may land while they wait — feed them straight from it.
-		if os.clock() >= nextStockCheck and not servingLock then
-			nextStockCheck = os.clock() + 2
-			local ate, paidNow = KitchenService:ConsumeSpecific(player, recipeId :: string)
-			if ate and cust.orderId ~= nil then
-				OrderService:CancelOrder(cust.orderId, true)
-				cust.orderId = nil
-				cust.served = true
-				fedPay = paidNow
-			end
-		end
+	local satisfaction = CafeOperationsService:GetSatisfaction(player)
+	local patienceMultiplier = 0.7 + satisfaction / 200
+	if cleanliness < Operations.dirtyPatienceThreshold then
+		patienceMultiplier *= math.max(
+			Operations.minPatienceMultiplier,
+			cleanliness / Operations.dirtyPatienceThreshold
+		)
+	end
+	local patience = PATIENCE_SECONDS * patienceMultiplier
+	local deadline = os.clock() + patience
+	while os.clock() < deadline and not cust.served and not cust.leaving do
+		setMood(cust, (deadline - os.clock()) / patience)
 		task.wait(0.25)
 	end
-	takePrompt:Destroy()
 
+	customersByOrder[orderId] = nil
 	if cust.leaving then
-		if cust.orderId ~= nil then
-			OrderService:CancelOrder(cust.orderId)
-		end
-		depart(cust, streetPos)
+		OrderService:CancelOrder(orderId)
+		releaseSeat(player, seatId)
+		cust.root.Anchored = false
+		depart(cust, streetExit)
 		return
 	end
-	if cust.orderId ~= nil then
-		-- Patience ran out at the window: cancel and leave visibly unhappy.
-		OrderService:CancelOrder(cust.orderId)
+	if cust.served then
 		cust.orderId = nil
-		stormOut(cust, Kitchen.buzzPerWalkout)
-		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
-	end
-	if cust.served and not cust.leaving then
-		-- Fed from stock while waiting, or hand-served: sit down and dine.
 		clearMood(cust)
-		eatMeal(player, cust, streetPos, recipeId :: string, fedPay)
+		eatMeal(player, cust, streetExit, recipeId, cust.resolvedPay)
 		return
 	end
-	task.wait(1.4) -- let the angry reaction read before walking off
 
-	depart(cust, streetPos)
+	OrderService:CancelOrder(orderId)
+	cust.orderId = nil
+	stormOut(cust, Kitchen.buzzPerWalkout, "😡 MY ORDER NEVER CAME!")
+	KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
+	CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionWalkoutLoss)
+	releaseSeat(player, seatId)
+	cust.seatId = nil
+	cust.seatCf = nil
+	cust.root.Anchored = false
+	if cust.anim then
+		cust.anim.setSeated(false)
+	end
+	task.wait(1.5)
+	depart(cust, streetExit)
 end
 
--- Called by OrderService when the order is served, with the coins awarded.
--- Only the front customer can hold an order, so match on orderId presence.
-function CustomerService.OnOrderResolved(_self: any, userId: number, coinsAwarded: number?)
-	local q = queues[userId]
-	local front = q and q[1]
-	if front and front.orderId ~= nil then
-		front.orderId = nil
-		front.served = true
-		front.bubble.Text = if coinsAwarded ~= nil
+function CustomerService.OnOrderResolved(
+	_self: any,
+	orderId: string,
+	coinsAwarded: number?,
+	manual: boolean?
+)
+	local cust = customersByOrder[orderId]
+	if cust and cust.orderId == orderId then
+		cust.served = true
+		cust.resolvedPay = coinsAwarded
+		cust.resolvedManual = manual == true
+		cust.bubble.Text = if coinsAwarded ~= nil
 			then "😊 +" .. tostring(coinsAwarded) .. " 🪙"
 			else "😊"
 	end
@@ -1134,6 +1149,7 @@ function CustomerService.Init(_self: any)
 	StaffService = ServiceRegistry.get("StaffService")
 	GoalService = ServiceRegistry.get("GoalService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function CustomerService.Start(_self: any)
@@ -1181,7 +1197,11 @@ function CustomerService.Start(_self: any)
 							leaving = false,
 						}
 						table.insert(q, cust)
-						task.spawn(runVisit, player, cust, origin)
+						allCustomers[cust] = true
+						cust.model.Destroying:Connect(function()
+							allCustomers[cust] = nil
+						end)
+						task.spawn(runActiveVisit, player, cust, origin)
 					end
 				end
 			end
@@ -1189,9 +1209,23 @@ function CustomerService.Start(_self: any)
 	end)
 
 	Players.PlayerRemoving:Connect(function(player)
+		for cust in allCustomers do
+			if cust.userId == player.UserId then
+				if cust.orderId then
+					customersByOrder[cust.orderId] = nil
+				end
+				cust.leaving = true
+				if cust.model.Parent ~= nil then
+					cust.model:Destroy()
+				end
+			end
+		end
 		local q = queues[player.UserId]
 		if q then
 			for _, cust in q do
+				if cust.orderId then
+					customersByOrder[cust.orderId] = nil
+				end
 				cust.leaving = true
 				cust.model:Destroy()
 			end

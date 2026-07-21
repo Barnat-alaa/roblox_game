@@ -13,6 +13,7 @@ export type PlacedFurniture = {
 	floor: number,
 	rotation: number, -- 0..3 (multiples of 90 degrees)
 	variant: string?,
+	liftY: number?, -- extra studs above the floor (e.g. an appliance ON a counter)
 }
 
 export type RecipeMasteryEntry = {
@@ -109,6 +110,22 @@ export type KitchenState = {
 	nextJobId: number,
 }
 
+export type OfflineSummary = {
+	seconds: number,
+	earnings: number,
+	satisfactionLost: number,
+	at: number,
+}
+
+export type OperationsState = {
+	satisfaction: number,
+	cleanliness: number,
+	staffCapacity: { [string]: number },
+	lastSeenAt: number,
+	lastDirtAt: number,
+	lastOffline: OfflineSummary?,
+}
+
 export type GoalState = {
 	id: string,
 	text: string,
@@ -144,6 +161,7 @@ export type PlayerData = {
 	recipeMastery: { [string]: RecipeMasteryEntry },
 	staff: { StaffMember },
 	kitchen: KitchenState,
+	operations: OperationsState,
 	daily: DailyState,
 	trophies: { [string]: boolean }, -- permanent streak-milestone trophies
 	settings: PlayerSettings,
@@ -206,6 +224,8 @@ export type Order = {
 	status: OrderStatus,
 	createdAtClock: number,
 	claimed: boolean,
+	seatId: string?,
+	tableLabel: string?,
 }
 
 -- Generic result envelope for server request handlers.

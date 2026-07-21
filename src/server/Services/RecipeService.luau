@@ -26,6 +26,7 @@ local DataService: any
 local OrderService: any
 local CafeService: any
 local AnalyticsService: any
+local CafeOperationsService: any
 
 type CookSession = { orderId: string, startClock: number }
 
@@ -106,6 +107,11 @@ local function handleFinish(player: Player, orderId: unknown)
 
 	if success then
 		manualReady[player.UserId] = orderId :: string
+		local order = OrderService:GetActiveOrder(orderId :: string)
+		local recipe = order and Recipes[order.recipeId]
+		if recipe then
+			CafeOperationsService:RestoreFromManual(player, recipe.staffRole)
+		end
 	end
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "cook_result",
@@ -135,6 +141,7 @@ function RecipeService.Init(_self: any)
 	OrderService = ServiceRegistry.get("OrderService")
 	CafeService = ServiceRegistry.get("CafeService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 end
 
 function RecipeService.Start(_self: any)

@@ -15,6 +15,8 @@ export type FurnitureAsset = {
 	maxSpan: number, -- max horizontal studs after scaling (grid footprint cap)
 	yaw: number?, -- degrees added at placement to align the imported model's visible front
 	liftY: number?, -- studs above the floor (wall art, clocks, hanging lamps)
+	flat: boolean?, -- rugs/mats: scale by SPAN (not height) and lay the thin axis down
+	widen: number?, -- non-uniform stretch of the LONGEST horizontal axis (wider counter)
 }
 
 export type WorldAsset = {
@@ -57,8 +59,15 @@ local AssetManifest = {
 			assetId = 8509855137,
 			name = "Counter and Cash Register (oceanicwavss)",
 			height = 3.8,
-			maxSpan = 12,
-			yaw = 90, -- native long axis is on Z; rotate it onto the 3-cell X span
+			maxSpan = 24,
+			yaw = 90, -- native long axis is on Z; rotate it onto the wide X span
+			-- Stretch wider without making it taller (owner request). Measured in
+			-- Studio: the normalised counter body is 9.38 studs long before this
+			-- multiplier, and the seed counter's 6-cell footprint is 24 studs, so
+			-- 24 / 9.38 = 2.56 makes the body actually FILL its footprint. At the
+			-- old 2.1 it spanned only 19.7 studs, which left the espresso machine
+			-- (placed at the footprint's right edge) hanging off the counter end.
+			widen = 2.56,
 		},
 		chair_wood = {
 			assetId = 14269301866,
@@ -139,6 +148,38 @@ local AssetManifest = {
 			height = 2.9,
 			maxSpan = 7.4,
 		},
+		-- Owner haul 2026-07-19 — the last 5 greybox shop items get real models.
+		prep_station = {
+			assetId = 100119851703802,
+			name = "Kitchen Counter/Prep (owner pick)",
+			height = 3.6,
+			maxSpan = 7.6,
+		},
+		table_round = {
+			assetId = 2052055475,
+			name = "Glass Table (owner pick)",
+			height = 3,
+			maxSpan = 7.4,
+		},
+		plant_small = {
+			assetId = 111366669245364,
+			name = "Low Poly Potted Plant",
+			height = 3.4,
+			maxSpan = 3.4,
+		},
+		lamp_floor = {
+			assetId = 101194656934237,
+			name = "Floor Lamp (owner pick)",
+			height = 4.8,
+			maxSpan = 3.2,
+		},
+		rug_round = {
+			assetId = 12141085266,
+			name = "KotSS Carpet (owner pick)",
+			height = 0.4,
+			maxSpan = 7.6,
+			flat = true,
+		},
 	} :: { [string]: FurnitureAsset },
 
 	-- World dressing (garden + street + plaza), applied automatically by
@@ -160,10 +201,28 @@ local AssetManifest = {
 		hydrant = { assetId = 116893320502654, name = "Fire Hydrant", height = 2.8 },
 	} :: { [string]: WorldAsset },
 
+	-- Single-instance decor loaded by ID for a specific feature (not buyable,
+	-- not auto-dressed). Scaled by `fit` (longest axis) so FLAT meshes stay
+	-- flat. AssetLibraryService exposes GetDecor(key).
+	decor = {
+		-- Replaces the procedural brown splat with a real spill mesh (dirt).
+		dirt = { assetId = 9738324539, name = "Spill puddle MeshPart", fit = 3.4 },
+		-- Neon "Coffee Cup" sign mounted on each café's exterior facade.
+		cafe_sign = {
+			assetId = 83710614887731,
+			name = "Neon Coffee Cup Sign (owner pick)",
+			fit = 4.5,
+		},
+	} :: { [string]: PropAsset },
+
 	-- Food/drink props, keyed by recipe CATEGORY, shown on counters and diner
 	-- plates in place of the old coloured cylinders.
 	props = {
-		Coffee = { assetId = 5371778048, name = "Coffee Cup (Think_yDev)", fit = 1.3 },
+		Coffee = {
+			assetId = 134685565050613,
+			name = "Coffee packaging cup (owner pick)",
+			fit = 1.4,
+		},
 		Tea = { assetId = 6169001071, name = "Cup of Tea (Jellywelly666)", fit = 1.3 },
 		Pastry = { assetId = 9500111031, name = "[PBR] Croissant (ordinarytyson)", fit = 1.6 },
 		Sandwich = { assetId = 2528907852, name = "Sandwich on plate (magaia10)", fit = 1.8 },
@@ -217,9 +276,9 @@ local AssetManifest = {
 		Cook = { assetId = 108490018615318, name = "Chef NPC (TurboTigerByte2002)" },
 		-- Butler: R15, complete 15/15 skeleton, zero scripts — Noah's real look.
 		Waiter = { assetId = 3230955000, name = "Butler (Verdonis)" },
-		-- The maid kit (14466134917) has a 13/15-joint skeleton → walk gate
-		-- rejects it; Pia stays on the verified Mom base until a complete
-		-- maid rig is shopped (docs/ASSET_SHOPPING_LIST.md #63).
+		-- The maid rig (14466134917) walked/looked worse in play than the Mom
+		-- base — owner reverted it 2026-07-20. Pia is back on the verified Mom
+		-- base + green apron.
 		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },
 	},
 }

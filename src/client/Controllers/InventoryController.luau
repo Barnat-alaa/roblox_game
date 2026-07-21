@@ -7,6 +7,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Recipes = require(Shared.Config.Recipes)
 local Staff = require(Shared.Config.Staff)
+local KitchenConfig = require(Shared.Config.Kitchen)
+local Operations = require(Shared.Config.Operations)
+local OperationsMath = require(Shared.Utilities.OperationsMath)
 local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
@@ -45,6 +48,22 @@ local RECIPE_IDS = sortedRecipeIds()
 
 local function kitchen(): any
 	return if profile and typeof(profile.kitchen) == "table" then profile.kitchen else {}
+end
+
+local function operationRates(): any
+	return OperationsMath.calculate(
+		profile,
+		Recipes,
+		Staff,
+		KitchenConfig.staffLevelSpeedPerLevel,
+		KitchenConfig.batchCostMultiplier,
+		KitchenConfig.servingPayoutFraction,
+		Operations.offlineEarningsDivisor
+	)
+end
+
+local function oneDecimal(value: number): string
+	return string.format("%.1f", math.max(0, value))
 end
 
 local function hasAppliance(recipeId: string): boolean
@@ -299,10 +318,56 @@ local function updateProductionRow(recipeId: string)
 	row.minus.Active = unlocked
 	row.plus.Active = unlocked
 	row.priority.Active = unlocked
+	local rates = operationRates()
+	local product = rates.products[recipeId]
+	local recipe = Recipes[recipeId]
+	local rawProduction = if hasAppliance(recipeId) and hasRole(recipe.staffRole)
+		then recipe.productionYield * 60 / recipe.productionTime
+		else 0
+	local rawService = if hasRole("Waiter") then 60 / recipe.serveTime else 0
+	local productionRate = if product then product.productionPerMinute else rawProduction
+	local serviceRate = if product then product.serviceCapacityPerMinute else rawService
+	local netRate = if product
+		then product.netPerMinute
+		else math.min(rawProduction, rawService) * math.max(
+			0,
+			math.floor(recipe.basePrice * KitchenConfig.servingPayoutFraction)
+				- recipe.ingredientCost
+					* KitchenConfig.batchCostMultiplier
+					/ recipe.productionYield
+		)
+	row.meta.Text = string.format(
+		"%ds ×%d  |  PRODUCE %s/m  |  WAITER %s/m  |  NET $%s/m",
+		recipe.productionTime,
+		recipe.productionYield,
+		oneDecimal(productionRate),
+		oneDecimal(serviceRate),
+		oneDecimal(netRate)
+	)
+	row.offline.Text = string.format(
+		"OFFLINE: %d× slower  •  net ÷%d = $%s/min",
+		Operations.offlineTimeMultiplier,
+		Operations.offlineEarningsDivisor,
+		oneDecimal(netRate / Operations.offlineEarningsDivisor)
+	)
 end
 
 local function updateAll()
 	updateDock()
+	if ui.productionSummary and profile then
+		local rates = operationRates()
+		local operations = profile.operations or {}
+		local capacity = operations.staffCapacity or {}
+		ui.productionSummary.Text = string.format(
+			"SHIFT FORECAST  •  ONLINE NET $%s/min  •  OFFLINE $%s/min\nWAITER LOAD %d%%  |  BARISTA %d%%  |  WAITER %d%%  |  OFFLINE IS %d× SLOWER",
+			oneDecimal(rates.netPerMinute),
+			oneDecimal(rates.offlineNetPerMinute),
+			math.floor(rates.waiterUtilization * 100),
+			math.floor(tonumber(capacity.Barista) or 0),
+			math.floor(tonumber(capacity.Waiter) or 0),
+			Operations.offlineTimeMultiplier
+		)
+	end
 	for _, id in RECIPE_IDS do
 		updateStockRow(id)
 		updateProductionRow(id)
@@ -404,7 +469,7 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	local recipe = Recipes[recipeId]
 	local row = Instance.new("Frame")
 	row.Name = recipeId
-	row.Size = UDim2.new(1, -6, 0, 100)
+	row.Size = UDim2.new(1, -6, 0, 120)
 	row.BackgroundColor3 = Theme.Colors.Paper
 	row.LayoutOrder = order
 	row.ZIndex = 22
@@ -417,29 +482,25 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	name.TextXAlignment = Enum.TextXAlignment.Left
 	name.TextTruncate = Enum.TextTruncate.AtEnd
 	name.ZIndex = 23
-	local meta = Components.Label(
-		row,
-		string.format(
-			"+%d / %s  |  %s",
-			recipe.productionYield,
-			shortTime(recipe.productionTime),
-			recipe.staffRole
-		),
-		10,
-		false
-	)
+	local meta = Components.Label(row, "", 9, false)
 	meta.Size = UDim2.new(1, -126, 0, 18)
 	meta.Position = UDim2.fromOffset(12, 29)
 	meta.TextColor3 = Theme.Colors.Muted
 	meta.TextXAlignment = Enum.TextXAlignment.Left
 	meta.ZIndex = 23
+	local offline = Components.Label(row, "", 9, true)
+	offline.Size = UDim2.new(1, -24, 0, 17)
+	offline.Position = UDim2.fromOffset(12, 47)
+	offline.TextColor3 = Theme.Colors.Berry
+	offline.TextXAlignment = Enum.TextXAlignment.Left
+	offline.ZIndex = 23
 	local status = Components.Label(row, "", 9, true)
 	status.Size = UDim2.fromOffset(104, 20)
 	status.Position = UDim2.new(1, -114, 0, 9)
 	status.TextXAlignment = Enum.TextXAlignment.Right
 	status.ZIndex = 23
 	local toggle = Components.Button(row, "AUTO OFF", Theme.Colors.Muted, UDim2.fromOffset(88, 44))
-	toggle.Position = UDim2.fromOffset(10, 52)
+	toggle.Position = UDim2.fromOffset(10, 70)
 	toggle.TextSize = 10
 	toggle.ZIndex = 23
 	toggle.Activated:Connect(function()
@@ -449,7 +510,7 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 		end
 	end)
 	local minus = Components.Button(row, "-", Theme.Colors.Coral, UDim2.fromOffset(44, 44))
-	minus.Position = UDim2.fromOffset(104, 52)
+	minus.Position = UDim2.fromOffset(104, 70)
 	minus.TextSize = 18
 	minus.ZIndex = 23
 	minus.Activated:Connect(function()
@@ -458,13 +519,13 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	end)
 	local target = Components.Label(row, "0", 15, true)
 	target.Size = UDim2.fromOffset(52, 44)
-	target.Position = UDim2.fromOffset(152, 52)
+	target.Position = UDim2.fromOffset(152, 70)
 	target.BackgroundTransparency = 0
 	target.BackgroundColor3 = Theme.Colors.PaperDark
 	Components.Corner(target, Theme.Radius.Small)
 	target.ZIndex = 23
 	local plus = Components.Button(row, "+", Theme.Colors.Mint, UDim2.fromOffset(44, 44))
-	plus.Position = UDim2.fromOffset(208, 52)
+	plus.Position = UDim2.fromOffset(208, 70)
 	plus.TextSize = 18
 	plus.ZIndex = 23
 	plus.Activated:Connect(function()
@@ -472,7 +533,7 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 		Remotes.event("SetTargetStock"):FireServer(recipeId, current + recipe.productionYield)
 	end)
 	local priority = Components.Button(row, "P1", Theme.Colors.Honey, UDim2.fromOffset(52, 44))
-	priority.Position = UDim2.new(1, -60, 0, 52)
+	priority.Position = UDim2.new(1, -60, 0, 70)
 	priority.TextColor3 = Theme.Colors.Espresso
 	priority.ZIndex = 23
 	priority.Activated:Connect(function()
@@ -483,6 +544,7 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 		frame = row,
 		name = name,
 		meta = meta,
+		offline = offline,
 		status = status,
 		toggle = toggle,
 		minus = minus,
@@ -587,6 +649,17 @@ local function buildDrawer(gui: ScreenGui)
 	end
 	ui.stockList = makeList("StockList")
 	ui.productionList = makeList("ProductionList")
+	local summary = Components.Label(ui.productionList, "", 10, true)
+	summary.Name = "ShiftForecast"
+	summary.Size = UDim2.new(1, -6, 0, 54)
+	summary.LayoutOrder = -10
+	summary.BackgroundTransparency = 0
+	summary.BackgroundColor3 = Theme.Colors.Espresso
+	summary.TextColor3 = Theme.Colors.Cream
+	summary.TextWrapped = true
+	summary.ZIndex = 22
+	Components.Corner(summary, Theme.Radius.Medium)
+	ui.productionSummary = summary
 	for order, recipeId in RECIPE_IDS do
 		makeStockRow(ui.stockList, recipeId, order)
 		makeProductionRow(ui.productionList, recipeId, order)
@@ -623,7 +696,7 @@ local function applyResponsive(mode: string, viewport: Vector2)
 		else
 			row.name.Size = UDim2.new(1, -126, 0, 22)
 			row.status.Position = UDim2.new(1, -114, 0, 9)
-			row.priority.Position = UDim2.new(1, -60, 0, 52)
+			row.priority.Position = UDim2.new(1, -60, 0, 70)
 		end
 	end
 	local drawer = ui.drawer
