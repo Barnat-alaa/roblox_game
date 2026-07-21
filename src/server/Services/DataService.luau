@@ -391,6 +391,18 @@ local function onPlayerAdded(player: Player)
 	end
 	loading[player.UserId] = true
 	local data, safeToSave = loadAsync(player.UserId)
+	-- loadAsync YIELDS — a GetAsync, and up to 3 attempts with 2s waits between
+	-- them on failure, so this coroutine can be parked here for seconds. If the
+	-- player left while we were away, onPlayerRemoving has ALREADY run and
+	-- cleared its tables. Storing the profile now would leave a ghost entry that
+	-- no future leave event ever cleans up, and the 60s autosave loop would keep
+	-- writing that stale snapshot over their real save for the life of the
+	-- server. Drop it instead.
+	if player.Parent == nil then
+		loading[player.UserId] = nil
+		Log.info("Profile load finished after", player.Name, "already left - discarded")
+		return
+	end
 	profiles[player.UserId] = data
 	saveBlocked[player.UserId] = not safeToSave
 	loaded[player.UserId] = true

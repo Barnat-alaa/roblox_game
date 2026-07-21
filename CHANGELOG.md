@@ -5,6 +5,52 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — 2026-07-21 — 10-café lobbies, and the surplus-player path made real
+The lobby drops from 30 cafés to **10** (owner request). Scale now comes from
+Roblox spawning MORE servers, not bigger ones — total concurrent players stays
+unbounded while each street stays a readable 10.
+- **`World.plotCount` 30 → 10, `plotsPerRow` 15 → 5.** streetLength 1248 → 408
+  studs. Nearly all geometry was already parameterised and rescaled cleanly
+  (plot origins, road tiling, sidewalk slabs, plaza, sky backdrop, StreetGround,
+  world boundary, and all of `StreetMath`).
+- **⚠️ The dashboard Max Players must be set to 10 to match.** It is not
+  settable from code. At the recorded setting of 30, twenty players per server
+  would join with no café.
+- **Surplus players are no longer stranded.** `assignPlot` returning nil used to
+  `return` silently: no plot, no PlotOrigin attribute, no furniture rendered, no
+  teleport, no fall-recovery, and a build mode that swallowed every tap without
+  explanation. They now join a **waiting queue**, are told so, and are handed the
+  next café that frees up (`serveNextWaiting` on `onPlayerRemoving`).
+- **`plotCount == plotsPerRow * 2` is now enforced.** `plotOriginFor` wraps its
+  column modulo `plotsPerRow`, so a mismatch silently stacked a second café on an
+  existing origin and handed two players the same building. Asserted at boot and
+  covered in `tests/StreetMath.spec.luau`.
+- **Pedestrians could be trapped outside the world boundary.** `END_MARGIN` was a
+  flat 20 studs, but the StreetGround slab only reaches `plotSpacing/2 - 32` = 10
+  studs past the last plot, with the boundary wall on that edge — so a spawn in
+  that strip landed *outside* the wall and `clampX` kept it there forever.
+  `walkXBounds` now clamps the margin to what actually fits (20 → 6). Pre-existing,
+  but the odds roughly tripled on the shorter street. Covered by a new spec case.
+- **Street decor now scales with the street.** Trees were a hardcoded `for i = 1, 4`,
+  which on a 408-stud street meant one tree per café (~3x intended density); the
+  count is now derived from length (2 trees, 210-stud spacing). The `% 3` / `% 4`
+  accent strides collapsed to 2 mailboxes and a single lone hydrant on the whole
+  far pavement; the stride is now size-aware (3 mailboxes, 2 hydrants).
+
+### Fixed — 2026-07-21 — ghost profiles, and an unprotected loop that could disable the shift system
+- **Ghost profile overwriting real saves.** `DataService.onPlayerAdded` yields
+  inside `loadAsync` (a GetAsync, plus up to 3 retries with 2s waits). It then
+  populated `profiles`/`loaded`/`saveBlocked` *after* that yield — so a player who
+  left mid-load had `onPlayerRemoving` run first against empty tables, and the
+  load then **repopulated them for the life of the server**. The 60s autosave kept
+  writing that orphaned snapshot over their real save. The load result is now
+  discarded if the player has already left.
+- **The 5s operations loop had no `pcall`.** It owns offline settlement, staff
+  capacity recovery, satisfaction decay, dirt spawning and `lastSeenAt` freshness.
+  One uncaught error from any single player's tick killed the thread and silently
+  disabled all of that for **every** player on the server, permanently. Every
+  comparable loop in the codebase was already protected; this one was not.
+
 ### Fixed — 2026-07-21 — persistence safety: a failed load no longer wipes the account
 Found while verifying "does a returning player get their progress back".
 - **A transient DataStore outage permanently erased accounts.** When all three

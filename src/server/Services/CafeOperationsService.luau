@@ -14,6 +14,7 @@ local StaffDefinitions = require(Shared.Config.Staff)
 local Kitchen = require(Shared.Config.Kitchen)
 local World = require(Shared.Config.World)
 local Remotes = require(Shared.Network.Remotes)
+local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -450,25 +451,38 @@ function CafeOperationsService.Init(_self: any)
 end
 
 function CafeOperationsService.Start(_self: any)
+	-- This loop owns offline settlement, staff-capacity recovery, satisfaction
+	-- decay, dirt spawning and lastSeenAt freshness. Unprotected, a single error
+	-- from any one player's tick would kill the thread and silently disable all
+	-- of that for EVERY player on the server for the rest of its life. Every
+	-- comparable loop in the codebase is pcall'd (ProductionService, CafeService,
+	-- KitchenService); this one was not.
+	local function tickOperations(player: Player)
+		if not DataService:IsLoaded(player) then
+			return
+		end
+		CafeOperationsService:ResumeAfterOffline(player, os.time())
+		local nowClock = os.clock()
+		local elapsed = math.max(0, nowClock - (lastRecoveryClock[player.UserId] or nowClock))
+		lastRecoveryClock[player.UserId] = nowClock
+		recoverOnline(player, elapsed)
+		local data = DataService:GetProfile(player)
+		if data then
+			local state = stateOf(data)
+			local jitter = rng:NextInteger(0, 8)
+			if os.time() - state.lastDirtAt >= Operations.dirtSpawnSeconds + jitter then
+				spawnDirt(player)
+			end
+		end
+	end
+
 	task.spawn(function()
 		while true do
 			task.wait(5)
 			for _, player in Players:GetPlayers() do
-				if DataService:IsLoaded(player) then
-					CafeOperationsService:ResumeAfterOffline(player, os.time())
-					local nowClock = os.clock()
-					local elapsed =
-						math.max(0, nowClock - (lastRecoveryClock[player.UserId] or nowClock))
-					lastRecoveryClock[player.UserId] = nowClock
-					recoverOnline(player, elapsed)
-					local data = DataService:GetProfile(player)
-					if data then
-						local state = stateOf(data)
-						local jitter = rng:NextInteger(0, 8)
-						if os.time() - state.lastDirtAt >= Operations.dirtSpawnSeconds + jitter then
-							spawnDirt(player)
-						end
-					end
+				local ok, err = pcall(tickOperations, player)
+				if not ok then
+					Log.warn("Operations tick failed for", player.Name, err)
 				end
 			end
 		end

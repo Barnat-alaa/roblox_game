@@ -728,6 +728,17 @@ function UIController.Start(_self: any)
 					.. " speed  •  Satisfaction -"
 					.. tostring(msg.satisfactionLost)
 			)
+		elseif msg.kind == "no_plot" then
+			-- Every café on this server is taken. Say so plainly instead of
+			-- leaving the player poking at a build mode that silently does
+			-- nothing; they are queued and get one as soon as somebody leaves.
+			UIController.toast(
+				"All cafés on this server are taken - you're #"
+					.. tostring(msg.queued)
+					.. " in line. Rejoin for a new server, or wait for one to free up."
+			)
+		elseif msg.kind == "plot_assigned" then
+			UIController.toast("A café just opened up - it's yours! Welcome in.")
 		elseif msg.kind == "recipe_unlocked" then
 			UIController.toast("New recipe unlocked: " .. tostring(msg.recipe))
 		elseif msg.kind == "mastery_up" then

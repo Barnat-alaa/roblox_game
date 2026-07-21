@@ -1,9 +1,21 @@
 --!strict
 -- Neighbourhood layout constants. plotCount is THE lobby-capacity knob:
 -- Roblox fills servers to Max Players (set on the dashboard) and every player
--- gets one plot, so keep Max Players <= plotCount. Launch tuning: 24 plots /
--- 30 max players is wrong — keep Max Players at or below plotCount (30 → 24
--- means 6 players could go plotless; dashboard is set to 30, so plotCount 30).
+-- gets one plot, so Max Players MUST be <= plotCount.
+--
+-- 2026-07-21: the lobby was cut from 30 cafés to 10 (owner request). Scale is
+-- handled the way Roblox intends — not by a bigger server, but by MORE servers:
+-- Roblox spawns a fresh instance whenever the current one fills, so total
+-- concurrent players is unbounded while each street stays a readable 10.
+-- ⚠️ The dashboard Max Players must be set to 10 to match. It is NOT settable
+-- from code, and a mismatch strands the surplus players with no café at all
+-- (CafeService.Start warns about this at boot, and now queues them for the
+-- next café that frees up).
+--
+-- INVARIANT: plotCount == plotsPerRow * 2 — the street is two facing rows, and
+-- plotOriginFor wraps its column index modulo plotsPerRow, so any extra plot
+-- would silently stack a second café on an existing origin. CafeService
+-- asserts this at boot and tests/StreetMath.spec.luau covers it.
 --
 -- S2 architecture (2026-07-16): every café is a real BUILDING — front facade
 -- with an auto-opening door — and owns a fenced PRIVATE GARDEN behind it.
@@ -11,8 +23,8 @@
 -- into the garden in tiers (PlayerData.expansionTier; purchase flow lands in
 -- S4 — the geometry, data field and rebuild path all exist now).
 local World = {
-	plotCount = 30, -- total cafés per server (two facing rows)
-	plotsPerRow = 15, -- cafés per street side
+	plotCount = 10, -- total cafés per server; MUST equal plotsPerRow * 2
+	plotsPerRow = 5, -- cafés per street side
 	boulevardWidth = 60, -- studs between the two facing rows
 	plotGap = 12, -- studs between neighbouring plots
 	-- Width of the tiled road running down the middle of the boulevard. What is
