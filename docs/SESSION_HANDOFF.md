@@ -56,19 +56,16 @@ previously described this as unbuilt — corrected.
 2. **Create an Open Cloud API key** for `scripts/publish.ps1` — see HANDOFF §2a.
 3. **Supply the HUD icons** listed in [docs/HUD_REDESIGN.md](HUD_REDESIGN.md) §4.
 
-## ⚠️ Merged but NOT yet verified in-engine
+## Verification state
 
-Be honest about this with the owner — it is the biggest risk carried forward.
-
-- **The 10-café world has never been run.** Geometry was verified by recomputing
-  against the same formulas CafeService uses, not by playtesting.
-- **`PedestrianService` has never executed once.** The lane math and café-entry
-  path were proven with probe NPCs injected into a running session; the service
-  itself has never started.
-- **The `saveBlocked` path is not runtime-tested.** Reproducing it needs a store
-  that exists but whose `GetAsync` fails.
-
-First thing next session: reopen the rebuilt place, playtest, and verify these.
+- **The 10-café street and the ambient crowd: playtested and confirmed by the
+  owner (2026-07-21).** Do not ask him to re-run it. Geometry had also been
+  verified by recomputing against the same formulas CafeService uses
+  (walkXBounds [-6, 414] inside the east wall at 418; road paving to 468 ≥ 408;
+  2 trees at 210-stud spacing; 3 mailboxes / 2 hydrants).
+- **Still not runtime-tested: the `saveBlocked` path.** Reproducing it needs a
+  store that exists but whose `GetAsync` fails, which cannot be forced from
+  Studio. Correct by inspection only — treat with care if you touch DataService.
 
 ## Known gaps worth picking up
 
@@ -130,19 +127,26 @@ give French click paths. Never run two agents on this repo at once.
 > UIController, keep every colour/radius/motion value in Theme, and put image
 > ids only in Graphics.UI.
 >
-> **Copy the layout and interaction pattern, NOT the reference's art.** Every
-> image must be an owner-approved Creator Store asset recorded in
-> docs/ASSET_LICENSES.md — same rule docs/MENU_SPEC.md applies to Café World.
-> Ask the owner for the icons listed in docs/HUD_REDESIGN.md §4 (Staff,
-> Upgrades, Trophy, Map, Music, Settings) and prefer ONE cohesive pack; he has
-> said he will supply them. He will also send a screenshot per menu panel later
-> — panels are out of scope for this pass.
+> **SOURCE THE ICONS YOURSELF — do not wait for the owner to send them.** He
+> has explicitly asked you to go and get them. The research is already done and
+> licence-verified in docs/HUD_REDESIGN.md §4: use the **Nieobie Game Icon Pack**
+> (CC0, github.com/Nieobie/Game-Icon-Pack, 800+ rounded icons from one artist —
+> covers all 13 HUD icons with zero attribution) for the glyphs, and **Kenney UI
+> Pack** (CC0, kenney.nl) for the rounded button plates behind them. For food/menu
+> item icons use **Kenney Food Kit** (CC0) and render each 3D model to a flat 2D
+> icon, so the cookbook icon and the object on the plate are the same asset.
+> Re-confirm each licence page yourself before uploading, pin Nieobie by git
+> commit hash, self-upload as Decals so the owner is the uploader, and record
+> every id in docs/ASSET_LICENSES.md. §4.4 lists sources that are explicitly
+> rejected (game-icons.net, OpenMoji, Noto, CraftPix, Lucide, the unverified
+> Filwarka itch.io pack) — do not quietly reintroduce them.
 >
-> **FIRST, though:** three things merged today have never actually run — the
-> 10-café street, PedestrianService, and the saveBlocked path. Reopen the
-> rebuilt SocialCafe.rbxlx, playtest, and verify the shorter street builds
-> cleanly, the decor spacing looks right, and the ambient crowd stays on the
-> pavement. Don't build on top of unverified ground.
+> **Copy the layout and interaction pattern, NOT the reference's art** — same
+> rule docs/MENU_SPEC.md applies to Café World. §4.5 explains why migrating off
+> the current Simulator Icon Pack also retires a provenance risk: prefer
+> replacing all 13 icons with Nieobie rather than mixing packs, because mixed
+> corner radii are visible side by side in one toolbar. The owner will send a
+> screenshot per menu panel later — panels are out of scope for this pass.
 >
 > Keep StyLua+Selene+Rojo gates green, commit with conventional messages +
 > CHANGELOG, open a PR and merge it once CI is green. Work in strict Luau,

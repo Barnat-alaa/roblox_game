@@ -134,29 +134,99 @@ keyboard letter shown beside/below it, matching the reference's pattern.
 - Panels themselves are out of scope for this pass. The owner will supply a
   screenshot per menu and those get specced separately.
 
-## 4. 🖼️ Images needed from the owner
+## 4. 🖼️ Icons — source these yourself
 
-The HUD only reads as one system if the icons come from **one cohesive pack**.
-Ask for a single Creator Store icon set and take everything from it.
+**The owner has asked the implementing agent to source the icons, not to wait
+for them.** The research below is already done and licence-verified (2026-07-21,
+parallel scouts + an adversarial licence-verification pass). Do not redo it;
+do confirm each licence page yourself before uploading, because licences change.
 
-Already have (in `Graphics.UI`, from the "Simulator pack"): Coin, Reputation,
-Level, Buzz, Goals, Cookbook, Build, Shop, Pantry.
+### 4.1 The pack to use — Nieobie Game Icon Pack (CC0)
 
-**Still needed:**
+<https://github.com/Nieobie/Game-Icon-Pack>
 
-| Slot | Used by |
+- **CC0 1.0**, verified down to the repo's actual `LICENSE` file containing the
+  full legal deed — not just a README claim.
+- **800+ icons from a single artist**, so cohesion is guaranteed by
+  construction. Covers all 13 HUD icons in ONE `ASSET_LICENSES.md` row with
+  **zero attribution burden**.
+- Explicitly "no sharp corners" — the closest verified match to this project's
+  warm rounded direction.
+- Ships **padding and no-padding** variants in SVG and PNG; no re-packing
+  needed. The repo carries no version number — **pin the exact git commit hash**
+  in `ASSET_LICENSES.md`.
+
+It is *flat*, not glossy. That is fine: the glossy chunk comes from the button
+plate behind it, not the glyph.
+
+### 4.2 The button plates — Kenney UI Pack (CC0)
+
+<https://kenney.nl/assets/ui-pack-adventure> (and the base `ui-pack`)
+
+- **CC0 1.0**, verified on the pack page and site-wide at kenney.nl/support:
+  "Attribution is not required", commercial use permitted.
+- Rounded plates, buttons, panels. This is what supplies the chunky warmth.
+- The base pack's blue is cool and clashes with the maroon/oak palette — take
+  the grey/white variants and tint them warm in `Theme`.
+- Kenney asks you not to use *his logo*. That is a trademark reservation and
+  does not constrain the art.
+
+### 4.3 Food icons — Kenney Food Kit (CC0)
+
+<https://kenney.nl/assets/food-kit> — ~200 low-poly models, CC0, no attribution.
+
+The trick that makes this the right answer: **render each 3D model to a flat 2D
+icon.** The cookbook icon and the object on the plate are then literally the
+same asset, which no 2D-only pack can give you. CC0 permits rendering and
+redistributing those renders.
+
+Verified coverage: tea cup, frappe, croissant, cake, cake slice, sandwich,
+muffin, donuts, bread/baguette. **Gap:** no small espresso cup — recolour the
+tea cup.
+
+### 4.4 Explicitly rejected, with reasons
+
+Do not quietly reintroduce these:
+
+| Source | Why not |
 | --- | --- |
-| `Staff` | dock button 3 |
-| `Upgrades` | dock button 4 |
-| `Trophy` | right rail |
-| `Map` | right rail |
-| `Music` | right rail |
-| `Settings` | right rail |
+| **game-icons.net** | CC BY 3.0 with **per-author** attribution — 13 icons from 6 artists = 6 credits, forever. Monochrome silhouettes anyway. |
+| **OpenMoji** | CC BY-**SA** 4.0. Recolouring to the palette forces re-release under SA. Looks like CC BY at a glance — the classic trap. |
+| **Noto Emoji** | README says "**most** image resources" are Apache 2.0. You cannot cleanly assert coverage for a specific image. |
+| **CraftPix free** | Custom licence forbids redistribution, which conflicts with uploading to Roblox. |
+| **Lucide** | Dual **ISC + MIT** (~150 Feather-derived icons keep Cole Bemis's MIT notice). Thin outlines — wrong style regardless. |
+| **Filwarka "2D Roblox Food Icons"** (itch.io) | Closest style match to the current HUD, but itch.io blocked verification — licence **UNVERIFIED**. Do not adopt until someone reads the terms; "free download" often does not grant commercial use. |
 
-For each: the owner sends the **Creator Store asset id or link**, and it gets
-recorded in `docs/ASSET_LICENSES.md` with its creator before use. If the owner
-prefers to replace the existing nine as well so the whole set matches, that is
-better — ask.
+### 4.5 ⚠️ Provenance caveat on the pack currently shipping
+
+`Graphics.UI` currently draws nine icons from **Simulator Icon Pack**
+`99176447965360`. `ASSET_LICENSES.md` audits it as "112 decals, no scripts" —
+that is a **script** audit, not a **provenance** audit.
+
+The same pack is published on the Creator Store **three times** with
+byte-identical descriptions, each claiming to be the original:
+`99176447965360` (DevJoob, 2026-02-26), `75039072715318` (WDavidig,
+2026-04-12), `71964724767093` (CodeNova492Frost9191). Ours is the earliest, so
+it is the likely origin on Roblox — but there is no findable artist footprint
+and no written commercial grant, and a Creator Store licence does **not**
+warrant provenance (Roblox cannot grant rights the uploader never held). The
+grant is also scoped to Studio and Experiences only — it does not cover the game
+icon, thumbnails, or marketing.
+
+Migrating the HUD to the CC0 packs above therefore also *retires* this risk.
+Prefer replacing all 13 icons with Nieobie rather than mixing the two — mixed
+corner radii and stroke weights are visible side by side in one toolbar.
+
+### 4.6 Uploading to Roblox
+
+Self-upload the CC0 art as Images/Decals via the Creator Dashboard — the owner
+becomes the uploader, provenance is documented, attribution burden is zero.
+Note: since 2026-05-05 **new** accounts/Groups default to Asset Privacy on, so
+uploads can be *Restricted* and silently fail to render; existing accounts are
+unaffected but it is a toggle. "Open Use" is **irreversible**.
+
+Record every uploaded id in `docs/ASSET_LICENSES.md` with pack, licence, source
+URL and commit hash before shipping it.
 
 ## 5. Acceptance criteria
 
