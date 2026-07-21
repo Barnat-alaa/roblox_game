@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — 2026-07-21 — HUD redesign spec + a truthful status pass
+- **`docs/HUD_REDESIGN.md` (new)** — full spec for the menu rework the owner
+  asked for: bottom-left stat pills (money/reputation/buzz), a bottom-centre
+  dock of five chunky icon buttons with numbered shortcuts that lift and show
+  their name on hover, and a right-hand rail with single-key shortcuts. Records
+  what we take from the owner's reference screenshot (layout, information
+  architecture, interaction pattern) and what we explicitly do not (its icon
+  art, skins, wording) — the same line `docs/MENU_SPEC.md` draws for Café World.
+  Includes the exact list of icon slots still needed from the owner.
+- **`docs/SESSION_HANDOFF.md`** — rewritten: merged work, the DataStore
+  environment split, the real offline-earnings formula, and an explicit
+  "merged but never actually run" section (the 10-café street,
+  `PedestrianService`, the `saveBlocked` path).
+- **`NEXT_ACTIONS.md`** — was badly stale: it still listed publishing the
+  experience as "the only real blocker left" when the experience has been
+  published since 2026-07-20. Rewritten around what is actually outstanding.
+- **`KNOWN_ISSUES.md`** — corrected the claim that capped offline earnings
+  "remains a later idle-progression feature"; it shipped. The two real
+  remaining gaps (Waiter-only capacity scale, and `lastSeenAt` being stamped
+  even when settlement never ran) are recorded instead.
+- **`CURRENT_STATUS.md`** — persistence is no longer blocked on publishing;
+  points at the session handoff as the authoritative status doc.
+
 ### Changed — 2026-07-21 — 10-café lobbies, and the surplus-player path made real
 The lobby drops from 30 cafés to **10** (owner request). Scale now comes from
 Roblox spawning MORE servers, not bigger ones — total concurrent players stays

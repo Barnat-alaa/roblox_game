@@ -35,18 +35,33 @@ _Last updated: 2026-07-14 (evening) — Days 1–5 shipped; Day 6 in progress._
   clean scripted pass in Studio).
 - Mobile/touch pass with the device simulator; two-client visit +
   compliment test (Studio multi-client mode — needs a human click).
-- Save persistence — **blocked on publishing the place** (see below).
+- ~~Save persistence — blocked on publishing the place.~~ **Resolved:** the
+  experience is published (HANDOFF §2) and the persistence chain is verified —
+  a real profile round-trips through DataStore-style JSON with zero field loss.
 
-## What YOU need to do next
+---
 
-1. **Publish** (unblocks persistence testing): open the place in Studio →
-   Alt+P → name `Social Cafe DEV` → Create → Game Settings → Security →
-   **Enable Studio Access to API Services** → Save → tell Claude "published".
-2. Optional but recommended: install the **Rojo plugin** (Toolbox → Plugins →
-   search "Rojo" by evaera) and click **Connect** so code syncs into Studio
-   automatically.
+# 2026-07-21 update
+
+Superseded by [docs/SESSION_HANDOFF.md](docs/SESSION_HANDOFF.md), which is the
+authoritative status doc. Summary of that day:
+
+**Merged (PRs #3–#7, all CI green, no open PRs):** kitchen layout verified and
+counter/machine fitted · permanent ambient sidewalk pedestrians · persistence
+safety (a failed load no longer wipes the account) · **lobby cut from 30 cafés
+to 10** with surplus players queued instead of stranded · `scripts/publish.ps1`
+for publishing local source directly.
+
+**Merged but NEVER RUN — verify first:** the 10-café street, `PedestrianService`,
+and the `saveBlocked` path.
+
+**Owner actions outstanding:** dashboard Max Players → **10**; create an Open
+Cloud API key for `publish.ps1`; supply the HUD icons in
+[docs/HUD_REDESIGN.md](docs/HUD_REDESIGN.md) §4.
+
+**Next build task:** the HUD/menu rework — see docs/HUD_REDESIGN.md.
 
 ## Exact command to continue
 
-Open Claude Code in `C:\Users\barna\Desktop\roblox` and say "continue".
-Claude can reopen Studio itself (shell-launches the .rbxlx) when needed.
+Open Claude Code in `C:\Users\barna\Desktop\roblox` and say "continue", or paste
+the prompt at the bottom of `docs/SESSION_HANDOFF.md`.
