@@ -32,6 +32,25 @@ return function()
 			expect(bHi).to.equal(-World.boulevardWidth + StreetMath.sidewalkWidth())
 		end)
 
+		it("keeps plotCount at exactly two rows", function()
+			-- plotOriginFor wraps its column index modulo plotsPerRow, so any
+			-- extra plot silently lands on top of an existing café and two
+			-- players would share one building. CafeService asserts this at
+			-- boot; this is the automated guard.
+			expect(World.plotCount).to.equal(World.plotsPerRow * 2)
+		end)
+
+		it("keeps the pedestrian walk range inside the boundary walls", function()
+			-- The StreetGround slab (and the WorldBoundary wall sitting on its
+			-- edge) only reaches eastHeadroom() studs past the last plot. If the
+			-- walk range overshot that, a pedestrian could spawn on the far side
+			-- of the wall and clampX would keep it out there permanently.
+			local lo, hi = StreetMath.walkXBounds()
+			local limit = StreetMath.streetLength() + StreetMath.eastHeadroom()
+			expect(hi <= limit - StreetMath.WALL_CLEARANCE).to.equal(true)
+			expect(lo >= -(StreetMath.eastHeadroom())).to.equal(true)
+		end)
+
 		it("maps plot indices to the sidewalk their door faces", function()
 			expect(StreetMath.sideForPlotIndex(1)).to.equal(0)
 			expect(StreetMath.sideForPlotIndex(World.plotsPerRow)).to.equal(0)

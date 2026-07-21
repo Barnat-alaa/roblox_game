@@ -34,8 +34,15 @@ StreetMath.DECOR_INSET = 14
 -- side, street decor on the other). Roughly an NPC's shoulder width.
 StreetMath.CLEARANCE = 3.5
 
--- Margin kept between the walkable X range and the very ends of the paving.
+-- Desired margin between the walkable X range and the ends of the paving. This
+-- is only a WISH: walkXBounds clamps it to whatever actually fits inside the
+-- StreetGround slab, because overshooting puts a pedestrian on the far side of
+-- the WorldBoundary wall, where clampX then keeps it forever (it can walk the
+-- lane but never back through the wall).
 StreetMath.END_MARGIN = 20
+
+-- Clearance kept between the walkable range and the boundary wall itself.
+StreetMath.WALL_CLEARANCE = 4
 
 function StreetMath.plotWidth(): number
 	return Grid.PLOT_WIDTH * Grid.CELL_SIZE
@@ -122,9 +129,25 @@ function StreetMath.onSidewalk(side: number, z: number): boolean
 	return z >= lo and z <= hi
 end
 
--- Walkable X range along the boulevard, kept just inside the paved ends.
+-- How far the StreetGround slab reaches past streetLength() at the east end.
+-- CafeService sizes the slab as (plotsPerRow * plotSpacing + 80) centred at
+-- (plotsPerRow * plotSpacing)/2 - plotSpacing/2, so the headroom past the last
+-- plot works out to plotSpacing/2 - 32 — independent of plotsPerRow. The
+-- WorldBoundary east wall sits on that edge.
+function StreetMath.eastHeadroom(): number
+	return StreetMath.plotSpacing() / 2 - 32
+end
+
+-- Walkable X range along the boulevard, kept just inside the paved ends AND
+-- inside the boundary walls. At plotSpacing 84 the headroom is only 10 studs,
+-- so the requested END_MARGIN of 20 gets clamped down to 6 — without this an
+-- ambient pedestrian could spawn beyond the east wall and never get back in.
 function StreetMath.walkXBounds(): (number, number)
-	return -StreetMath.END_MARGIN, StreetMath.streetLength() + StreetMath.END_MARGIN
+	local margin = math.max(
+		0,
+		math.min(StreetMath.END_MARGIN, StreetMath.eastHeadroom() - StreetMath.WALL_CLEARANCE)
+	)
+	return -margin, StreetMath.streetLength() + margin
 end
 
 function StreetMath.clampX(x: number): number

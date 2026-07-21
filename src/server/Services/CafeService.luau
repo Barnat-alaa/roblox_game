@@ -25,6 +25,7 @@ local Grid = require(Shared.Utilities.Grid)
 local Graphics = require(Shared.Config.Graphics)
 local World = require(Shared.Config.World)
 local Log = require(Shared.Utilities.Log)
+local Remotes = require(Shared.Network.Remotes)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 local NpcNav = require(script.Parent.Parent.NpcNav)
@@ -39,6 +40,19 @@ local AssetLibraryService: any
 local NUM_PLOTS = World.plotCount
 local PLOTS_PER_ROW = World.plotsPerRow
 local PLOT_SPACING = Grid.PLOT_WIDTH * Grid.CELL_SIZE + World.plotGap
+
+-- The street is two facing rows and plotOriginFor wraps its column modulo
+-- plotsPerRow, so a plotCount above plotsPerRow * 2 would silently place a
+-- second café on top of an existing one and hand two players the same building.
+-- Fail loudly at boot instead.
+assert(
+	NUM_PLOTS == PLOTS_PER_ROW * 2,
+	string.format(
+		"World.plotCount (%d) must equal plotsPerRow * 2 (%d) — see Config/World.luau",
+		NUM_PLOTS,
+		PLOTS_PER_ROW * 2
+	)
+)
 
 local WALL_H = World.wallHeight
 local DOOR_W = World.doorWidth
@@ -994,17 +1008,26 @@ local function buildStreetDecor(parent: Instance)
 				pole.Name = "LampPole_" .. i
 			end
 		end
-		-- Sidewalk accents between every few cafés.
-		if i % 3 == 1 then
+		-- Sidewalk accents. The stride is derived rather than a fixed modulo:
+		-- at 15 cafés/row "% 3" and "% 4" read well, but on the 5/row street they
+		-- collapse to 2 mailboxes and a single lone hydrant across the whole far
+		-- pavement. Alternating sides keeps both pavements furnished at any size.
+		local accentStride = if PLOTS_PER_ROW >= 12 then 3 else 2
+		if i % accentStride == 1 then
 			placeWorld("mailbox", x + 10, -0.5, -14)
 		end
-		if i % 4 == 2 then
+		if i % accentStride == 0 and i > 0 then
 			placeWorld("hydrant", x + 10, -0.5, -(World.boulevardWidth - 14))
 		end
 	end
 
-	for i = 1, 4 do
-		local x = (i - 0.5) * (PLOTS_PER_ROW * PLOT_SPACING) / 4 - 12
+	-- Boulevard trees, spaced by DISTANCE rather than a fixed count of 4 — on the
+	-- shortened street a hardcoded 4 put a tree every ~105 studs (roughly one per
+	-- café, ~3x the intended density) instead of every ~315.
+	local streetRun = PLOTS_PER_ROW * PLOT_SPACING
+	local treeCount = math.max(2, math.floor(streetRun / 315 + 0.5))
+	for i = 1, treeCount do
+		local x = (i - 0.5) * streetRun / treeCount - 12
 		local z = -44
 		if not placeWorld("tree", x, -0.5, z) then
 			makePart(
@@ -1344,18 +1367,20 @@ local function teleportOnto(plot: Plot, character: Model)
 	end
 end
 
-local function onPlayerAdded(player: Player)
-	-- Idempotent: guard against PlayerAdded firing alongside the catch-up loop,
-	-- which would otherwise assign the same player a second plot.
-	if plotByUser[player.UserId] then
-		return
-	end
-	local plot = assignPlot(player)
-	if not plot then
-		Log.warn("No free plot for", player.Name, "- server full")
-		return
-	end
+-- Players admitted while every café was taken. Roblox lets people in up to the
+-- dashboard Max Players regardless of what this server can seat, so if that is
+-- ever misconfigured above plotCount the surplus must NOT be left in a dead
+-- session — they queue here and are served the moment a café frees up.
+local waitingForPlot: { Player } = {}
 
+local function removeFromWaiting(player: Player)
+	local i = table.find(waitingForPlot, player)
+	if i then
+		table.remove(waitingForPlot, i)
+	end
+end
+
+local function activatePlot(player: Player, plot: Plot)
 	-- Render only once the profile has actually loaded. Rendering early draws an
 	-- EMPTY café even though the player has saved furniture, so keep waiting
 	-- while they are still in the server instead of giving up on a fixed
@@ -1390,8 +1415,57 @@ local function onPlayerAdded(player: Player)
 	end)
 end
 
+local function onPlayerAdded(player: Player)
+	-- Idempotent: guard against PlayerAdded firing alongside the catch-up loop,
+	-- which would otherwise assign the same player a second plot.
+	if plotByUser[player.UserId] then
+		return
+	end
+	local plot = assignPlot(player)
+	if not plot then
+		-- Every café is taken. Previously this returned silently and the player
+		-- spent the whole session with no plot, no furniture, no income and no
+		-- explanation. Queue them and tell them instead.
+		Log.warn(
+			"No free plot for",
+			player.Name,
+			string.format(
+				"- all %d cafés taken; queued (Max Players should be <= %d)",
+				NUM_PLOTS,
+				NUM_PLOTS
+			)
+		)
+		if not table.find(waitingForPlot, player) then
+			table.insert(waitingForPlot, player)
+		end
+		Remotes.event("Notify"):FireClient(player, { kind = "no_plot", queued = #waitingForPlot })
+		return
+	end
+	activatePlot(player, plot)
+end
+
+-- Hand the longest-waiting player the café that just freed up.
+local function serveNextWaiting()
+	while #waitingForPlot > 0 do
+		local player = table.remove(waitingForPlot, 1) :: Player
+		if player and player.Parent ~= nil and not plotByUser[player.UserId] then
+			local plot = assignPlot(player)
+			if not plot then
+				-- Nothing free after all; put them back at the front and stop.
+				table.insert(waitingForPlot, 1, player)
+				return
+			end
+			Log.info("Freed café assigned to queued player", player.Name)
+			Remotes.event("Notify"):FireClient(player, { kind = "plot_assigned" })
+			task.spawn(activatePlot, player, plot)
+			return
+		end
+	end
+end
+
 local function onPlayerRemoving(player: Player)
 	jumpStates[player] = nil
+	removeFromWaiting(player)
 	local plot = plotByUser[player.UserId]
 	if plot then
 		plot.ownerUserId = nil
@@ -1402,6 +1476,8 @@ local function onPlayerRemoving(player: Player)
 		end
 		setPlotClosed(plot)
 		plotByUser[player.UserId] = nil
+		-- A café just re-shuttered; give it to whoever is queued.
+		serveNextWaiting()
 	end
 end
 
