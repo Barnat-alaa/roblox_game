@@ -33,8 +33,40 @@ players (whitelisted compliments only).
 | --- | --- |
 | Repo (public) | <https://github.com/Barnat-alaa/roblox_game> (branch `main`) |
 | Local checkout | `C:\Users\barna\Desktop\roblox` |
-| Published experience | **Social Cafe DEV** — universeId `10501568035`, placeId `85898641225605`, **Private**, Max Players **30**, API Services **ON** (real DataStore `DEV_PlayerProfiles_v1`) |
+| Published experience | **Social Cafe DEV** — universeId `10501568035`, placeId `85898641225605`, **Private**, API Services **ON**. ⚠️ Max Players must be **10** to match `World.plotCount` (2026-07-21) |
 | Place file (built artifact, gitignored) | `SocialCafe.rbxlx` — rebuild any time with `rojo build --output SocialCafe.rbxlx` |
+| **Publishing** | `./scripts/publish.ps1` — gates + build + Open Cloud upload, straight from `src/`. See §2a. |
+
+### 2a. Publishing (always ships the LOCAL source)
+
+```powershell
+$env:ROBLOX_API_KEY = "<Open Cloud key>"   # once per shell
+./scripts/publish.ps1
+```
+
+Do **not** publish from Studio's *Fichier → Publier sur Roblox*: that uploads
+whatever is currently OPEN in Studio, which is not necessarily what is on disk.
+Forget to reopen the rebuilt `SocialCafe.rbxlx` first and you silently ship
+stale scripts — this has already caused confusion once. `publish.ps1` builds
+from `src/` and uploads that, so published == local, always.
+
+Create the key at <https://create.roblox.com/dashboard/credentials> with the
+**universe-places** system, this universe selected, and the **write** scope.
+Never commit it (`.gitignore` already covers `.env` / `*.key`).
+
+**DataStore environments** (`DataService.environmentPrefix`), so a playtest can
+never corrupt a real player's save:
+
+| where | store |
+| --- | --- |
+| Live server on the published place | `PROD_PlayerProfiles_v1` |
+| Studio playtest (any place) | `DEV_PlayerProfiles_v1` |
+| Unpublished / local `.rbxlx` (PlaceId 0) | `DEV_PlayerProfiles_v1` |
+
+No setup needed — live is PROD by default. Only set an `Environment` string
+attribute on the place if you want to override (e.g. `"STAGING"`, or `"DEV"` on
+a secondary dev place once a separate production place exists, so the two don't
+share the PROD store).
 | Docs | `docs/` (+ `ROADMAP.md`, `CHANGELOG.md`, `KNOWN_ISSUES.md`, `CURRENT_STATUS.md`) |
 
 **Toolchain (installed & pinned):** Rojo 7.4.4 · Rokit 1.2.0 · StyLua 2.0.2 ·
