@@ -60,6 +60,27 @@ local Graphics = {
 	-- Catalogue rows call this with an AssetManifest id to get the item's own
 	-- picture.
 	ItemThumbnail = itemThumbnail,
+	-- One icon per dish, keyed by Config/Recipes id. Kenney Food Kit 2.0 (CC0)
+	-- flat renders, self-uploaded — the fix docs/HUD_REDESIGN.md §4.3 called for.
+	-- The 14 dishes are meshes inside one packaged model, so they have no
+	-- individual Creator Store id to render a thumbnail from; these give each
+	-- dish its own picture instead of four shared category photos.
+	Dishes = {
+		espresso = "rbxassetid://80930338989723",
+		cappuccino = "rbxassetid://85121371995613",
+		tea = "rbxassetid://87677406983122",
+		croissant = "rbxassetid://98503280270358",
+		sandwich = "rbxassetid://124917609220287",
+		latte = "rbxassetid://120609673339594",
+		muffin = "rbxassetid://116845304850777",
+		iced_tea = "rbxassetid://102246519602825",
+		fruit_salad = "rbxassetid://95586842311547",
+		mocha = "rbxassetid://138226741866127",
+		cinnamon_roll = "rbxassetid://131649668281254",
+		club_sandwich = "rbxassetid://85863668096370",
+		slow_roast = "rbxassetid://137686512001808",
+		quiche = "rbxassetid://137520402102940",
+	},
 	Surfaces = {
 		Sidewalk = thumbnail(2922135969),
 		RoadStraight = thumbnail(17092935),

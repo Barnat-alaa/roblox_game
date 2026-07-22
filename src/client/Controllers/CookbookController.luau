@@ -4,19 +4,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local AssetManifest = require(Shared.Config.AssetManifest)
+local Graphics = require(Shared.Config.Graphics)
 local Recipes = require(Shared.Config.Recipes)
 local Kitchen = require(Shared.Config.Kitchen)
 local Mastery = require(Shared.Utilities.Mastery)
-
--- The 14 dishes are meshes extracted from one Creator Store pack, so no dish
--- has an asset id of its own to render. The nearest real picture is the
--- category's plate prop — four pictures across fourteen dishes. Per-dish art is
--- the open gap tracked in docs/ASSET_SHOPPING_LIST.md.
-local function dishAssetId(category: string): number?
-	local entry = (AssetManifest.props :: any)[category]
-	return if entry then entry.assetId else nil
-end
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -117,11 +108,10 @@ local function rebuild()
 		cards[item.id] = card
 
 		local color = Components.CategoryColor(recipe.category)
-		-- Dishes have no per-recipe Creator Store asset (they are meshes inside
-		-- one pack), so the picture is the category's plate prop. A locked
-		-- recipe shows that same picture blurred rather than a bare "?".
+		-- Each dish has its own icon; a locked recipe shows that same picture
+		-- blurred rather than a bare "?".
 		local thumbnail = Components.ItemThumbnail(card, {
-			assetId = dishAssetId(recipe.category),
+			image = (Graphics.Dishes :: any)[item.id],
 			size = Theme.Thumbnail.CardSize,
 			glyph = Components.CategoryGlyph(recipe.category),
 			accent = color,

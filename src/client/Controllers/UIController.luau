@@ -1004,14 +1004,18 @@ function UIController.Start(_self: any)
 	-- first time they open.
 	task.spawn(function()
 		local warm = {}
-		for _, source in { AssetManifest.furniture, AssetManifest.props } do
-			for _, entry in source :: any do
-				local image = Instance.new("ImageLabel")
-				image.Image = Graphics.ItemThumbnail(entry.assetId)
-				image.Parent = gui
-				image.Visible = false
-				table.insert(warm, image)
-			end
+		local function stage(content: string)
+			local image = Instance.new("ImageLabel")
+			image.Image = content
+			image.Visible = false
+			image.Parent = gui
+			table.insert(warm, image)
+		end
+		for _, entry in AssetManifest.furniture :: any do
+			stage(Graphics.ItemThumbnail(entry.assetId))
+		end
+		for _, content in Graphics.Dishes :: any do
+			stage(content)
 		end
 		pcall(function()
 			ContentProvider:PreloadAsync(warm)

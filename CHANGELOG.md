@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-22 — every dish has its own picture
+Closes the one gap the coverage audit found. The 14 dishes are meshes *inside*
+one packaged model, so no dish had a Creator Store id to render a thumbnail
+from — Espresso and Latte showed the same coffee-cup photo, and the four
+pastries shared one croissant.
+
+- **14 dish icons from Kenney Food Kit 2.0 (CC0)**, self-uploaded, one per
+  recipe, keyed by `Config/Recipes` id in `Graphics.Dishes`. The kit ships a
+  flat 2D render per model, which is exactly the 3D-to-2D step
+  `docs/HUD_REDESIGN.md` §4.3 called for; each was upscaled to 256px. Two were
+  modified (CC0 permits it): the iced tea is hue-shifted from the stock purple
+  to tea colour, and the cappuccino uses `cup` because `cup-saucer` renders as
+  an empty plate.
+- `Components.ItemThumbnail` gained an `image` option so a dish can pass its own
+  uploaded icon, while furniture keeps rendering from its Creator Store model.
+- The **always-visible stock dock** slots now show the dish icon instead of a
+  coloured letter puck, with the puck kept as the fallback.
+- Verified live: 14 cookbook cards, **14 distinct images**, all loading. (Rows
+  scrolled out of view report "not loaded" — Roblox does not fetch images it is
+  not rendering. Walking the list confirms 14/14.)
+
+Art coverage is now complete for everything the player can buy, place or cook.
+
 ### Added — 2026-07-22 — catalogue rows show the actual item, blurred when locked
 Owner report: "in the shop or when I want to put an item I can't find the photo
 of the item I will be putting." Every catalogue row showed a two-letter category
