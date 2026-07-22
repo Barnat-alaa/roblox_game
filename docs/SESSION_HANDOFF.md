@@ -102,8 +102,12 @@ instead and takes `--rows/--cols/--names`.
    is 30; leave it and 20 players per server join with no café.
 2. **Create an Open Cloud API key** for `scripts/publish.ps1` — see HANDOFF §2a.
 3. **Publish.** The cloud place still lags the repo — everything above is local.
-4. **Decide the next feature.** [GAMEPLAY_DIRECTION.md](GAMEPLAY_DIRECTION.md)
-   ranks seven; the recommendation is ingredients + rush hours, then regulars.
+4. ~~Decide the next feature.~~ **Decided 2026-07-23** — the owner chose the
+   feature set now written in [GAMEPLAY_DIRECTION.md](GAMEPLAY_DIRECTION.md):
+   ingredients + staff hire/upgrade first, then VIP + gift box, then neighbour
+   help + smell bomb, then a monetisation pass. Two things still need the owner:
+   the **VIP NPC model**, and a **sign-off on the monetisation stance** (Robux
+   buys accelerators, not power) and on the **smell-bomb guard rails**.
 
 ---
 
@@ -197,20 +201,29 @@ agents on this repo at once.
 > Every buyable, placeable and cookable thing has real art; every HUD button is
 > on the owner's own icon set. The tutorial runs end to end.
 >
-> **MAIN TASK — ask the owner which to build first, then build it.** The game's
-> real weakness is diagnosed in docs/GAMEPLAY_DIRECTION.md: there are **no
-> ingredients** (the word is a coin deduction with nothing behind it), and the
-> game **automates away its own gameplay** — staff progressively remove every
-> physical action, so the most engaged a player ever is, is their first twenty
-> minutes. The recommended order is:
->   1. **Ingredients as a delivery you go and meet** — a supply van, crates you
->      unload, pantry shelves that visibly empty as cooking drains them, and
->      running dry as a real failure state. Hooks into the existing
->      `ingredientCost` path in KitchenService/ProductionService.
->   2. **Rush hours** — Buzz spikes for ~90s, staff capacity cannot cover it, so
->      the player works the floor by hand. An opportunity, never a punishment.
->   3. **Regulars** — named customers who return, have a favourite dish, and warm
->      to you the more you serve them personally.
+> **MAIN TASK — build the owner's chosen feature set, in
+> docs/GAMEPLAY_DIRECTION.md, in the order there.** It fixes the two diagnosed
+> problems: there are **no ingredients** (the word is a coin deduction with
+> nothing behind it) and the game **automates away its own gameplay** (staff
+> progressively remove every physical action). Read the doc in full first — each
+> feature names the exact service it hooks into. In order:
+>   - **Phase A — Ingredients + Staff hire/upgrade panel.** Recipes consume real
+>     stock from a pantry, bought in bulk at the market (art: HAVE, all 14 — 11
+>     direct Kenney Food Kit renders + 3 recolours). The café starts with only a
+>     Barista and Waiter; the Staff button hires the locked Cook/Cleaner (blurred
+>     photo when locked) and upgrades each in 10% steps that raise their
+>     capacity, with a level-up effect on the NPC. `StaffMember` already carries
+>     `level`; `staffCapacity` is already per-role; the plumbing fits.
+>   - **Phase B — VIP customers + gift box.** A VIP spawns in the lobby and walks
+>     to the busiest café on the server; eats, tips big, leaves a gift box the
+>     player opens for a reward (coins now). Owner supplies the VIP NPC model.
+>     The gift box is EARNED, never a paid random box.
+>   - **Phase C — Neighbour help (co-op) + smell bomb (competitive).** See the
+>     doc; the smell bomb brushes the ethics rails and needs the guard rails
+>     spelled out there — confirm with the owner before building it.
+>   - **Phase D — Monetisation**, only after A–C prove the loop is fun. Robux
+>     buys ACCELERATORS (everything also earnable with coins), never power;
+>     idempotent `ProcessReceipt`.
 >
 > **Ethics rails are absolute** (HANDOFF §1): spoilage transparent and paused
 > offline, no missed-day punishment, no loot boxes, no pay-to-win, no fake
@@ -218,7 +231,9 @@ agents on this repo at once.
 >
 > **Before you build anything that asks the player to cook on demand:** the
 > automatic production loop holds a job on the appliance, so a manual `StartCook`
-> answers `stove_busy`. That is what made the old tutorial impossible.
+> answers `stove_busy`. That is what made the old tutorial impossible — and it is
+> why ingredient checks must gate the AUTOMATIC production tick, not just manual
+> cooking.
 >
 > Work in strict Luau on disk. Keep StyLua + Selene + both Rojo builds green with
 > `set -o pipefail` and unpiped selene, commit with conventional messages +
