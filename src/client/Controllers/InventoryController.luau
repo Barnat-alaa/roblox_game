@@ -5,15 +5,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local AssetManifest = require(Shared.Config.AssetManifest)
+local Graphics = require(Shared.Config.Graphics)
 local Recipes = require(Shared.Config.Recipes)
-
--- Dishes are meshes inside one pack rather than separate assets, so the nearest
--- real picture is the category's plate prop. See CookbookController.
-local function dishAssetId(category: string): number?
-	local entry = (AssetManifest.props :: any)[category]
-	return if entry then entry.assetId else nil
-end
 local Staff = require(Shared.Config.Staff)
 local KitchenConfig = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
@@ -269,8 +262,14 @@ local function updateDock()
 			slot.count.Text = tostring(stock)
 			slot.dot.BackgroundColor3 = stateColor
 			slot.state.Text = state
-			slot.icon.Text = Components.CategoryGlyph(recipe.category)
-			slot.icon.BackgroundColor3 = Components.CategoryColor(recipe.category)
+			local dish = (Graphics.Dishes :: any)[id]
+			slot.icon.Image = dish or ""
+			-- Keep the coloured letter puck as the fallback when a dish has no
+			-- icon yet, so the slot is never an empty square.
+			slot.iconGlyph.Text = if dish then "" else Components.CategoryGlyph(recipe.category)
+			slot.icon.BackgroundColor3 = if dish
+				then Theme.Colors.PaperDark
+				else Components.CategoryColor(recipe.category)
 		end
 	end
 	ui.empty.Visible = #active == 0
@@ -392,12 +391,19 @@ local function makeDockSlot(parent: Instance, order: number)
 	Components.Corner(frame, Theme.Radius.Small)
 	Components.Stroke(frame, Theme.Colors.Line, 1, 0.45)
 	frame.Parent = parent
-	local icon = Components.Label(frame, "", 9, true)
+	-- The dish's own picture. Kept as a plain ImageLabel rather than a
+	-- ItemThumbnail: this slot is 28px and never shows a locked state.
+	local icon = Instance.new("ImageLabel")
+	icon.Name = "DishIcon"
 	icon.Size = UDim2.fromOffset(28, 28)
 	icon.Position = UDim2.fromOffset(5, 5)
-	icon.BackgroundTransparency = 0
-	icon.TextColor3 = Theme.Colors.White
+	icon.BackgroundColor3 = Theme.Colors.PaperDark
+	icon.ScaleType = Enum.ScaleType.Fit
 	Components.Corner(icon, 14)
+	icon.Parent = frame
+	local iconGlyph = Components.Label(icon, "", 9, true)
+	iconGlyph.Size = UDim2.fromScale(1, 1)
+	iconGlyph.TextColor3 = Theme.Colors.White
 	local name = Components.Label(frame, "", 10, true)
 	name.Size = UDim2.new(1, -44, 0, 18)
 	name.Position = UDim2.fromOffset(38, 3)
@@ -418,8 +424,15 @@ local function makeDockSlot(parent: Instance, order: number)
 	state.Position = UDim2.fromOffset(48, 23)
 	state.TextColor3 = Theme.Colors.Muted
 	state.TextXAlignment = Enum.TextXAlignment.Left
-	local slot =
-		{ frame = frame, icon = icon, name = name, count = count, dot = dot, state = state }
+	local slot = {
+		frame = frame,
+		icon = icon,
+		iconGlyph = iconGlyph,
+		name = name,
+		count = count,
+		dot = dot,
+		state = state,
+	}
 	table.insert(dockSlots, slot)
 	frame.InputBegan:Connect(function(input)
 		if
@@ -444,7 +457,7 @@ local function makeStockRow(parent: Instance, recipeId: string, order: number)
 	row.Parent = parent
 	local color = Components.CategoryColor(recipe.category)
 	local thumbnail = Components.ItemThumbnail(row, {
-		assetId = dishAssetId(recipe.category),
+		image = (Graphics.Dishes :: any)[recipeId],
 		size = Theme.Thumbnail.CardSize,
 		glyph = Components.CategoryGlyph(recipe.category),
 		accent = color,

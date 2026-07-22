@@ -285,6 +285,9 @@ function Components.SetPanelVisible(panel: Frame, visible: boolean)
 end
 
 export type ItemThumbnailOpts = {
+	-- An explicit image wins over assetId: dishes ship their own uploaded icon,
+	-- while furniture is rendered on demand from its Creator Store model.
+	image: string?,
 	assetId: number?,
 	size: number,
 	-- Shown instead of a picture when the item has no Creator Store asset.
@@ -309,8 +312,9 @@ export type ItemThumbnailHandle = {
 function Components.ItemThumbnail(parent: Instance, opts: ItemThumbnailOpts): ItemThumbnailHandle
 	local spec = Theme.Thumbnail
 	local px = opts.size
-	local image = if opts.assetId and opts.assetId > 0
-		then Graphics.ItemThumbnail(opts.assetId)
+	local image = if opts.image and opts.image ~= ""
+		then opts.image
+		elseif opts.assetId and opts.assetId > 0 then Graphics.ItemThumbnail(opts.assetId)
 		else nil
 
 	local root = Instance.new("Frame")

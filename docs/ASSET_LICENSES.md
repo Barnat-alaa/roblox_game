@@ -205,16 +205,53 @@ already recorded in the tables above, generated on demand by Roblox.
 | Catalogue | Entries | Real per-item picture? |
 | --- | ---: | --- |
 | Furniture (buy + place) | 20 | ✅ **20/20** — every catalogue id has a Creator Store model, all verified rendering |
-| Recipes / dishes | 14 | ⚠️ **category-level only** — 4 pictures (Coffee, Tea, Pastry, Sandwich props) shared across 14 dishes |
+| Recipes / dishes | 14 | ✅ **14/14** — one Kenney Food Kit icon each (see next section) |
 | Staff | 4 | ✅ rig thumbnails render, ❌ but no staff panel exists to show them yet |
 
-**The one real gap: per-dish art.** The 14 dishes are meshes *inside* one packaged
-model (`retroPropPack`), so no dish has an asset id of its own — a thumbnail of
-that pack shows the whole pack, not the dish. The documented fix is
-`docs/HUD_REDESIGN.md` §4.3: render each **Kenney Food Kit** (CC0) model to a
-flat 2D icon and upload it, which also makes the cookbook icon and the object on
-the plate the same asset. Until then the cookbook shows the category's plate
-prop, blurred while the recipe is locked.
+~~The one real gap: per-dish art.~~ **Closed 2026-07-22 — see below.**
+
+## Dish icons — Kenney Food Kit (CC0), self-uploaded 2026-07-22
+
+The 14 dishes are meshes *inside* one packaged model (`retroPropPack`), so no
+dish has a Creator Store id of its own to render a thumbnail from; they shared
+four category photos. Each dish now has **its own icon**, which is the fix
+`docs/HUD_REDESIGN.md` §4.3 specified.
+
+**Source: Kenney Food Kit 2.0** — <https://kenney.nl/assets/food-kit>,
+`kenney_food-kit.zip` (created 26-06-2024). **CC0 1.0**, verified in the zip's
+own `License.txt`: *"License: (Creative Commons Zero, CC0)… You can use this
+content for personal, educational, and commercial purposes."* No attribution
+required; Kenney's logo is not used.
+
+The kit ships a flat 2D render per model in `Previews/` (64×64 PNG, transparent)
+— the 3D-model-to-2D-icon step §4.3 describes, already done by the artist. Each
+was upscaled to 256px (Lanczos) for upload. Two were modified, which CC0 permits:
+`iced_tea` is `soda-glass` hue-rotated from purple to tea colour, and
+`cappuccino` uses `cup` because `cup-saucer` renders as an empty plate.
+
+| Recipe id | Dish | Food Kit model | Roblox asset id |
+| --- | --- | --- | ---: |
+| `espresso` | Espresso | `cup-coffee` | 80930338989723 |
+| `cappuccino` | Cappuccino | `cup` | 85121371995613 |
+| `tea` | House Tea | `cup-tea` | 87677406983122 |
+| `croissant` | Croissant | `croissant` | 98503280270358 |
+| `sandwich` | Café Sandwich | `sandwich` | 124917609220287 |
+| `latte` | Silky Latte | `mug` | 120609673339594 |
+| `muffin` | Berry Muffin | `muffin` | 116845304850777 |
+| `iced_tea` | Garden Iced Tea | `soda-glass` (hue-shifted) | 102246519602825 |
+| `fruit_salad` | Sunrise Fruit Bowl | `bowl-cereal` | 95586842311547 |
+| `mocha` | Velvet Mocha | `frappe` | 138226741866127 |
+| `cinnamon_roll` | Cinnamon Swirl | `donut` | 131649668281254 |
+| `club_sandwich` | Terrace Club | `sub` | 85863668096370 |
+| `slow_roast` | Overnight Roast Blend | `bag` | 137686512001808 |
+| `quiche` | Morning Quiche | `pie` | 137520402102940 |
+
+Ids live in `Graphics.Dishes`, keyed by `Config/Recipes` id. All 14 verified
+loading live in the cookbook (each row scrolled into view — Roblox does not
+fetch images it is not currently rendering, so an off-screen row reporting
+"not loaded" is normal, not a fault).
+
+**Coverage is now complete for everything the player can buy, place or cook.**
 
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
