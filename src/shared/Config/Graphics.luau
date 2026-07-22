@@ -15,6 +15,14 @@ local function thumbnail(assetId: number): string
 	return string.format("rbxthumb://type=Asset&id=%d&w=420&h=420", assetId)
 end
 
+-- Roblox renders a preview of any Creator Store asset for us, so catalogue rows
+-- can show the real item instead of a coloured letter. Measured 2026-07-22:
+-- type=Asset serves ONLY 150x150 and 420x420 — every other size the string
+-- accepts silently returns a blank image, so do not "optimise" this number.
+local function itemThumbnail(assetId: number): string
+	return string.format("rbxthumb://type=Asset&id=%d&w=150&h=150", assetId)
+end
+
 local Graphics = {
 	SourceAssets = {
 		Sidewalk = 2922135969,
@@ -49,6 +57,9 @@ local Graphics = {
 		PlateSquare = "rbxassetid://110496594476795",
 		PlateRound = "rbxassetid://118639991990376",
 	},
+	-- Catalogue rows call this with an AssetManifest id to get the item's own
+	-- picture.
+	ItemThumbnail = itemThumbnail,
 	Surfaces = {
 		Sidewalk = thumbnail(2922135969),
 		RoadStraight = thumbnail(17092935),

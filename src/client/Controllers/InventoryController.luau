@@ -5,7 +5,15 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local AssetManifest = require(Shared.Config.AssetManifest)
 local Recipes = require(Shared.Config.Recipes)
+
+-- Dishes are meshes inside one pack rather than separate assets, so the nearest
+-- real picture is the category's plate prop. See CookbookController.
+local function dishAssetId(category: string): number?
+	local entry = (AssetManifest.props :: any)[category]
+	return if entry then entry.assetId else nil
+end
 local Staff = require(Shared.Config.Staff)
 local KitchenConfig = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
@@ -435,9 +443,14 @@ local function makeStockRow(parent: Instance, recipeId: string, order: number)
 	Components.Stroke(row, Theme.Colors.Line, 1, 0.4)
 	row.Parent = parent
 	local color = Components.CategoryColor(recipe.category)
-	local icon = Components.Icon(row, Components.CategoryGlyph(recipe.category), nil, color, 42)
-	icon.Position = UDim2.fromOffset(10, 15)
-	icon.ZIndex = 23
+	local thumbnail = Components.ItemThumbnail(row, {
+		assetId = dishAssetId(recipe.category),
+		size = Theme.Thumbnail.CardSize,
+		glyph = Components.CategoryGlyph(recipe.category),
+		accent = color,
+	})
+	thumbnail.root.Position = UDim2.fromOffset(10, 13)
+	thumbnail.root.ZIndex = 23
 	local name = Components.Label(row, recipe.displayName, 14, true)
 	name.Size = UDim2.new(1, -190, 0, 22)
 	name.Position = UDim2.fromOffset(62, 10)

@@ -1,6 +1,7 @@
 --!strict
 -- Compact HUD, action dock, order ticket, shop, and shared panel coordination.
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -8,6 +9,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
+local AssetManifest = require(Shared.Config.AssetManifest)
+local Graphics = require(Shared.Config.Graphics)
 local Furniture = require(Shared.Config.Furniture)
 local Recipes = require(Shared.Config.Recipes)
 
@@ -314,11 +317,16 @@ local function updateStats()
 	for id, row in shopRows do
 		local def = Furniture[id]
 		local level = tonumber(profile.level) or 1
-		local canBuy = level >= def.requiredLevel and (tonumber(profile.coins) or 0) >= def.price
+		local levelLocked = level < def.requiredLevel
+		local canBuy = not levelLocked and (tonumber(profile.coins) or 0) >= def.price
 		row.buy.BackgroundColor3 = if canBuy then Theme.Colors.Coral else Theme.Colors.Muted
-		row.buy.Text = if level < def.requiredLevel
-			then "LV " .. tostring(def.requiredLevel)
-			else "BUY"
+		row.buy.Text = if levelLocked then "LV " .. tostring(def.requiredLevel) else "BUY"
+		-- Blur the picture only while the item is level-locked. Merely being
+		-- short of coins is not a mystery - you can see what you are saving for.
+		if row.locked ~= levelLocked then
+			row.locked = levelLocked
+			row.thumbnail.setLocked(levelLocked, "LV " .. tostring(def.requiredLevel))
+		end
 	end
 end
 
@@ -601,6 +609,13 @@ local function setShopCategory(category: string)
 	end
 end
 
+-- Every catalogue id has a Creator Store model, so the row can show the real
+-- item. Returns nil for anything unmapped, which falls back to the glyph badge.
+local function assetIdFor(catalogId: string): number?
+	local entry = (AssetManifest.furniture :: any)[catalogId]
+	return if entry then entry.assetId else nil
+end
+
 local function sortedFurnitureIds(): { string }
 	local ids = {}
 	for id in Furniture do
@@ -691,12 +706,17 @@ local function buildShop(parent: Instance)
 		Components.Stroke(row, Theme.Colors.Line, 1, 0.35)
 		row.Parent = list
 		local color = Components.CategoryColor(def.category)
-		local icon = Components.Icon(row, Components.CategoryGlyph(def.category), nil, color, 42)
-		icon.Position = UDim2.fromOffset(10, 13)
-		icon.ZIndex = 23
+		local thumbnail = Components.ItemThumbnail(row, {
+			assetId = assetIdFor(id),
+			size = Theme.Thumbnail.RowSize,
+			glyph = Components.CategoryGlyph(def.category),
+			accent = color,
+		})
+		thumbnail.root.Position = UDim2.fromOffset(8, 6)
+		thumbnail.root.ZIndex = 23
 		local name = Components.Label(row, def.displayName, 14, true)
 		name.Size = UDim2.new(1, -170, 0, 24)
-		name.Position = UDim2.fromOffset(62, 9)
+		name.Position = UDim2.fromOffset(72, 9)
 		name.TextXAlignment = Enum.TextXAlignment.Left
 		name.TextTruncate = Enum.TextTruncate.AtEnd
 		name.ZIndex = 23
@@ -707,7 +727,7 @@ local function buildShop(parent: Instance)
 			false
 		)
 		detail.Size = UDim2.new(1, -170, 0, 20)
-		detail.Position = UDim2.fromOffset(62, 35)
+		detail.Position = UDim2.fromOffset(72, 35)
 		detail.TextColor3 = Theme.Colors.Muted
 		detail.TextXAlignment = Enum.TextXAlignment.Left
 		detail.ZIndex = 23
@@ -717,7 +737,7 @@ local function buildShop(parent: Instance)
 		buy.Activated:Connect(function()
 			Remotes.event("PurchaseItem"):FireServer(id)
 		end)
-		shopRows[id] = { frame = row, buy = buy }
+		shopRows[id] = { frame = row, buy = buy, thumbnail = thumbnail, locked = nil }
 	end
 	ui.shopPanel = panel
 	setShopCategory(shopCategory)
@@ -975,6 +995,29 @@ function UIController.Start(_self: any)
 			)
 		elseif msg.kind == "error" then
 			UIController.toast(FRIENDLY_ERROR[msg.reason] or tostring(msg.reason))
+		end
+	end)
+
+	-- Roblox generates an asset's preview server-side the first time anyone asks
+	-- for it, which measured several seconds. Warm every catalogue picture in
+	-- the background so the shop and build lists are never a wall of blanks the
+	-- first time they open.
+	task.spawn(function()
+		local warm = {}
+		for _, source in { AssetManifest.furniture, AssetManifest.props } do
+			for _, entry in source :: any do
+				local image = Instance.new("ImageLabel")
+				image.Image = Graphics.ItemThumbnail(entry.assetId)
+				image.Parent = gui
+				image.Visible = false
+				table.insert(warm, image)
+			end
+		end
+		pcall(function()
+			ContentProvider:PreloadAsync(warm)
+		end)
+		for _, image in warm do
+			image:Destroy()
 		end
 	end)
 

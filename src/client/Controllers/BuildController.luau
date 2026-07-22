@@ -10,7 +10,15 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Grid = require(Shared.Utilities.Grid)
 local World = require(Shared.Config.World)
+local AssetManifest = require(Shared.Config.AssetManifest)
 local Furniture = require(Shared.Config.Furniture)
+
+-- Every catalogue id has a Creator Store model, so the row can show the real
+-- item. Returns nil for anything unmapped, which falls back to a glyph badge.
+local function assetIdFor(catalogId: string): number?
+	local entry = (AssetManifest.furniture :: any)[catalogId]
+	return if entry then entry.assetId else nil
+end
 local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
@@ -197,28 +205,48 @@ local function refreshCatalogue()
 		button.LayoutOrder = order
 		button.BackgroundColor3 = if selected then Theme.Colors.Mint else Theme.Colors.Paper
 		button.TextColor3 = if selected then Theme.Colors.White else Theme.Colors.Ink
-		button.Font = Theme.Font.Bold
-		button.TextSize = 13
-		button.TextXAlignment = Enum.TextXAlignment.Left
-		button.TextWrapped = true
-		button.Text = string.format(
-			"      %s\n      %s  |  %dx%d cells  |  x%d",
-			definition.displayName,
-			definition.category,
-			definition.width,
-			definition.depth,
-			count
-		)
+		button.Text = ""
 		button.ZIndex = 22
 		Components.Corner(button, Theme.Radius.Medium)
 		Components.Stroke(button, Theme.Colors.Line, 1, 0.35)
-		local accent = Instance.new("Frame")
-		accent.Size = UDim2.fromOffset(8, 42)
-		accent.Position = UDim2.fromOffset(10, 8)
-		accent.BackgroundColor3 = Components.CategoryColor(definition.category)
-		accent.ZIndex = 23
-		Components.Corner(accent, 4)
-		accent.Parent = button
+
+		-- Show the actual item you are about to place, not a coloured bar.
+		local thumbnail = Components.ItemThumbnail(button, {
+			assetId = assetIdFor(id),
+			size = Theme.Thumbnail.CardSize,
+			glyph = Components.CategoryGlyph(definition.category),
+			accent = Components.CategoryColor(definition.category),
+		})
+		thumbnail.root.Position = UDim2.fromOffset(6, 6)
+		thumbnail.root.ZIndex = 23
+
+		local textLeft = 6 + Theme.Thumbnail.CardSize + 8
+		local name = Components.Label(button, definition.displayName, 13, true)
+		name.Size = UDim2.new(1, -(textLeft + 8), 0, 22)
+		name.Position = UDim2.fromOffset(textLeft, 7)
+		name.TextXAlignment = Enum.TextXAlignment.Left
+		name.TextTruncate = Enum.TextTruncate.AtEnd
+		name.TextColor3 = button.TextColor3
+		name.ZIndex = 23
+		local detail = Components.Label(
+			button,
+			string.format(
+				"%s  |  %dx%d cells  |  x%d",
+				definition.category,
+				definition.width,
+				definition.depth,
+				count
+			),
+			11,
+			false
+		)
+		detail.Size = UDim2.new(1, -(textLeft + 8), 0, 20)
+		detail.Position = UDim2.fromOffset(textLeft, 30)
+		detail.TextXAlignment = Enum.TextXAlignment.Left
+		detail.TextTruncate = Enum.TextTruncate.AtEnd
+		detail.TextColor3 = if selected then Theme.Colors.Cream else Theme.Colors.Muted
+		detail.ZIndex = 23
+
 		button.Activated:Connect(function()
 			selectedId = id
 			refreshCatalogue()

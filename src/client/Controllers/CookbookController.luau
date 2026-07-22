@@ -4,9 +4,19 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local AssetManifest = require(Shared.Config.AssetManifest)
 local Recipes = require(Shared.Config.Recipes)
 local Kitchen = require(Shared.Config.Kitchen)
 local Mastery = require(Shared.Utilities.Mastery)
+
+-- The 14 dishes are meshes extracted from one Creator Store pack, so no dish
+-- has an asset id of its own to render. The nearest real picture is the
+-- category's plate prop — four pictures across fourteen dishes. Per-dish art is
+-- the open gap tracked in docs/ASSET_SHOPPING_LIST.md.
+local function dishAssetId(category: string): number?
+	local entry = (AssetManifest.props :: any)[category]
+	return if entry then entry.assetId else nil
+end
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -107,15 +117,19 @@ local function rebuild()
 		cards[item.id] = card
 
 		local color = Components.CategoryColor(recipe.category)
-		local icon = Components.Icon(
-			card,
-			if item.unlocked then Components.CategoryGlyph(recipe.category) else "?",
-			nil,
-			if item.unlocked then color else Theme.Colors.Muted,
-			46
-		)
-		icon.Position = UDim2.fromOffset(10, 18)
-		icon.ZIndex = 23
+		-- Dishes have no per-recipe Creator Store asset (they are meshes inside
+		-- one pack), so the picture is the category's plate prop. A locked
+		-- recipe shows that same picture blurred rather than a bare "?".
+		local thumbnail = Components.ItemThumbnail(card, {
+			assetId = dishAssetId(recipe.category),
+			size = Theme.Thumbnail.CardSize,
+			glyph = Components.CategoryGlyph(recipe.category),
+			accent = color,
+			locked = not item.unlocked,
+			lockLabel = "LV " .. tostring(recipe.requiredLevel),
+		})
+		thumbnail.root.Position = UDim2.fromOffset(10, 18)
+		thumbnail.root.ZIndex = 23
 		local title = Components.Label(
 			card,
 			if item.unlocked then recipe.displayName else "SECRET RECIPE",
