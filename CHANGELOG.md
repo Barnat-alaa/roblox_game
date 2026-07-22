@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — 2026-07-23 — gameplay direction set to the owner's chosen features
+`docs/GAMEPLAY_DIRECTION.md` rewritten from a menu of options into the committed
+next-build spec, each feature named against the service it hooks into:
+- **Staff you hire and upgrade** — café starts with only a Barista and Waiter;
+  the Staff panel hires the locked Cook/Cleaner (blurred photo when locked) and
+  upgrades each in 10% steps that raise capacity, with a level-up effect on the
+  NPC. Grounded: `StaffMember` already has `level`, `staffCapacity` is already
+  per-role, `starterStaff()` seeds the four.
+- **Ingredients bought in bulk at the market** — recipes consume real pantry
+  stock; running dry stops production. **Art coverage confirmed: all 14
+  ingredients** (11 direct Kenney Food Kit CC0 renders + 3 recolours), rendered
+  and proven in a proof sheet. Nothing to buy.
+- **VIP customers** — spawn in the lobby, walk to the busiest café on the server,
+  leave an *earned* gift box (never a paid random box). Owner supplies the model.
+- **Neighbour help** (co-op, extends `SocialService`'s anti-farm) and the
+  **smell bomb** (competitive customer-steal) — the smell bomb brushes the ethics
+  rails, so the doc spells out the guard rails and flags it for owner sign-off.
+- **Monetisation suggestions** — cosmetics-first; the owner's asks (Robux staff/
+  upgrades/ingredients/boosters) framed honestly as accelerators-not-power, with
+  the pay-to-win line drawn and idempotent `ProcessReceipt` required.
+
+The next-session prompt in `docs/SESSION_HANDOFF.md` now points at this spec.
+
 ### Docs — 2026-07-22 — handoff rewritten around what the game actually is
 - **`docs/GAMEPLAY_DIRECTION.md` (new)** — the loop read out of the services
   rather than the design docs: the nine things a player can physically do, and
