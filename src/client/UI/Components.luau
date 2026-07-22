@@ -1,7 +1,9 @@
 --!strict
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local Graphics = require(ReplicatedStorage.Shared.Config.Graphics)
 local Theme = require(script.Parent.Theme)
 
 local Components = {}
@@ -280,6 +282,135 @@ function Components.SetPanelVisible(panel: Frame, visible: boolean)
 	else
 		panel.Visible = false
 	end
+end
+
+export type ItemThumbnailOpts = {
+	assetId: number?,
+	size: number,
+	-- Shown instead of a picture when the item has no Creator Store asset.
+	glyph: string,
+	accent: Color3,
+	locked: boolean?,
+	lockLabel: string?,
+}
+
+export type ItemThumbnailHandle = {
+	root: Frame,
+	setLocked: (locked: boolean, lockLabel: string?) -> (),
+}
+
+-- A catalogue row's picture of the actual item. Roblox renders a preview of any
+-- Creator Store asset, so this is the real model, not a stand-in.
+--
+-- Locked items show the same picture heavily blurred. Roblox has no GUI blur
+-- and rbxthumb serves only 150px and 420px (verified live - every other size
+-- returns a blank image), so there is no small source to upscale; the blur is
+-- composited by drawing the picture many times at small offsets.
+function Components.ItemThumbnail(parent: Instance, opts: ItemThumbnailOpts): ItemThumbnailHandle
+	local spec = Theme.Thumbnail
+	local px = opts.size
+	local image = if opts.assetId and opts.assetId > 0
+		then Graphics.ItemThumbnail(opts.assetId)
+		else nil
+
+	local root = Instance.new("Frame")
+	root.Name = "Thumbnail"
+	root.Size = UDim2.fromOffset(px, px)
+	root.BackgroundColor3 = spec.Plate
+	root.ClipsDescendants = true
+	Components.Corner(root, Theme.Radius.Medium)
+	Components.Stroke(root, Theme.Colors.Line, 1, 0.55)
+	root.Parent = parent
+
+	local picture: ImageLabel? = nil
+	if image then
+		local label = Instance.new("ImageLabel")
+		label.Name = "Picture"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.ScaleType = Enum.ScaleType.Fit
+		label.Image = image
+		label.Parent = root
+		picture = label
+	else
+		-- No asset for this item: fall back to the code-drawn glyph badge so the
+		-- row is never empty.
+		local badge = Components.Icon(root, opts.glyph, nil, opts.accent, px - 10)
+		badge.AnchorPoint = Vector2.new(0.5, 0.5)
+		badge.Position = UDim2.fromScale(0.5, 0.5)
+	end
+
+	local overlay: Frame? = nil
+
+	local function clearOverlay()
+		if overlay then
+			overlay:Destroy()
+			overlay = nil
+		end
+		if picture then
+			picture.Visible = true
+		end
+	end
+
+	local function buildOverlay(lockLabel: string?)
+		local holder = Instance.new("Frame")
+		holder.Name = "Locked"
+		holder.Size = UDim2.fromScale(1, 1)
+		holder.BackgroundTransparency = 1
+		holder.ZIndex = root.ZIndex + 1
+		holder.Parent = root
+
+		if picture and image then
+			picture.Visible = false
+			local blur = spec.Blur
+			for sample = 1, blur.Samples do
+				local angle = (sample / blur.Samples) * math.pi * 2
+				-- Two rings read smoother than one at the same instance count.
+				local reach = if sample % 2 == 0 then blur.Radius else blur.Radius * 0.5
+				local copy = Instance.new("ImageLabel")
+				copy.Size = UDim2.fromScale(1, 1)
+				copy.Position = UDim2.fromOffset(
+					math.floor(math.cos(angle) * reach),
+					math.floor(math.sin(angle) * reach)
+				)
+				copy.BackgroundTransparency = 1
+				copy.ScaleType = Enum.ScaleType.Fit
+				copy.Image = image
+				copy.ImageTransparency = blur.Transparency
+				copy.ZIndex = holder.ZIndex
+				copy.Parent = holder
+			end
+		end
+
+		local veil = Instance.new("Frame")
+		veil.Name = "Veil"
+		veil.Size = UDim2.fromScale(1, 1)
+		veil.BackgroundColor3 = spec.VeilColor
+		veil.BackgroundTransparency = spec.VeilTransparency
+		veil.ZIndex = holder.ZIndex + 1
+		veil.Parent = holder
+
+		if lockLabel and lockLabel ~= "" then
+			local text = Components.Label(holder, lockLabel, spec.LockTextSize, true)
+			text.Size = UDim2.fromScale(1, 1)
+			text.TextColor3 = Theme.Colors.Cream
+			text.ZIndex = holder.ZIndex + 2
+		end
+		overlay = holder
+	end
+
+	local function setLocked(locked: boolean, lockLabel: string?)
+		clearOverlay()
+		if locked then
+			buildOverlay(lockLabel)
+		end
+	end
+
+	if opts.locked then
+		buildOverlay(opts.lockLabel)
+	end
+
+	return { root = root, setLocked = setLocked }
 end
 
 export type IconButtonOpts = {

@@ -184,6 +184,38 @@ free (licence forbids redistribution, conflicts with uploading to Roblox) ·
 Lucide (dual ISC+MIT, thin outlines) · Filwarka "2D Roblox Food Icons"
 (itch.io blocked licence verification — **UNVERIFIED**, do not adopt).
 
+## Catalogue item pictures (2026-07-22) — no new assets needed
+
+Shop rows, build-placement rows, cookbook cards and pantry rows now show the
+**real item**, rendered by Roblox from the Creator Store asset we already ship
+(`rbxthumb://type=Asset&id=<id>&w=150&h=150`, built by `Graphics.ItemThumbnail`).
+Nothing was uploaded and no new licence applies: these are previews of assets
+already recorded in the tables above, generated on demand by Roblox.
+
+**Measured constraints (live, 2026-07-22)** — do not "optimise" these away:
+
+| Fact | Detail |
+| --- | --- |
+| Valid `type=Asset` sizes | **Only 150×150 and 420×420.** 48/60/75/100/110/128/140/160/180/250/256/352/512/720 all return a blank image while silently accepting the string. |
+| First request is slow | Roblox generates the preview server-side on first ask (seconds). `UIController` warms every furniture + prop thumbnail with `ContentProvider:PreloadAsync` on a background thread at join. |
+| No GUI blur exists | `BlurEffect` is a Lighting post-process on the 3D world. With no small thumbnail available to upscale either, the locked-item blur is composited: the same picture drawn 14× at small offsets. 20 blurred rows = 260 ImageLabels = 61 fps. |
+
+### Coverage
+
+| Catalogue | Entries | Real per-item picture? |
+| --- | ---: | --- |
+| Furniture (buy + place) | 20 | ✅ **20/20** — every catalogue id has a Creator Store model, all verified rendering |
+| Recipes / dishes | 14 | ⚠️ **category-level only** — 4 pictures (Coffee, Tea, Pastry, Sandwich props) shared across 14 dishes |
+| Staff | 4 | ✅ rig thumbnails render, ❌ but no staff panel exists to show them yet |
+
+**The one real gap: per-dish art.** The 14 dishes are meshes *inside* one packaged
+model (`retroPropPack`), so no dish has an asset id of its own — a thumbnail of
+that pack shows the whole pack, not the dish. The documented fix is
+`docs/HUD_REDESIGN.md` §4.3: render each **Kenney Food Kit** (CC0) model to a
+flat 2D icon and upload it, which also makes the cookbook icon and the object on
+the plate the same asset. Until then the cookbook shows the category's plate
+prop, blurred while the recipe is locked.
+
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
 - No reusing another work's textures, music, SFX, logos, character designs, UI

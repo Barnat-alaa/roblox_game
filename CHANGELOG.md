@@ -5,6 +5,40 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — 2026-07-22 — catalogue rows show the actual item, blurred when locked
+Owner report: "in the shop or when I want to put an item I can't find the photo
+of the item I will be putting." Every catalogue row showed a two-letter category
+badge (`AP`, `SE`, `DE`) or, in the build list, nothing but a coloured bar.
+
+- **`Components.ItemThumbnail`** — a row's picture of the real item. Roblox
+  renders a preview of any Creator Store asset, so this is the actual model we
+  ship, not a stand-in. Falls back to the code-drawn glyph badge when an item
+  has no asset, so a row is never empty.
+- **Locked items show the same picture heavily blurred**, with the level
+  requirement over it. Roblox has no GUI blur (`BlurEffect` is a Lighting
+  post-process on the 3D world) and `rbxthumb` serves **only 150×150 and
+  420×420** — every other size silently returns blank, so there is no
+  low-resolution source to upscale either. The blur is therefore composited:
+  the same picture drawn 14× at small offsets. Measured 20 blurred rows = 260
+  ImageLabels = 61 fps.
+- **Shop** rows: 56px picture; blur toggles live as you level up, since the
+  rows are mutated rather than rebuilt. Being short of coins does *not* blur —
+  you should be able to see what you are saving for.
+- **Build placement** rows: 46px picture, replacing the coloured accent bar. The
+  row text also stops being one space-indented string and becomes real labels.
+- **Cookbook** cards and **pantry** rows: the category's plate prop, blurred
+  while the recipe is locked instead of a bare "?".
+- Thumbnails are warmed with `ContentProvider:PreloadAsync` on a background
+  thread at join, because Roblox generates a preview server-side on first
+  request and that measured several seconds.
+
+**Coverage audit** (asked for in the same report — full table in
+`docs/ASSET_LICENSES.md`): all **20/20** buyable/placeable furniture items have
+real per-item art, verified rendering live. The gap is **per-dish art**: the 14
+recipes are meshes inside one packaged model, so no dish has its own asset id;
+they share 4 category pictures. `docs/HUD_REDESIGN.md` §4.3 already documents
+the fix (render Kenney Food Kit models to flat icons).
+
 ### Changed — 2026-07-22 — the chunky icon HUD (docs/HUD_REDESIGN.md)
 The menu rework the owner asked for. The old HUD put a stat capsule at the top
 and a small text dock bottom-right; it now reads like a tycoon toolbar.
