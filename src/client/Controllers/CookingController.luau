@@ -48,7 +48,7 @@ local function buildUi()
 	local panel = Instance.new("Frame")
 	panel.Name = "BrewPanel"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
-	panel.Position = UDim2.new(0.5, 0, 1, -96)
+	panel.Position = UDim2.new(0.5, 0, 1, -180)
 	panel.Size = UDim2.fromOffset(430, 126)
 	panel.BackgroundColor3 = Theme.Colors.Cream
 	panel.Visible = false
@@ -102,7 +102,14 @@ local function buildUi()
 		panel.Size = if mode == "Phone"
 			then UDim2.fromOffset(math.min(viewport.X - 20, 390), 118)
 			else UDim2.fromOffset(430, 126)
-		panel.Position = UDim2.new(0.5, 0, 1, if mode == "Phone" then -74 else -96)
+		-- Stack above the serve button and the action dock instead of over them:
+		-- the HUD redesign raised both off the bottom edge. On a viewport too
+		-- short for that, staying fully on screen wins over clearing the serve
+		-- button, so the panel is clamped rather than pushed off the top.
+		local layout = ResponsiveLayout.hudLayout(mode, viewport)
+		local panelHeight = panel.AbsoluteSize.Y
+		local highest = viewport.Y - panelHeight - 8
+		panel.Position = UDim2.new(0.5, 0, 1, -math.min(layout.serveTopFromBottom + 10, highest))
 	end)
 end
 

@@ -56,8 +56,13 @@ local CONDITIONS: { [string]: () -> boolean } = {
 	end,
 }
 
+-- The size the card takes when expanded, chosen per viewport by the responsive
+-- pass. It used to be hardcoded here, which silently undid the narrow-screen
+-- sizing every time this ran.
+local expandedSize = UDim2.fromOffset(360, 72)
+
 local function applyMinimized()
-	ui.card.Size = if minimized then UDim2.fromOffset(52, 46) else UDim2.fromOffset(360, 72)
+	ui.card.Size = if minimized then UDim2.fromOffset(52, 46) else expandedSize
 	ui.step.Visible = not minimized
 	ui.text.Visible = not minimized
 	ui.minimize.Text = if minimized then "?" else "-"
@@ -102,11 +107,24 @@ function TutorialController.Start(_self: any)
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	-- The HUD redesign moved the stat pills into the lower-left, where this card
+	-- used to sit - an opaque card there hid every currency for the whole of
+	-- onboarding. It now sits in the band under the cafe-health card and right
+	-- of the camera pad. Short viewports have no such band (the serve button and
+	-- action dock reach up into it), so there it goes to the very top strip,
+	-- which is clear of the order ticket and the camera pad.
+	local function cardLeft(mode: string): number
+		return if mode == "Desktop" then 10 else 118
+	end
+	local function cardTop(viewport: Vector2): number
+		return if viewport.Y < Theme.Hud.ShortViewport then 4 else 158
+	end
+
 	local card = Instance.new("Frame")
 	card.Name = "TutorialCard"
-	card.AnchorPoint = Vector2.new(0, 1)
+	card.AnchorPoint = Vector2.new(0, 0)
 	card.Size = UDim2.fromOffset(360, 72)
-	card.Position = UDim2.new(0, 10, 1, -98)
+	card.Position = UDim2.new(0, 10, 0, 158)
 	card.BackgroundColor3 = Theme.Colors.Cream
 	card.Visible = false
 	Components.Corner(card, Theme.Radius.Large)
@@ -143,9 +161,12 @@ function TutorialController.Start(_self: any)
 	ui.minimize = minimize
 
 	ResponsiveLayout.watch(function(mode, viewport)
-		if mode == "Phone" and not minimized then
-			card.Size = UDim2.fromOffset(math.min(viewport.X - 82, 340), 54)
-			card.Position = UDim2.new(0, 10, 1, -72)
+		card.Position = UDim2.new(0, cardLeft(mode), 0, cardTop(viewport))
+		-- Short viewports get the squat card: it lives in the top strip there,
+		-- which is only tall enough for the compact height.
+		local short = viewport.Y < Theme.Hud.ShortViewport
+		if mode == "Phone" or short then
+			expandedSize = UDim2.fromOffset(math.min(viewport.X - cardLeft(mode) - 20, 300), 54)
 			accent.Size = UDim2.fromOffset(7, 38)
 			accent.Position = UDim2.fromOffset(8, 8)
 			step.Position = UDim2.fromOffset(24, 4)
@@ -153,18 +174,15 @@ function TutorialController.Start(_self: any)
 			body.Size = UDim2.new(1, -72, 0, 30)
 			body.TextSize = 10
 		else
-			if mode == "Compact" and not minimized then
-				card.Size = UDim2.fromOffset(math.clamp(viewport.X - 420, 220, 292), 54)
-			end
-			card.Position = UDim2.new(0, 10, 1, if mode == "Compact" then -72 else -98)
+			expandedSize = UDim2.fromOffset(360, 72)
 			accent.Size = UDim2.fromOffset(7, 52)
 			accent.Position = UDim2.fromOffset(8, 10)
 			step.Position = UDim2.fromOffset(24, 8)
 			body.Position = UDim2.fromOffset(24, 26)
 			body.Size = UDim2.new(1, -72, 0, 38)
 			body.TextSize = 12
-			applyMinimized()
 		end
+		applyMinimized()
 	end)
 	UIController.subscribeProfile(function(profile)
 		latestProfile = profile
