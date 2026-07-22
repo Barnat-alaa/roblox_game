@@ -79,8 +79,8 @@ approved their use in Social Cafe. Decal listing IDs are loaded through
 
 | Asset ID | Store item | Shipped use | Audit |
 | ---: | --- | --- | --- |
-| 99176447965360 | Simulator Icon Pack | HUD resources and edge-menu icons | 112 decals, no scripts; only nine selected image IDs ship |
-| 6020249531 | Coin Icon | Coin HUD badge | clean single decal |
+| 99176447965360 | Simulator Icon Pack | ~~HUD resources and edge-menu icons~~ **retired 2026-07-22**, see below | 112 decals, no scripts; script audit only, never a provenance audit |
+| 6020249531 | Coin Icon | ~~Coin HUD badge~~ **retired 2026-07-22** (replaced by the CC0 coin below) | clean single decal |
 | 2922135969 | Sidewalk2 | tiled boulevard sidewalks | clean single decal |
 | 17092935 | Road - Straight | two-lane boulevard modules | clean single decal |
 | 17093010 | Road - Left Turn | west boulevard turn | clean single decal |
@@ -115,6 +115,74 @@ approved their use in Social Cafe. Decal listing IDs are loaded through
   return "User is not authorized" (not freely licensed to us).
 - `10141391344`, `90025178048963`, `76971459946852` — duplicate base rig /
   ragdoll-death or AI-bot scripts; redundant with the four kept rigs.
+
+## HUD icons — self-uploaded CC0 renders (adopted 2026-07-22)
+
+The chunky-icon HUD (`docs/HUD_REDESIGN.md`) draws every image from two **CC0
+1.0** packs, rendered locally and **self-uploaded by the owner**, so the account
+that holds the assets is the account that ships them. Attribution burden: none.
+Licences were re-read at adoption, not taken from the earlier research pass.
+
+| Pack | Source | Licence | Verified how (2026-07-22) |
+| --- | --- | --- | --- |
+| **Nieobie Game Icon Pack** | <https://github.com/Nieobie/Game-Icon-Pack> pinned at commit `fb27988095086b3cafa85d070eccb8bc3e993911` | CC0 1.0 Universal | Cloned the repo and read `LICENSE` directly — it contains the full CC0 1.0 legal deed, not a README claim |
+| **Kenney UI Pack 2.0** | <https://kenney.nl/assets/ui-pack> (`kenney_ui-pack.zip`, created 12-06-2024) | CC0 1.0 Universal | `License.txt` inside the downloaded zip: "License: (Creative Commons Zero, CC0)… free to use in personal, educational and commercial projects". Site-wide terms at <https://kenney.nl/support> confirm "Attribution is not required" |
+
+**Preparation.** Nieobie glyphs are the `svg/padding` variants rendered to
+256×256 PNG with `fill` forced to white, so `Theme.Hud.IconTint` recolours them
+per-surface via `ImageColor3` rather than shipping one PNG per colour. Kenney
+plates are the **Grey** `button_square_depth_gloss` / `button_round_depth_gloss`
+vectors at 256×256, tinted warm in `Theme` so the cool default never fights the
+maroon/oak palette. Rendering and recolouring are both permitted by CC0.
+
+Kenney asks that his **logo** not be reused; that is a trademark reservation and
+does not constrain the art. No logo ships.
+
+| Our key | Roblox asset id | Pack | Source file |
+| --- | ---: | --- | --- |
+| `UI.Money` | 80375713494681 | Nieobie | `2-items/coin.svg` |
+| `UI.Reputation` | 75203433466466 | Nieobie | `12-misc/five-pointed-star.svg` |
+| `UI.Buzz` | 120973646100849 | Nieobie | `4-nature/fire.svg` |
+| `UI.Build` | 89794042167710 | Nieobie | `2-items/hammer.svg` |
+| `UI.Cookbook` | 89252167506542 | Nieobie | `2-items/book.svg` |
+| `UI.Staff` | 125822390757999 | Nieobie | `8-ui/user-group.svg` |
+| `UI.Upgrades` | 114343896557596 | Nieobie | `8-ui/arrow-up-02.svg` |
+| `UI.Shop` | 98312388730885 | Nieobie | `6-buildings/shop.svg` |
+| `UI.Goals` | 128144538146723 | Nieobie | `6-buildings/target.svg` |
+| `UI.Trophies` | 127872459522051 | Nieobie | `1-game/trophy.svg` |
+| `UI.Map` | 95010028808469 | Nieobie | `2-items/map.svg` |
+| `UI.Music` | 130857741918858 | Nieobie | `9-media/music.svg` |
+| `UI.MusicOff` | 72428685512561 | Nieobie | `9-media/no-music.svg` |
+| `UI.Settings` | 78498019750021 | Nieobie | `8-ui/settings.svg` |
+| `UI.Pantry` | 114094476715548 | Nieobie | `2-items/chest.svg` |
+| `UI.PlateSquare` | 110496594476795 | Kenney UI Pack | `Vector/Grey/button_square_depth_gloss.svg` |
+| `UI.PlateRound` | 118639991990376 | Kenney UI Pack | `Vector/Grey/button_round_depth_gloss.svg` |
+
+All seventeen were confirmed rendering in a live playtest (`IsLoaded == true` on
+every HUD image), so none landed Restricted under the 2026-05-05 Asset Privacy
+default. `Components.Icon` still falls back to a code-drawn glyph badge if an
+image ever fails to load.
+
+### Retired 2026-07-22 — Simulator Icon Pack `99176447965360`
+
+The nine HUD icons previously drawn from this pack are **no longer referenced by
+any source file**; `Graphics.UI` now points exclusively at the CC0 uploads above.
+This deliberately retires the provenance risk recorded in
+`docs/HUD_REDESIGN.md` §4.5: the pack is published on the Creator Store three
+times with byte-identical descriptions, each claiming originality, with no
+findable artist footprint — and a Creator Store licence cannot warrant rights
+the uploader never held. Nothing was mixed: all thirteen HUD icons moved at once,
+because mismatched corner radii read badly side by side in one toolbar.
+
+The pack's row remains in the table above as history; it is no longer shipped.
+
+**Rejected for the HUD (2026-07-21 research, re-affirmed at adoption):**
+game-icons.net (CC BY 3.0, per-author attribution, 6 credits forever) ·
+OpenMoji (CC BY-**SA**, recolouring forces SA re-release) · Noto Emoji
+("**most**" resources Apache 2.0 — cannot assert per-image coverage) · CraftPix
+free (licence forbids redistribution, conflicts with uploading to Roblox) ·
+Lucide (dual ISC+MIT, thin outlines) · Filwarka "2D Roblox Food Icons"
+(itch.io blocked licence verification — **UNVERIFIED**, do not adopt).
 
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
