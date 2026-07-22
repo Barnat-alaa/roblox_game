@@ -153,9 +153,11 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	local serveHeight = if compact then 46 else 50
 	local serveBottom = dockBottom + dockPlate + 12
 
-	-- The cafe-health card drops into the left column once there is no room for
-	-- it beside the top-centre; the camera pad shares that column and has to
-	-- know.
+	-- The cafe-health bars sit centred along the top edge (owner request). Only
+	-- a viewport too narrow to centre them without colliding with the order
+	-- ticket drops them into the left column, where the camera pad also lives —
+	-- which is why the pad reads these numbers.
+	local healthWidth = if viewport.X < 700 then 292 else 304
 	local healthNarrow = viewport.X < 700
 
 	return {
@@ -180,9 +182,9 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 		serveHeight = serveHeight,
 		serveBottom = serveBottom,
 		serveTopFromBottom = serveBottom + serveHeight,
-		healthLeft = if healthNarrow then 10 else 270,
+		healthLeft = if healthNarrow then 10 else (viewport.X - healthWidth) / 2,
 		healthTopFromTop = if healthNarrow then 100 else 62,
-		healthWidth = if healthNarrow then 292 else 304,
+		healthWidth = healthWidth,
 		healthHeight = 50,
 	}
 end

@@ -3,6 +3,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
@@ -23,7 +24,7 @@ local latestProfile: any = nil
 local sentIndex = 0
 local sentAt = 0
 local minimized = false
-local flags = { brew = false, buy = false, visited = false }
+local flags = { cooked = false, buy = false, visited = false }
 
 local function plazaClose(): boolean
 	local centre = workspace:GetAttribute("PlazaCenter")
@@ -39,8 +40,8 @@ local CONDITIONS: { [string]: () -> boolean } = {
 	place_furniture = function()
 		return latestProfile ~= nil and #latestProfile.placedFurniture >= 5
 	end,
-	brew = function()
-		return flags.brew
+	menu = function()
+		return flags.cooked
 	end,
 	serve = function()
 		return latestProfile ~= nil and latestProfile.stats.customersServed >= 1
@@ -113,11 +114,19 @@ function TutorialController.Start(_self: any)
 	-- of the camera pad. Short viewports have no such band (the serve button and
 	-- action dock reach up into it), so there it goes to the very top strip,
 	-- which is clear of the order ticket and the camera pad.
-	local function cardLeft(mode: string): number
-		return if mode == "Desktop" then 10 else 118
+	-- Top-left (owner request). The camera pad used to own this corner on
+	-- desktop and the health bars sat under it; both have moved, so the card
+	-- gets the corner and the "?" bubble stays somewhere predictable.
+	local touch = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+	local function cardLeft(_mode: string): number
+		-- On touch the camera pad still occupies the left edge.
+		return if touch then 118 else 10
 	end
-	local function cardTop(viewport: Vector2): number
-		return if viewport.Y < Theme.Hud.ShortViewport then 4 else 158
+	local function cardTop(_viewport: Vector2): number
+		-- Below Roblox's own top bar. These ScreenGuis span the whole screen
+		-- (DeviceSafeInsets), so y=8 puts the card under the platform's menu
+		-- and chat buttons and you cannot read it.
+		return 62
 	end
 
 	local card = Instance.new("Frame")
@@ -192,8 +201,15 @@ function TutorialController.Start(_self: any)
 		if typeof(msg) ~= "table" then
 			return
 		end
-		if msg.kind == "cook_result" then
-			flags.brew = true
+		-- Working the menu is the signal that always fires; collecting a batch
+		-- or nailing the brew minigame also count, for a player who gets to an
+		-- appliance while the automatic loop happens to be idle.
+		if
+			msg.kind == "menu_changed"
+			or msg.kind == "cook_collected"
+			or msg.kind == "cook_result"
+		then
+			flags.cooked = true
 		elseif msg.kind == "purchased" then
 			flags.buy = true
 		elseif msg.kind == "visited" then

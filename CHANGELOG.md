@@ -5,6 +5,44 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — 2026-07-22 — the tutorial dead-ended on step 2
+Owner report: "it only stops at step 2 even though I did it." It was not a
+detection bug — **the step was impossible**.
+
+Step 2 asked for the brew timing minigame, which needs a *live order*; once a
+waiter is on shift, orders are served automatically before the player can reach
+the machine. Retargeting it to cook-by-hand does not help either: the automatic
+production loop holds a job on the appliance, so a manual `StartCook` answers
+`stove_busy` — measured live, on the seed café's only coffee machine.
+
+Step 2 is now the **menu**, which is the player's real lever over a cook-ahead
+kitchen and is always available: *"Your kitchen cooks on its own. Open Pantry
+and choose what it makes."* `ProductionService` emits a `menu_changed` notify so
+the tutorial has a signal it can attribute to the player; collecting a batch or
+landing the brew minigame still count for anyone who catches an idle appliance.
+Step 3's text also stopped describing a "green Serve button" that no longer
+exists — the flow is pick up at the pass, then carry to the table.
+
+Verified live end to end: 1 → 2 → 3 → 6 with no dead end.
+
+### Changed — 2026-07-22 — HUD rearranged and rebadged (owner request)
+- **Camera pad hidden on desktop.** The Q/E/+/− cluster duplicated the keyboard
+  and the scroll wheel and owned the top-left corner. It stays on touch, where
+  it is the *only* way to rotate the camera.
+- **Café health bars moved to top-centre** (SAT / CLEAN / BARISTA / WAITER).
+  Narrow viewports still drop them into the left column, and the camera pad
+  reads the same shared geometry so the two cannot overlap.
+- **Tutorial card moved to the top-left corner** it freed, below Roblox's own
+  top bar — at the obvious y=8 the platform's menu and chat buttons sit on top
+  of it and it cannot be read.
+- **New button art** from the owner's icon sheet: Build, Staff, Shop, Upgrades,
+  Goals, Trophies, Music, and the Money / Reputation / Buzz pills. Tinting is
+  now opt-out (`Graphics.UIFullColour`) so full-colour art keeps its palette
+  while the flat CC0 glyphs are still recoloured per surface, and a colour pill
+  icon replaces its coloured disc rather than sitting on it.
+  `Cookbook`, `Map` and `Settings` have no match in the sheet and stay on the
+  CC0 glyphs — so three buttons read flat next to ten colourful ones.
+
 ### Changed — 2026-07-22 — furniture renders 1.5× bigger; round table is one cell
 Owner request: placed furniture read too small next to a character, and a round
 table should occupy a single cell so chairs sit square against it.

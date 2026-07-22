@@ -253,6 +253,45 @@ fetch images it is not currently rendering, so an off-screen row reporting
 
 **Coverage is now complete for everything the player can buy, place or cook.**
 
+## HUD button art — owner-supplied AI sheet (adopted 2026-07-22)
+
+The owner supplied a 3×4 icon sheet generated with **Google Gemini** and asked
+for it on the HUD buttons. Sliced with the owner's own grid/name mapping,
+uploaded under the owner's account, ids in `Graphics.UI`.
+
+| Sheet cell | Our key | Roblox asset id |
+| --- | --- | ---: |
+| Star | `Reputation` | 106159084202396 |
+| Target | `Goals` | 72112954485657 |
+| Trophies | `Trophies` | 137488539860322 |
+| Music note | `Music` | 96404039920666 |
+| Tools | `Build` | 111961056777489 |
+| Shield person | `Staff` | 130832227566122 |
+| Cart | `Shop` | 114379023520936 |
+| Gear + arrow | `Upgrades` | 98681656717864 |
+| Coin stack | `Coins` (spare) | 106117241055513 |
+| Fire + arrow | `Buzz` | 105443225474473 |
+| Dollar | `Money` | 138291685268649 |
+| Trophy + chart | `Rankings` (spare) | 99014737661924 |
+
+**Preparation.** The sheet only *looked* transparent — the checkerboard was
+painted in as opaque pixels in two tones (~135 and ~97) with each icon's glow
+blended into it. A flat colour key left a dirty halo, so the background is
+**un-mixed** instead: pixels reachable from the border get an alpha from their
+distance to the nearer checker tone and are un-premultiplied to take the grey
+back out. Script kept at `scratchpad/iconwork/slice_sheet.py`.
+
+**Provenance note.** This is AI-generated imagery, which `docs/ART_DIRECTION.md`
+classes as a draft to be reviewed and ownership-checked rather than final art.
+The owner generated it, owns the Gemini output under Google's terms, and
+directed its use; it is recorded here so that decision is visible rather than
+implicit. It is the only AI-generated art shipping — everything else is CC0 or
+owner-approved Creator Store.
+
+**Still on the CC0 set (no matching art in the sheet):** `Cookbook`, `Map`,
+`Settings`. They remain Nieobie CC0 glyphs, so those three read flat next to ten
+full-colour icons. Generating three more in the same style closes it.
+
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
 - No reusing another work's textures, music, SFX, logos, character designs, UI
