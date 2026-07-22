@@ -426,6 +426,8 @@ export type IconButtonOpts = {
 	shape: "Square" | "Round",
 	badge: string?,
 	badgePlacement: ("Corner" | "Beside")?,
+	-- The icon carries its own colours and must not be tinted.
+	fullColour: boolean?,
 	labelSide: "Bottom" | "Left",
 	alwaysShowLabel: boolean?,
 	liftEnabled: boolean?,
@@ -484,8 +486,9 @@ function Components.IconButton(parent: Instance, opts: IconButtonOpts): IconButt
 	scale.Parent = plate
 
 	local iconPx = math.floor(size * hud.IconRatio)
-	local iconSlot =
-		Components.Icon(plate, opts.glyph, opts.icon, opts.accent, iconPx, hud.IconTint)
+	-- Full-colour artwork keeps its own palette; only flat glyphs get recoloured.
+	local iconTint = if opts.fullColour then nil else hud.IconTint
+	local iconSlot = Components.Icon(plate, opts.glyph, opts.icon, opts.accent, iconPx, iconTint)
 	iconSlot.AnchorPoint = Vector2.new(0.5, 0.5)
 	iconSlot.Position = UDim2.fromScale(0.5, 0.5)
 	iconSlot.ZIndex = plate.ZIndex + 1
@@ -605,8 +608,7 @@ function Components.IconButton(parent: Instance, opts: IconButtonOpts): IconButt
 
 	local function setIcon(image: string?, glyph: string?)
 		iconSlot:Destroy()
-		iconSlot =
-			Components.Icon(plate, glyph or opts.glyph, image, opts.accent, iconPx, hud.IconTint)
+		iconSlot = Components.Icon(plate, glyph or opts.glyph, image, opts.accent, iconPx, iconTint)
 		iconSlot.AnchorPoint = Vector2.new(0.5, 0.5)
 		iconSlot.Position = UDim2.fromScale(0.5, 0.5)
 		iconSlot.ZIndex = plate.ZIndex + 1

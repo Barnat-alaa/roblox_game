@@ -460,13 +460,24 @@ local function createStat(parent: Instance, def: StatDefinition, phone: boolean)
 	Components.Corner(disc, Theme.Radius.Pill)
 	Components.Gradient(disc, def.accent:Lerp(Theme.Colors.White, 0.25), def.accent, 90)
 	disc.Parent = chip
+	-- Full-colour pill art replaces the disc entirely rather than sitting on it:
+	-- a coloured sticker on a coloured circle reads as two competing shapes.
+	local fullColour = (Graphics.UIFullColour :: any)[def.key] == true
+	if fullColour then
+		disc.BackgroundTransparency = 1
+		for _, child in disc:GetChildren() do
+			if child:IsA("UIGradient") then
+				child:Destroy()
+			end
+		end
+	end
 	local icon = Components.Icon(
 		disc,
 		Theme.Glyphs[def.key],
 		Theme.Images[def.key],
 		def.accent,
-		discPx - 8,
-		Theme.Colors.White
+		if fullColour then discPx else discPx - 8,
+		if fullColour then nil else Theme.Colors.White
 	)
 	icon.AnchorPoint = Vector2.new(0.5, 0.5)
 	icon.Position = UDim2.fromScale(0.5, 0.5)
@@ -549,6 +560,7 @@ local function buildZone(zone: "Dock" | "Rail", parent: Frame, plate: number)
 				-- dock's look.
 				badge = if not dock and touchMode then nil else def.badge,
 				badgePlacement = if dock then "Corner" else "Beside",
+				fullColour = (Graphics.UIFullColour :: any)[def.id] == true,
 				labelSide = if dock then "Bottom" else "Left",
 				-- No hover on touch, so every name is pinned instead.
 				alwaysShowLabel = touchMode,

@@ -93,10 +93,16 @@ local function buildTouchControls()
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
+	-- Touch only. On a mouse and keyboard these four buttons duplicate Q/E and
+	-- the scroll wheel and just take up the top-left corner, but a phone has no
+	-- other way to rotate the camera at all, so they stay there.
+	local touchOnly = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+
 	local holder = Instance.new("Frame")
 	holder.AnchorPoint = Vector2.new(0, 0.5)
 	holder.Position = UDim2.new(0, 10, 0.5, 0)
 	holder.Size = UDim2.fromOffset(100, 100)
+	holder.Visible = touchOnly
 	holder.BackgroundColor3 = Theme.Colors.Espresso
 	holder.BackgroundTransparency = 0.12
 	Components.Corner(holder, Theme.Radius.Large)

@@ -35,27 +35,47 @@ local Graphics = {
 	},
 	UI = {
 		-- Stat pills
-		Money = "rbxassetid://80375713494681",
-		Reputation = "rbxassetid://75203433466466",
-		Buzz = "rbxassetid://120973646100849",
+		Money = "rbxassetid://138291685268649",
+		Reputation = "rbxassetid://106159084202396",
+		Buzz = "rbxassetid://105443225474473",
 		-- Action dock
-		Build = "rbxassetid://89794042167710",
+		Build = "rbxassetid://111961056777489",
 		Cookbook = "rbxassetid://89252167506542",
-		Staff = "rbxassetid://125822390757999",
-		Upgrades = "rbxassetid://114343896557596",
-		Shop = "rbxassetid://98312388730885",
+		Staff = "rbxassetid://130832227566122",
+		Upgrades = "rbxassetid://98681656717864",
+		Shop = "rbxassetid://114379023520936",
 		-- Right rail
-		Goals = "rbxassetid://128144538146723",
-		Trophies = "rbxassetid://127872459522051",
+		Goals = "rbxassetid://72112954485657",
+		Trophies = "rbxassetid://137488539860322",
 		Map = "rbxassetid://95010028808469",
-		Music = "rbxassetid://130857741918858",
+		Music = "rbxassetid://96404039920666",
 		MusicOff = "rbxassetid://72428685512561",
 		Settings = "rbxassetid://78498019750021",
 		-- Inventory drawer button
 		Pantry = "rbxassetid://114094476715548",
+		-- Spare art from the owner's sheet, not on the HUD yet
+		Coins = "rbxassetid://106117241055513",
+		Rankings = "rbxassetid://99014737661924",
 		-- Button plates
 		PlateSquare = "rbxassetid://110496594476795",
 		PlateRound = "rbxassetid://118639991990376",
+	},
+	-- Icons that carry their OWN colour and must never be tinted. The rest are
+	-- flat single-colour glyphs that Theme recolours per surface, so tinting is
+	-- opt-out rather than blanket.
+	UIFullColour = {
+		Money = true,
+		Reputation = true,
+		Buzz = true,
+		Build = true,
+		Staff = true,
+		Upgrades = true,
+		Shop = true,
+		Goals = true,
+		Trophies = true,
+		Music = true,
+		Coins = true,
+		Rankings = true,
 	},
 	-- Catalogue rows call this with an AssetManifest id to get the item's own
 	-- picture.

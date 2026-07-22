@@ -239,6 +239,11 @@ local function handleMenu(player: Player, recipeId: unknown, enabled: unknown)
 	end
 	kitchen.menu[recipeId] = enabled
 	DataService:Push(player)
+	-- Lets the tutorial see that the player actually worked the menu. There is
+	-- no other reliable signal: the appliances are driven by the automatic
+	-- production loop, so "did they cook something" cannot be attributed to the
+	-- player at all.
+	Remotes.event("Notify"):FireClient(player, { kind = "menu_changed", recipe = recipeId })
 end
 
 local function handleTarget(player: Player, recipeId: unknown, target: unknown)
