@@ -1,8 +1,9 @@
 # PROJECT HANDOFF — Social Café City (working title)
 
-_Last updated: 2026-07-19. This is the single source of truth for picking the
+_Last updated: 2026-07-22. This is the single source of truth for picking the
 project up — by the owner, a new developer, or a fresh AI session. Read this
-before touching anything._
+before touching anything, then `docs/SESSION_HANDOFF.md` for what shipped most
+recently and `docs/GAMEPLAY_DIRECTION.md` for what the game actually is._
 
 ---
 
@@ -70,6 +71,7 @@ attribute on the place if you want to override (e.g. `"STAGING"`, or `"DEV"` on
 a secondary dev place once a separate production place exists, so the two don't
 share the PROD store).
 | Docs | `docs/` (+ `ROADMAP.md`, `CHANGELOG.md`, `KNOWN_ISSUES.md`, `CURRENT_STATUS.md`) |
+| **Pick-up-here docs** | `docs/SESSION_HANDOFF.md` (last session + measured constraints), `docs/GAMEPLAY_DIRECTION.md` (what the game is, ranked next features), `docs/ASSET_LICENSES.md` (every shipped asset) |
 
 **Toolchain (installed & pinned):** Rojo 7.4.4 · Rokit 1.2.0 · StyLua 2.0.2 ·
 Selene 0.27.1 · Wally 0.3.2 (TestEZ dev-dep) · gh CLI (authed as Barnat-alaa).
@@ -123,12 +125,26 @@ waiters cap service throughput, FIFO lots spoil only while online, and the
 always-visible inventory rail exposes stock, incoming batches, freshness, and
 bottlenecks. The 8h Overnight Roast remains the appointment batch.
 
-**Compact tycoon UI:** the permanent screen footprint is one resource capsule,
-one dynamic 226–344px active-stock pill, a contextual order ticket, and a
-collapsed action menu. Landscape phones/short windows open 41–44% edge drawers;
-desktop drawers preserve at least 62% world visibility. All full panels share
-`CafeModals` at DisplayOrder 20. `Theme.Images` intentionally stays blank until
-the owner approves specific Creator Store icon assets.
+**The HUD (rebuilt 2026-07-22 — `docs/HUD_REDESIGN.md`):** bottom-left stat
+pills (Money · Reputation · Buzz) whose values tween rather than snap;
+bottom-centre dock of five chunky plates (Build 1, Cookbook 2, Staff 3,
+Upgrades 4, Shop 5) that lift and name themselves on hover and dip-then-settle
+on press; a right rail (Goals G, Trophies T, Map M, Music B, Settings V). Both
+zones are one `Components.IconButton`; every colour/size/motion value lives in
+`Theme.Hud` and one `HUD_BUTTONS` table declares each button's id, key, badge
+and accent together. All full panels share `CafeModals` at DisplayOrder 20.
+
+**`ResponsiveLayout.hudLayout(mode, viewport)` owns every HUD rectangle** and
+six controllers read it. Verified by measurement, not by eye: zero overlapping
+elements in all three modes, world visibility 80.3% desktop / 64.4% landscape
+phone / 56.3% phone against 62/62/55% floors.
+
+**Art coverage is complete.** Every buyable, placeable and cookable thing shows
+a real picture — furniture rendered on demand from its Creator Store model,
+dishes from their own uploaded icons, locked entries the same picture heavily
+blurred. HUD buttons use the owner's own icon set. All ids in
+`docs/ASSET_LICENSES.md`; `Components.Icon`'s text-glyph fallback still guards
+against a moderated or slow image.
 
 **Phase 2 — alive café:** customers queue (3-deep line), walk with a chibi
 waddle, **sit on your placed chairs** (verified at the exact grid cell), eat
@@ -147,7 +163,7 @@ to Lv 9, level-up celebration. *Verified live + spec.*
 cleaner → +1 Buzz per plate). *Gates green; **live playtest still owed** —
 see §6.*
 
-**Platform/infra:** 30-plot two-row boulevard with plaza + closed-café
+**Platform/infra:** 10-plot two-row boulevard with plaza + closed-café
 shutters (unowned cafés visibly CLOSED, open on claim), golden-hour lighting,
 licensed audio (ProSoundEffects/DistroKid only — logged), mobile camera
 buttons + pinch zoom, security audit of all remotes, zero-gap duplicate-claim
@@ -183,6 +199,13 @@ race verified closed, TestEZ runner place, spawn-in-front-of-your-café.
 > (publish after S1; two-client + mobile passes ride S5/S2). Creator Store
 > assets are now allowed under the ART_DIRECTION 2026-07-15 addendum.
 
+> **2026-07-22 — the biggest gap is now design, not polish.** The UI, the art
+> and the world scale are done and measured. What the game lacks is *things to
+> do*: there are **no ingredients** (the word is a coin deduction with nothing
+> behind it) and staff progressively **automate away every physical action**, so
+> a player is most engaged in their first twenty minutes. Read
+> `docs/GAMEPLAY_DIRECTION.md` before picking the next feature.
+
 ### Immediate (blocking release-quality confidence)
 1. **Owner playtest of Phase 3b** (goals tick + pay, crew of three visible,
    Noah delivers tray, Pia clears plates for +Buzz) — my test instance hit
@@ -190,9 +213,11 @@ race verified closed, TestEZ runner place, spawn-in-front-of-your-café.
 2. **Publish repo → cloud place** (Alt+P update-existing; 30 seconds).
 3. **Two-client test** (Studio: Test tab → 2 players): visits, compliments
    (+2 rep, once/visitor), two cafés running simultaneously, plot
-   assign/release with shutters.
-4. **Device-emulator mobile pass** (phone viewport: HUD fits, camera buttons,
-   brew panel cap, cook picker, goals/cookbook panels; touch targets ≥44px).
+   assign/release with shutters. **MCP cannot do this** — it cannot attach to
+   the child processes the multi-client test spawns, so it needs the owner.
+4. **Device-emulator mobile pass.** The HUD is measured against the visibility
+   floors at three viewport sizes, but never touched on a real phone — check
+   the permanent name labels, the rail's shrink-to-fit, and touch targets.
 5. **Icon + thumbnail**: raw staged screenshots exist at
    `scratchpad/thumb_raw.png` + `icon_raw.png` (session scratchpad — retake
    if gone: boulevard wide shot + café close-up). Crop/letterbox → upload on
@@ -248,19 +273,30 @@ update existing.
 
 **Fresh AI session bootstrap prompt (paste as-is):**
 
-> You are the lead developer of the Roblox game in this repo (see HANDOFF.md
-> — read it first, then ROADMAP.md and KNOWN_ISSUES.md). Work autonomously:
-> code in strict Luau on disk, keep StyLua+Selene+Rojo gates green with
-> `set -o pipefail` and unpiped selene, commit with conventional messages +
-> CHANGELOG entries, push to origin main, and verify CI with `gh run list`.
-> Test live via Roblox Studio MCP: kill any `SocialCafe.rbxlx` Studio
-> instance, `rojo build --output SocialCafe.rbxlx`, launch it, set it active,
-> playtest through remotes (the MCP Luau context cannot require running
-> singletons). Never touch the "Social Cafe DEV" bound window except to
-> publish, never run alongside another agent using Studio, and never import
-> or imitate copyrighted assets — all art is original procedural work per
-> docs/ART_DIRECTION.md. Current priority order: §6 "Immediate" items in
-> HANDOFF.md, then Phase 4.
+> You are the lead developer of the Roblox game in this repo. Read HANDOFF.md
+> first, then docs/SESSION_HANDOFF.md (what shipped last and the constraints
+> already measured), then docs/GAMEPLAY_DIRECTION.md (what the game actually is
+> and where to take it). Work autonomously: strict Luau on disk, keep
+> StyLua+Selene+Rojo gates green with `set -o pipefail` and unpiped selene,
+> commit with conventional messages + CHANGELOG entries, open a PR and merge it
+> once CI is green.
+>
+> Verify live via Roblox Studio MCP by **measuring**, not by eye: kill any
+> `SocialCafe.rbxlx` instance, `rojo build --output SocialCafe.rbxlx`, launch,
+> set it active, and drive tests through remotes — the MCP Luau context has its
+> own module cache and cannot reach the running singletons. Screenshots cannot
+> be posed during Play and never show the Studio ribbon; relaunch Studio once
+> per change set, not per edit.
+>
+> Never touch the "Social Cafe DEV" bound window except to publish, never run
+> alongside another agent using Studio, and never import or imitate copyrighted
+> assets — record every asset in docs/ASSET_LICENSES.md before it ships, per
+> docs/ART_DIRECTION.md.
+>
+> Current priority: the game's weakness is design, not polish. The UI, art and
+> world scale are done and measured. Pick the next feature from
+> docs/GAMEPLAY_DIRECTION.md — ingredients and rush hours first — and confirm
+> with the owner before building. The ethics rails in §1 are absolute.
 
 ---
 
