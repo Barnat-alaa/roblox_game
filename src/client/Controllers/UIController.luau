@@ -4,6 +4,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
@@ -39,13 +40,135 @@ local FRIENDLY_ERROR = {
 	wrong_table = "Wrong table - follow the table number on the order ticket.",
 }
 
-type ActionDefinition = {
+-- One declaration per HUD button: zone, slot, shortcut key, badge, label and
+-- accent all live here (docs/HUD_REDESIGN.md §3). Controllers attach behaviour
+-- with UIController.registerAction(id, callback); a button with no callback
+-- explains itself through its comingSoon toast.
+type HudButtonDefinition = {
 	id: string,
-	label: string,
-	glyph: string,
-	color: Color3,
+	zone: "Dock" | "Rail",
 	order: number,
-	callback: () -> (),
+	key: Enum.KeyCode,
+	badge: string,
+	label: string,
+	accent: Color3,
+	comingSoon: string?,
+	-- An always-on switch rather than a panel: shows its state through tint,
+	-- never through the raised "panel open" treatment.
+	toggle: boolean?,
+}
+
+local HUD_BUTTONS: { HudButtonDefinition } = {
+	{
+		id = "Build",
+		zone = "Dock",
+		order = 1,
+		key = Enum.KeyCode.One,
+		badge = "1",
+		label = "Build",
+		accent = Theme.Colors.Coral,
+	},
+	{
+		id = "Cookbook",
+		zone = "Dock",
+		order = 2,
+		key = Enum.KeyCode.Two,
+		badge = "2",
+		label = "Cookbook",
+		accent = Theme.Colors.MintDark,
+	},
+	{
+		id = "Staff",
+		zone = "Dock",
+		order = 3,
+		key = Enum.KeyCode.Three,
+		badge = "3",
+		label = "Staff",
+		accent = Theme.Colors.Blue,
+		comingSoon = "Mia, Noah and Pia run themselves for now - staff management is on the way.",
+	},
+	{
+		id = "Upgrades",
+		zone = "Dock",
+		order = 4,
+		key = Enum.KeyCode.Four,
+		badge = "4",
+		label = "Upgrades",
+		accent = Theme.Colors.Honey,
+		comingSoon = "Appliance upgrades are on the way.",
+	},
+	{
+		id = "Shop",
+		zone = "Dock",
+		order = 5,
+		key = Enum.KeyCode.Five,
+		badge = "5",
+		label = "Shop",
+		accent = Theme.Colors.Berry,
+	},
+	{
+		id = "Goals",
+		zone = "Rail",
+		order = 1,
+		key = Enum.KeyCode.G,
+		badge = "G",
+		label = "Goals",
+		accent = Theme.Colors.Honey,
+	},
+	{
+		id = "Trophies",
+		zone = "Rail",
+		order = 2,
+		key = Enum.KeyCode.T,
+		badge = "T",
+		label = "Trophies",
+		accent = Theme.Colors.Honey,
+	},
+	{
+		id = "Map",
+		zone = "Rail",
+		order = 3,
+		key = Enum.KeyCode.M,
+		badge = "M",
+		label = "Map",
+		accent = Theme.Colors.Mint,
+		comingSoon = "Stroll the boulevard to visit neighbours - a street map is on the way.",
+	},
+	{
+		id = "Music",
+		zone = "Rail",
+		order = 4,
+		key = Enum.KeyCode.B,
+		badge = "B",
+		label = "Music",
+		accent = Theme.Colors.Mint,
+		toggle = true,
+	},
+	{
+		id = "Settings",
+		zone = "Rail",
+		order = 5,
+		key = Enum.KeyCode.V,
+		badge = "V",
+		label = "Settings",
+		accent = Theme.Colors.Roast,
+		comingSoon = "The settings panel is on the way.",
+	},
+}
+
+-- Stat pills, bottom-left, stacked above the stock dock. Semantic colours are
+-- kept from the previous HUD: coins gold, reputation mint, buzz coral.
+type StatDefinition = {
+	key: string,
+	profileKey: string,
+	accent: Color3,
+	order: number,
+}
+
+local STAT_DEFINITIONS: { StatDefinition } = {
+	{ key = "Money", profileKey = "coins", accent = Theme.Colors.Honey, order = 1 },
+	{ key = "Reputation", profileKey = "reputation", accent = Theme.Colors.Mint, order = 2 },
+	{ key = "Buzz", profileKey = "buzz", accent = Theme.Colors.Coral, order = 3 },
 }
 
 local UIController = {}
@@ -58,12 +181,16 @@ local currentOrderId: string? = nil
 local carriedOrderId: string? = nil
 local pendingOrders: { [string]: any } = {}
 local profileListeners: { (any) -> () } = {}
-local actions: { [string]: ActionDefinition } = {}
+local actionCallbacks: { [string]: () -> () } = {}
+local actionHandles: { [string]: Components.IconButtonHandle } = {}
+local actionActive: { [string]: boolean } = {}
+local actionIconOverride: { [string]: { image: string?, glyph: string? } } = {}
 local ui: { [string]: any } = {}
 local activePanel: Frame? = nil
 local shopRows: { [string]: any } = {}
 local shopCategory = "All"
-local actionExpanded = false
+local touchMode = false
+local builtKey: string? = nil
 
 local function configureGui(gui: ScreenGui, order: number)
 	gui.ResetOnSpawn = false
@@ -161,10 +288,29 @@ local function updateStats()
 	if not profile or not ui.stats then
 		return
 	end
-	ui.stats.Coins.Text = tostring(math.floor(tonumber(profile.coins) or 0))
-	ui.stats.Reputation.Text = tostring(math.floor(tonumber(profile.reputation) or 0))
-	ui.stats.Level.Text = tostring(math.floor(tonumber(profile.level) or 1))
-	ui.stats.Buzz.Text = tostring(math.floor(tonumber(profile.buzz) or 0))
+	for _, def in STAT_DEFINITIONS do
+		local chip = ui.stats[def.key]
+		if chip then
+			local target = math.floor(tonumber(profile[def.profileKey]) or 0)
+			if chip.shown == nil then
+				-- First fill after join or a rebuild: no animation to play yet.
+				chip.shown = target
+				chip.counter.Value = target
+				chip.value.Text = tostring(target)
+			elseif chip.shown ~= target then
+				chip.shown = target
+				if chip.tween then
+					chip.tween:Cancel()
+				end
+				local tween =
+					TweenService:Create(chip.counter, Theme.Motion.Count, { Value = target })
+				chip.tween = tween
+				tween:Play()
+				chip.scale.Scale = Theme.Hud.StatPopScale
+				TweenService:Create(chip.scale, Theme.Motion.Fast, { Scale = 1 }):Play()
+			end
+		end
+	end
 	for id, row in shopRows do
 		local def = Furniture[id]
 		local level = tonumber(profile.level) or 1
@@ -281,86 +427,165 @@ local function clearOrder(orderId: string?)
 	showNextOrder()
 end
 
-local function createStat(
-	parent: Instance,
-	key: string,
-	glyph: string,
-	color: Color3,
-	order: number
-)
+local function createStat(parent: Instance, def: StatDefinition, phone: boolean)
+	local spec = Theme.Hud.StatChip
+	local width = if phone then spec.Width.Phone else spec.Width.Desktop
+	local height = if phone then spec.Height.Phone else spec.Height.Desktop
+	local discPx = if phone then spec.Disc.Phone else spec.Disc.Desktop
+	local pad = math.floor((height - discPx) / 2)
 	local chip = Instance.new("Frame")
-	chip.Name = key
-	chip.Size = UDim2.fromOffset(78, 34)
-	chip.BackgroundColor3 = Theme.Colors.Roast
-	chip.BackgroundTransparency = 0.18
-	chip.LayoutOrder = order
+	chip.Name = def.key
+	chip.Size = UDim2.fromOffset(width, height)
+	chip.BackgroundColor3 = Theme.Colors.Espresso
+	chip.BackgroundTransparency = spec.BackgroundTransparency
+	chip.LayoutOrder = def.order
 	Components.Corner(chip, Theme.Radius.Pill)
 	chip.Parent = parent
-	local icon = Components.Icon(chip, glyph, Theme.Images[key], color, 24)
-	icon.Position = UDim2.fromOffset(5, 5)
-	local value = Components.Label(chip, "0", 14, true)
-	value.Size = UDim2.new(1, -34, 1, 0)
-	value.Position = UDim2.fromOffset(31, 0)
+	local scale = Instance.new("UIScale")
+	scale.Parent = chip
+	local disc = Instance.new("Frame")
+	disc.Name = "Disc"
+	disc.AnchorPoint = Vector2.new(0, 0.5)
+	disc.Position = UDim2.new(0, pad, 0.5, 0)
+	disc.Size = UDim2.fromOffset(discPx, discPx)
+	disc.BackgroundColor3 = def.accent
+	Components.Corner(disc, Theme.Radius.Pill)
+	Components.Gradient(disc, def.accent:Lerp(Theme.Colors.White, 0.25), def.accent, 90)
+	disc.Parent = chip
+	local icon = Components.Icon(
+		disc,
+		Theme.Glyphs[def.key],
+		Theme.Images[def.key],
+		def.accent,
+		discPx - 8,
+		Theme.Colors.White
+	)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	local value = Components.Label(
+		chip,
+		"0",
+		if phone then spec.ValueTextSize.Phone else spec.ValueTextSize.Desktop,
+		true
+	)
+	value.Size = UDim2.new(1, -(pad + discPx + 8 + pad), 1, 0)
+	value.Position = UDim2.fromOffset(pad + discPx + 8, 0)
 	value.TextXAlignment = Enum.TextXAlignment.Left
 	value.TextColor3 = Theme.Colors.Cream
-	ui.stats[key] = value
-end
-
-local function actionList(): { ActionDefinition }
-	local ordered = {}
-	for _, action in actions do
-		table.insert(ordered, action)
-	end
-	table.sort(ordered, function(a, b)
-		return a.order < b.order
+	local counter = Instance.new("NumberValue")
+	counter.Changed:Connect(function(current: number)
+		value.Text = tostring(math.floor(current + 0.5))
 	end)
-	return ordered
+	counter.Parent = chip
+	ui.stats[def.key] = { value = value, counter = counter, scale = scale, shown = nil }
 end
 
-local function renderActions()
-	if not ui.actionList then
+local function buildStats(phone: boolean)
+	if not ui.statChips then
 		return
 	end
-	for _, child in ui.actionList:GetChildren() do
-		if child:IsA("TextButton") then
+	for _, child in ui.statChips:GetChildren() do
+		if child:IsA("Frame") then
 			child:Destroy()
 		end
 	end
-	local compact = ResponsiveLayout.isCompact()
-	for _, action in actionList() do
-		local button = Components.Button(
-			ui.actionList,
-			if compact then "" else action.label,
-			action.color,
-			if compact then UDim2.fromOffset(44, 44) else UDim2.fromOffset(78, 44),
-			action.glyph,
-			Theme.Images[action.id]
-		)
-		button.Name = action.id .. "Action"
-		button.LayoutOrder = action.order
-		button.TextSize = if compact then 11 else 12
-		button.Visible = not compact or actionExpanded
-		button.Activated:Connect(action.callback)
+	ui.stats = {}
+	for _, def in STAT_DEFINITIONS do
+		createStat(ui.statChips, def, phone)
+	end
+	updateStats()
+end
+
+local function hudDefinition(id: string): HudButtonDefinition?
+	for _, def in HUD_BUTTONS do
+		if def.id == id then
+			return def
+		end
+	end
+	return nil
+end
+
+local function pressAction(id: string)
+	local callback = actionCallbacks[id]
+	if callback then
+		callback()
+		return
+	end
+	local def = hudDefinition(id)
+	if def and def.comingSoon then
+		UIController.toast(def.comingSoon)
 	end
 end
 
-function UIController.registerAction(
-	id: string,
-	label: string,
-	glyph: string,
-	color: Color3,
-	order: number,
-	callback: () -> ()
-)
-	actions[id] = {
-		id = id,
-		label = label,
-		glyph = glyph,
-		color = color,
-		order = order,
-		callback = callback,
-	}
-	renderActions()
+local function buildZone(zone: "Dock" | "Rail", parent: Frame, plate: number)
+	for _, child in parent:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+	local dock = zone == "Dock"
+	for _, def in HUD_BUTTONS do
+		if def.zone == zone then
+			local override = actionIconOverride[def.id]
+			local handle = Components.IconButton(parent, {
+				name = def.label,
+				glyph = if override and override.glyph
+					then override.glyph
+					else Theme.Glyphs[def.id],
+				icon = if override then override.image else Theme.Images[def.id],
+				accent = def.accent,
+				size = plate,
+				shape = if dock then "Square" else "Round",
+				-- Letter badges are shortcut hints; they mean nothing without a
+				-- keyboard. The 1-5 number badges stay: they are part of the
+				-- dock's look.
+				badge = if not dock and touchMode then nil else def.badge,
+				badgePlacement = if dock then "Corner" else "Beside",
+				labelSide = if dock then "Bottom" else "Left",
+				-- No hover on touch, so every name is pinned instead.
+				alwaysShowLabel = touchMode,
+				liftEnabled = not touchMode,
+				persistentToggle = def.toggle == true,
+				layoutOrder = def.order,
+			})
+			handle.button.Activated:Connect(function()
+				pressAction(def.id)
+			end)
+			if actionActive[def.id] then
+				handle.setActive(true)
+			end
+			actionHandles[def.id] = handle
+		end
+	end
+end
+
+function UIController.registerAction(id: string, callback: () -> ())
+	actionCallbacks[id] = callback
+end
+
+function UIController.setActionActive(id: string, active: boolean)
+	actionActive[id] = active
+	local handle = actionHandles[id]
+	if handle then
+		handle.setActive(active)
+	end
+end
+
+-- Keeps a HUD button's raised/bright state in sync with its panel, however
+-- the panel gets opened or closed.
+function UIController.bindActionPanel(id: string, panel: Frame)
+	panel:GetPropertyChangedSignal("Visible"):Connect(function()
+		UIController.setActionActive(id, panel.Visible)
+	end)
+	UIController.setActionActive(id, panel.Visible)
+end
+
+function UIController.setActionIcon(id: string, image: string?, glyph: string?)
+	actionIconOverride[id] = { image = image, glyph = glyph }
+	local handle = actionHandles[id]
+	if handle then
+		handle.setIcon(image, glyph)
+	end
 end
 
 local function setShopCategory(category: string)
@@ -499,40 +724,45 @@ local function buildShop(parent: Instance)
 end
 
 local function applyResponsive(mode: string, viewport: Vector2)
-	if not ui.statBar then
+	if not ui.dock then
 		return
 	end
 	local phone = mode == "Phone"
 	local compact = mode ~= "Desktop"
-	ui.statBar.Size = if compact
-		then UDim2.fromOffset(math.min(viewport.X - 82, 292), 42)
-		else UDim2.fromOffset(352, 46)
-	ui.statBar.Position = if viewport.X >= 700
-		then UDim2.fromOffset(270, 8)
-		else UDim2.fromOffset(10, 52)
-	for _, chip in ui.statChips:GetChildren() do
-		if chip:IsA("Frame") then
-			chip.Size = if compact then UDim2.new(0.25, -4, 0, 32) else UDim2.fromOffset(78, 34)
-		end
+	local margin = Theme.Hud.EdgeMargin
+	local layout = ResponsiveLayout.hudLayout(mode :: ResponsiveLayout.Mode, viewport)
+
+	-- Rebuild the plates only when a size actually changed, so ordinary window
+	-- drags do not throw away every button and its state.
+	local key = string.format("%s|%d|%d", mode, layout.dockPlate, layout.railPlate)
+	if builtKey ~= key then
+		builtKey = key
+		buildZone("Dock", ui.dock, layout.dockPlate)
+		buildZone("Rail", ui.rail, layout.railPlate)
+		buildStats(layout.phoneSized)
 	end
+
+	ui.statChips.Position = UDim2.new(0, margin, 1, -layout.chipsBottom)
+	ui.statChips.Size = UDim2.fromOffset(layout.chipWidth, layout.chipsHeight)
+
+	ui.dock.Size = UDim2.fromOffset(layout.dockWidth, layout.dockPlate)
+	ui.dock.Position = UDim2.new(0.5, layout.dockOffsetX, 1, -layout.dockBottom)
+
 	ui.orderTicket.Size = if compact
-		then UDim2.fromOffset(math.min(230, viewport.X - 150), 42)
-		else UDim2.fromOffset(280, 48)
-	ui.orderTicket.Position = if viewport.X < 1000
-		then UDim2.new(1, -10, 0, 58)
-		else UDim2.new(1, -10, 0, 9)
+		then UDim2.fromOffset(math.min(230, viewport.X - 150), layout.ticketHeight)
+		else UDim2.fromOffset(280, layout.ticketHeight)
+	ui.orderTicket.Position = UDim2.new(1, -10, 0, layout.ticketTop)
 	ui.orderTicket.AnchorPoint = Vector2.new(1, 0)
-	ui.actionDock.AnchorPoint = Vector2.new(1, 1)
-	ui.actionDock.Position = UDim2.new(1, -12, 1, if compact then -96 else -12)
-	ui.actionDock.Size = if compact
-		then UDim2.fromOffset(if actionExpanded then 252 else 54, 48)
-		else UDim2.fromOffset(334, 48)
-	ui.actionMenu.Visible = compact
-	ui.actionMenu.Text = if actionExpanded then "X" else "MENU"
-	ui.actionList.Position = UDim2.fromOffset(0, 2)
-	ui.actionList.Size = if compact then UDim2.new(1, -58, 1, -4) else UDim2.fromScale(1, 1)
-	ui.actionMenu.Position = UDim2.new(1, -52, 0, 2)
-	renderActions()
+
+	ui.rail.Size = UDim2.fromOffset(layout.railPlate, layout.railHeight)
+	local railTop = layout.railTopFromTop
+	if railTop then
+		ui.rail.AnchorPoint = Vector2.new(1, 0)
+		ui.rail.Position = UDim2.new(1, -margin, 0, railTop)
+	else
+		ui.rail.AnchorPoint = Vector2.new(1, 0.5)
+		ui.rail.Position = UDim2.new(1, -margin, 0.5, 0)
+	end
 	local shop = ui.shopPanel
 	if phone then
 		shop.AnchorPoint = Vector2.new(0.5, 1)
@@ -547,8 +777,10 @@ local function applyResponsive(mode: string, viewport: Vector2)
 		shop.Position = UDim2.new(1, -238, 0.5, 0)
 		shop.Size = UDim2.fromOffset(450, math.min(540, viewport.Y - 24))
 	end
-	ui.serve.Size = if compact then UDim2.fromOffset(142, 46) else UDim2.fromOffset(170, 50)
-	ui.serve.Position = UDim2.new(0.5, 0, 1, if viewport.X < 1000 then -126 else -18)
+	ui.serve.Size = if compact
+		then UDim2.fromOffset(142, layout.serveHeight)
+		else UDim2.fromOffset(170, layout.serveHeight)
+	ui.serve.Position = UDim2.new(0.5, layout.dockOffsetX, 1, -layout.serveBottom)
 end
 
 function UIController.Start(_self: any)
@@ -564,37 +796,21 @@ function UIController.Start(_self: any)
 	gui.Parent = playerGui
 	ui.gui = gui
 
-	local statBar = Instance.new("Frame")
-	statBar.Name = "BusinessCapsule"
-	statBar.Size = UDim2.fromOffset(352, 46)
-	statBar.Position = UDim2.fromOffset(10, 8)
-	statBar.BackgroundColor3 = Theme.Colors.Espresso
-	statBar.BackgroundTransparency = 0.04
-	Components.Corner(statBar, Theme.Radius.Large)
-	Components.Stroke(statBar, Theme.Colors.Roast, 1, 0.1)
-	Components.Gradient(statBar, Theme.Colors.Espresso, Theme.Colors.Roast, 0)
-	statBar.Parent = gui
-	ui.statBar = statBar
+	touchMode = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 	local chips = Instance.new("Frame")
-	chips.Name = "Stats"
-	chips.Size = UDim2.new(1, -10, 1, 0)
-	chips.Position = UDim2.fromOffset(5, 0)
+	chips.Name = "StatStack"
+	chips.AnchorPoint = Vector2.new(0, 1)
 	chips.BackgroundTransparency = 1
-	chips.Parent = statBar
+	chips.Parent = gui
 	local statLayout = Instance.new("UIListLayout")
-	statLayout.FillDirection = Enum.FillDirection.Horizontal
-	statLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	statLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	statLayout.Padding = UDim.new(0, 6)
+	statLayout.FillDirection = Enum.FillDirection.Vertical
+	statLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	statLayout.Padding = UDim.new(0, Theme.Hud.StatChip.Gap)
 	statLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	statLayout.Parent = chips
 	ui.stats = {}
 	ui.statChips = chips
-	createStat(chips, "Coins", Theme.Glyphs.Coin, Theme.Colors.Honey, 1)
-	createStat(chips, "Reputation", Theme.Glyphs.Reputation, Theme.Colors.Mint, 2)
-	createStat(chips, "Level", Theme.Glyphs.Level, Theme.Colors.Blue, 3)
-	createStat(chips, "Buzz", Theme.Glyphs.Buzz, Theme.Colors.Coral, 4)
 
 	local ticket = Instance.new("Frame")
 	ticket.Name = "OrderTicket"
@@ -656,55 +872,49 @@ function UIController.Start(_self: any)
 	end)
 	ui.serve = serve
 
-	local actionDock = Instance.new("Frame")
-	actionDock.Name = "ActionDock"
-	actionDock.AnchorPoint = Vector2.new(1, 1)
-	actionDock.Size = UDim2.fromOffset(334, 48)
-	actionDock.Position = UDim2.new(1, -12, 1, -12)
-	actionDock.BackgroundColor3 = Theme.Colors.Espresso
-	actionDock.BackgroundTransparency = 0.08
-	Components.Corner(actionDock, Theme.Radius.Large)
-	Components.Stroke(actionDock, Theme.Colors.Cream, 1, 0.7)
-	actionDock.Parent = gui
-	local actionListFrame = Instance.new("Frame")
-	actionListFrame.Name = "Actions"
-	actionListFrame.Size = UDim2.fromScale(1, 1)
-	actionListFrame.BackgroundTransparency = 1
-	actionListFrame.Parent = actionDock
-	local actionLayout = Instance.new("UIListLayout")
-	actionLayout.FillDirection = Enum.FillDirection.Horizontal
-	actionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-	actionLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-	actionLayout.Padding = UDim.new(0, 6)
-	actionLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	actionLayout.Parent = actionListFrame
-	local actionMenu =
-		Components.Button(actionDock, "MENU", Theme.Colors.Roast, UDim2.fromOffset(50, 44))
-	actionMenu.Name = "MenuToggle"
-	actionMenu.Visible = false
-	actionMenu.TextSize = 10
-	actionMenu.Activated:Connect(function()
-		actionExpanded = not actionExpanded
-		local camera = workspace.CurrentCamera
-		if camera then
-			applyResponsive(ResponsiveLayout.mode(camera.ViewportSize), camera.ViewportSize)
-		end
-	end)
-	ui.actionDock = actionDock
-	ui.actionList = actionListFrame
-	ui.actionMenu = actionMenu
+	local dock = Instance.new("Frame")
+	dock.Name = "ActionDock"
+	dock.AnchorPoint = Vector2.new(0.5, 1)
+	dock.BackgroundTransparency = 1
+	dock.Parent = gui
+	local dockLayout = Instance.new("UIListLayout")
+	dockLayout.FillDirection = Enum.FillDirection.Horizontal
+	dockLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	dockLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	dockLayout.Padding = UDim.new(0, Theme.Hud.DockGap)
+	dockLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	dockLayout.Parent = dock
+	ui.dock = dock
+
+	local rail = Instance.new("Frame")
+	rail.Name = "ActionRail"
+	rail.BackgroundTransparency = 1
+	rail.Parent = gui
+	local railLayout = Instance.new("UIListLayout")
+	railLayout.FillDirection = Enum.FillDirection.Vertical
+	railLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	railLayout.Padding = UDim.new(0, Theme.Hud.RailGap)
+	railLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	railLayout.Parent = rail
+	ui.rail = rail
 
 	buildShop(modalRoot)
-	UIController.registerAction(
-		"Shop",
-		"Shop",
-		Theme.Glyphs.Shop,
-		Theme.Colors.Berry,
-		40,
-		function()
-			UIController.togglePanel(ui.shopPanel)
+	UIController.registerAction("Shop", function()
+		UIController.togglePanel(ui.shopPanel)
+	end)
+	UIController.bindActionPanel("Shop", ui.shopPanel)
+
+	UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
+		if gameProcessed or input.UserInputType ~= Enum.UserInputType.Keyboard then
+			return
 		end
-	)
+		for _, def in HUD_BUTTONS do
+			if def.key == input.KeyCode then
+				pressAction(def.id)
+				break
+			end
+		end
+	end)
 
 	Remotes.event("ProfileUpdated").OnClientEvent:Connect(setProfile)
 	Remotes.event("OrderCreated").OnClientEvent:Connect(showOrder)
@@ -769,7 +979,6 @@ function UIController.Start(_self: any)
 	end)
 
 	ResponsiveLayout.watch(applyResponsive)
-	renderActions()
 	task.spawn(function()
 		local snapshot: any = nil
 		local ok = pcall(function()

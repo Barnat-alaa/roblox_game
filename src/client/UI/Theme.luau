@@ -36,6 +36,7 @@ local Theme = {
 	},
 	Glyphs = {
 		Coin = "$",
+		Money = "$",
 		Reputation = "R",
 		Level = "L",
 		Buzz = "B",
@@ -47,6 +48,13 @@ local Theme = {
 		Cookbook = "CB",
 		Build = "BU",
 		Shop = "SH",
+		Staff = "CR",
+		Upgrades = "UP",
+		Trophies = "TR",
+		Map = "MP",
+		Music = "MU",
+		MusicOff = "MX",
+		Settings = "OP",
 		Pantry = "ST",
 		Clock = "T",
 		Fresh = "F",
@@ -69,6 +77,52 @@ local Theme = {
 	Motion = {
 		Fast = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		Panel = TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+		Settle = TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		Count = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	},
+	-- The chunky icon HUD (docs/HUD_REDESIGN.md). Every size, scale, and tint
+	-- the dock, rail, and stat pills use lives here - controllers hold no
+	-- layout literals.
+	Hud = {
+		-- Phone sizes are tuned against the measured world-visibility floor
+		-- (phone >=55%), not picked by eye: five dock plates plus a five-button
+		-- rail plus three pills is a lot of furniture on a 560px screen.
+		DockPlate = { Desktop = 72, Phone = 54 },
+		DockGap = 10,
+		RailPlate = { Desktop = 46, Phone = 40 },
+		RailPlateMin = 30,
+		RailGap = 10,
+		-- Viewports shorter than this get phone-sized plates and pills even when
+		-- ResponsiveLayout calls them "Compact" - that is where landscape phones
+		-- land, and desktop-sized chunky buttons swallow those screens.
+		ShortViewport = 480,
+		LabelHeight = 20,
+		LabelTextSize = 12,
+		LabelTextSizeTouch = 10,
+		LabelBackgroundTransparency = 0.15,
+		BadgeSize = 22,
+		BadgeTextSize = 12,
+		BadgeSizeBeside = 18,
+		BadgeTextSizeBeside = 10,
+		HoverScale = 1.1,
+		PressScale = 0.94,
+		StatPopScale = 1.08,
+		PlateTint = Color3.fromRGB(255, 240, 214),
+		PlateTintActive = Color3.fromRGB(255, 252, 240),
+		IconTint = Color3.fromRGB(72, 45, 38),
+		IconRatio = 0.62,
+		StrokeTransparency = 0.55,
+		StrokeTransparencyActive = 0.05,
+		StatChip = {
+			Width = { Desktop = 128, Phone = 92 },
+			Height = { Desktop = 36, Phone = 28 },
+			Gap = 6,
+			Disc = { Desktop = 28, Phone = 24 },
+			BackgroundTransparency = 0.15,
+			ValueTextSize = { Desktop = 15, Phone = 13 },
+		},
+		StockDockHeight = { Desktop = 78, Compact = 56 },
+		EdgeMargin = 10,
 	},
 	-- Approved Creator Store images, with code-drawn glyphs retained as the
 	-- automatic fallback if Roblox cannot fetch an image.

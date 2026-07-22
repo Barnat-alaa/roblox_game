@@ -359,14 +359,8 @@ end
 function BuildController.Start(_self: any)
 	buildPanel()
 	UIController.onBuildToggle = toggle
-	UIController.registerAction(
-		"Build",
-		"Build",
-		Theme.Glyphs.Build,
-		Theme.Colors.Coral,
-		30,
-		toggle
-	)
+	UIController.registerAction("Build", toggle)
+	UIController.bindActionPanel("Build", ui.panel)
 	UIController.subscribeProfile(function()
 		if active then
 			refreshCatalogue()

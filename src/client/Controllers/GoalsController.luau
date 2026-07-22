@@ -151,19 +151,26 @@ function GoalsController.Start(_self: any)
 	ui.footer = footer
 	ui.panel = panel
 
-	UIController.registerAction(
-		"Goals",
-		"Goals",
-		Theme.Glyphs.Goals,
-		Theme.Colors.Honey,
-		10,
-		function()
+	-- Streak trophies live on this panel (footer + the in-cafe shelf), so the
+	-- rail's Trophies button opens it too until a dedicated panel exists. Only
+	-- the button actually pressed lights up, or the player cannot tell which
+	-- one owns the open panel.
+	local openedFrom = "Goals"
+	local function opener(id: string): () -> ()
+		return function()
+			openedFrom = id
 			UIController.togglePanel(panel)
 			if panel.Visible then
 				rebuild()
 			end
 		end
-	)
+	end
+	UIController.registerAction("Goals", opener("Goals"))
+	UIController.registerAction("Trophies", opener("Trophies"))
+	panel:GetPropertyChangedSignal("Visible"):Connect(function()
+		UIController.setActionActive("Goals", panel.Visible and openedFrom == "Goals")
+		UIController.setActionActive("Trophies", panel.Visible and openedFrom == "Trophies")
+	end)
 	UIController.subscribeProfile(function()
 		if panel.Visible then
 			rebuild()
