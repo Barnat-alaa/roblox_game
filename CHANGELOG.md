@@ -40,8 +40,12 @@ Verified live end to end: 1 → 2 → 3 → 6 with no dead end.
   now opt-out (`Graphics.UIFullColour`) so full-colour art keeps its palette
   while the flat CC0 glyphs are still recoloured per surface, and a colour pill
   icon replaces its coloured disc rather than sitting on it.
-  `Cookbook`, `Map` and `Settings` have no match in the sheet and stay on the
-  CC0 glyphs — so three buttons read flat next to ten colourful ones.
+  `Cookbook`, `Map` and `Settings` arrived on a second sheet, so **every** HUD
+  button and stat pill is now on the owner's art — no mixed styles left. The
+  muted-music icon is derived from the owner's own music note (desaturated and
+  dimmed) rather than falling back to a flat glyph.
+- `scripts/slice_icon_sheet.py` takes `--rows/--cols/--names`, so the next sheet
+  is one command.
 
 ### Changed — 2026-07-22 — furniture renders 1.5× bigger; round table is one cell
 Owner request: placed furniture read too small next to a character, and a round

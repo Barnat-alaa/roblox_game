@@ -274,6 +274,19 @@ uploaded under the owner's account, ids in `Graphics.UI`.
 | Dollar | `Money` | 138291685268649 |
 | Trophy + chart | `Rankings` (spare) | 99014737661924 |
 
+Second sheet (1×3), supplied 2026-07-22 to close the three gaps:
+
+| Sheet cell | Our key | Roblox asset id |
+| --- | --- | ---: |
+| Cook book | `Cookbook` | 78909102358565 |
+| Map scroll | `Map` | 78785839275091 |
+| Gear + tools | `Settings` | 101966431239256 |
+| *(derived)* desaturated music note | `MusicOff` | 88490987948549 |
+
+`MusicOff` is not from a sheet — it is the owner's own `Music` icon desaturated
+and dimmed, so the muted state matches the set instead of dropping back to a
+flat CC0 glyph.
+
 **Preparation.** The sheet only *looked* transparent — the checkerboard was
 painted in as opaque pixels in two tones (~135 and ~97) with each icon's glow
 blended into it. A flat colour key left a dirty halo, so the background is
@@ -288,9 +301,9 @@ directed its use; it is recorded here so that decision is visible rather than
 implicit. It is the only AI-generated art shipping — everything else is CC0 or
 owner-approved Creator Store.
 
-**Still on the CC0 set (no matching art in the sheet):** `Cookbook`, `Map`,
-`Settings`. They remain Nieobie CC0 glyphs, so those three read flat next to ten
-full-colour icons. Generating three more in the same style closes it.
+**Coverage: complete.** All thirteen HUD buttons and the three stat pills are on
+the owner's art. The Nieobie CC0 glyphs stay in the codebase as the text-glyph
+fallback path, but no longer render on the HUD in normal operation.
 
 ## Rules (do NOT skip)
 - No ripping/decompiling/extracting from any game. No tracing protected artwork.
