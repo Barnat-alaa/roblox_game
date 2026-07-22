@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — 2026-07-22 — furniture renders 1.5× bigger; round table is one cell
+Owner request: placed furniture read too small next to a character, and a round
+table should occupy a single cell so chairs sit square against it.
+
+- **`AssetManifest.displayScale = 1.5`** — one number scales every placed piece.
+  It multiplies both `height` and `maxSpan`, because height alone gets undone by
+  the span clamp that keeps a model inside its footprint. The procedural greybox
+  fallback scales by the same figure, growing from the floor so it neither sinks
+  nor hovers, and grid footprints are deliberately **not** scaled — a piece may
+  now overhang its cells, which is what makes a room look furnished.
+- **`table_round` is 1×1** (was 2×2). The four orthogonally adjacent cells are
+  now exactly the four chair positions. Measured live: each chair sits **4.00
+  studs** from the table centre with a **+0.07 to +0.14 stud** edge gap — tucked
+  in, not clipping. `BuildService.autoFaceSeats` already turns each chair to
+  face the table, so a set snaps together with no fiddling.
+- **The counter keeps its length.** `widen` is applied *after* the uniform scale,
+  so it multiplied it: the counter measured **36 studs inside a 24-stud
+  footprint**, hanging 6 studs off each end. `maxSpan` cannot fix this (it
+  clamps before `widen` and never bound here), so the counter's `widen` is
+  divided by `displayScale`. It now measures exactly 24.0.
+
+### Fixed — 2026-07-22 — `deepen`, the missing companion to `widen`
+Closes a tracked issue. The counter body imported ~3.1 studs deep inside a
+4-stud cell, so appliances standing on it hung off the front and back, and there
+was no mechanism to correct a model that is too thin rather than too short.
+`deepen` stretches the **short** horizontal axis exactly as `widen` stretches the
+long one; the counter now fills its cell depth at 3.9 studs.
+
 ### Added — 2026-07-22 — every dish has its own picture
 Closes the one gap the coverage audit found. The 14 dishes are meshes *inside*
 one packaged model, so no dish had a Creator Store id to render a thumbnail

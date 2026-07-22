@@ -10,6 +10,7 @@ local Shared = ReplicatedStorage.Shared
 local Types = require(Shared.Types)
 local Grid = require(Shared.Utilities.Grid)
 local World = require(Shared.Config.World)
+local AssetManifest = require(Shared.Config.AssetManifest)
 local Furniture = require(Shared.Config.Furniture)
 local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
@@ -421,6 +422,17 @@ function BuildService.SpawnFurniture(_self: any, player: Player, placed: Types.P
 			def.color
 		)
 		part.CanCollide = true
+	end
+
+	-- Match the imported pieces' size, growing from the floor so the model does
+	-- not sink or hover after scaling.
+	local displayScale = AssetManifest.displayScale
+	if displayScale ~= 1 then
+		model.PrimaryPart = nil
+		model.WorldPivot = CFrame.new(cf.Position.X, cf.Y - def.height / 2, cf.Position.Z)
+		pcall(function()
+			model:ScaleTo(displayScale)
+		end)
 	end
 
 	model.Parent = folder

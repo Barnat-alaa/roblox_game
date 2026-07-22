@@ -69,8 +69,12 @@ local Furniture: { [string]: Types.FurnitureDefinition } = {
 		category = "Seating",
 		price = 40,
 		requiredLevel = 1,
-		width = 2,
-		depth = 2,
+		-- ONE cell, so the four orthogonally adjacent cells are exactly the four
+		-- chair seats. At 2x2 a chair could never sit square to the table: it
+		-- landed against a corner or an edge midpoint. BuildService.autoFaceSeats
+		-- turns each of those chairs to face the table automatically.
+		width = 1,
+		depth = 1,
 		rotatable = false,
 		blocksWalk = true,
 		seatCount = 0,
