@@ -109,10 +109,23 @@ local function buildTouchControls()
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = holder
-	ResponsiveLayout.watch(function(mode)
-		holder.Position = if mode == "Compact"
-			then UDim2.fromOffset(10, 112)
-			else UDim2.new(0, 10, 0.5, 0)
+	ResponsiveLayout.watch(function(mode, viewport)
+		if mode == "Desktop" then
+			holder.Position = UDim2.new(0, 10, 0.5, 0)
+			return
+		end
+		-- The HUD's stat pills claim the lower-left on small screens; keep this
+		-- pad's bottom edge clear of them rather than letting the chips draw
+		-- over invisible-but-tappable camera buttons.
+		local hud = ResponsiveLayout.hudLayout(mode, viewport)
+		local centre = if mode == "Compact" then 112 else viewport.Y * 0.5
+		-- Stay clear of everything else that wants this column: the stat pills
+		-- below, and the cafe-health card above once it drops down here.
+		centre = math.min(centre, hud.chipsTopFromTop - 56)
+		if hud.healthLeft < 110 then
+			centre = math.min(centre, hud.healthTopFromTop - 50)
+		end
+		holder.Position = UDim2.fromOffset(10, math.max(50, centre))
 	end)
 
 	local function button(text: string, order: number, onTap: () -> ())

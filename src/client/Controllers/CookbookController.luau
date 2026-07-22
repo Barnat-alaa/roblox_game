@@ -262,19 +262,13 @@ function CookbookController.Start(_self: any)
 	ui.list = list
 	ui.panel = panel
 
-	UIController.registerAction(
-		"Cookbook",
-		"Recipes",
-		Theme.Glyphs.Cookbook,
-		Theme.Colors.MintDark,
-		20,
-		function()
-			UIController.togglePanel(panel)
-			if panel.Visible then
-				rebuild()
-			end
+	UIController.registerAction("Cookbook", function()
+		UIController.togglePanel(panel)
+		if panel.Visible then
+			rebuild()
 		end
-	)
+	end)
+	UIController.bindActionPanel("Cookbook", panel)
 	UIController.subscribeProfile(function()
 		if panel.Visible then
 			rebuild()

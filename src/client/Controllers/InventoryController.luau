@@ -674,10 +674,11 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	end
 	local phone = mode == "Phone"
 	local compact = mode ~= "Desktop"
-	ui.dock.Size = if phone
-		then UDim2.fromOffset(math.max(260, viewport.X - 82), 56)
-		elseif compact then UDim2.fromOffset(math.min(344, viewport.X - 120), 56)
-		else UDim2.fromOffset(500, 78)
+	-- Shared formula: UIController stacks the stat pills directly above this
+	-- dock and lifts the centre action dock over it when they would collide.
+	local stockWidth, stockHeight =
+		ResponsiveLayout.stockDockSize(mode :: ResponsiveLayout.Mode, viewport)
+	ui.dock.Size = UDim2.fromOffset(stockWidth, stockHeight)
 	ui.dock.Position = UDim2.new(0, 10, 1, -10)
 	ui.dock.AnchorPoint = Vector2.new(0, 1)
 	ui.dockHeader.Size = UDim2.new(1, -8, 0, if compact then 18 else 25)
@@ -739,7 +740,7 @@ function InventoryController.Start(_self: any)
 	dock.Name = "StockDock"
 	dock.AnchorPoint = Vector2.new(0, 1)
 	dock.Position = UDim2.new(0, 10, 1, -10)
-	dock.Size = UDim2.fromOffset(500, 78)
+	dock.Size = UDim2.fromOffset(500, Theme.Hud.StockDockHeight.Desktop)
 	dock.BackgroundColor3 = Theme.Colors.Espresso
 	dock.BackgroundTransparency = 0.04
 	Components.Corner(dock, Theme.Radius.Large)

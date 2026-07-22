@@ -62,27 +62,10 @@ function Components.Label(parent: Instance, text: string, size: number, bold: bo
 	return label
 end
 
-function Components.Icon(
-	parent: Instance,
-	glyph: string,
-	image: string?,
-	color: Color3?,
-	size: number?
-): GuiObject
-	local px = size or 28
-	if image and image ~= "" then
-		local icon = Instance.new("ImageLabel")
-		icon.Name = "Icon"
-		icon.Size = UDim2.fromOffset(px, px)
-		icon.BackgroundTransparency = 1
-		icon.Image = image
-		icon.ScaleType = Enum.ScaleType.Fit
-		icon.Parent = parent
-		return icon
-	end
+local function glyphBadge(parent: Instance, glyph: string, color: Color3?, px: number): Frame
 	local badge = Instance.new("Frame")
 	badge.Name = "IconFallback"
-	badge.Size = UDim2.fromOffset(px, px)
+	badge.Size = UDim2.fromScale(1, 1)
 	badge.BackgroundColor3 = color or Theme.Colors.Honey
 	Components.Corner(badge, math.floor(px / 2))
 	Components.Gradient(
@@ -104,6 +87,57 @@ function Components.Icon(
 	text.ZIndex = badge.ZIndex + 1
 	badge.Parent = parent
 	return badge
+end
+
+-- Returns a fixed-size slot holding either the image or the code-drawn glyph
+-- badge. If an image id is present but Roblox never loads it (moderated,
+-- restricted, deleted), the slot swaps to the glyph badge, so the HUD never
+-- renders a blank square.
+function Components.Icon(
+	parent: Instance,
+	glyph: string,
+	image: string?,
+	color: Color3?,
+	size: number?,
+	imageTint: Color3?
+): GuiObject
+	local px = size or 28
+	local slot = Instance.new("Frame")
+	slot.Name = "Icon"
+	slot.Size = UDim2.fromOffset(px, px)
+	slot.BackgroundTransparency = 1
+	slot.Parent = parent
+	if image and image ~= "" then
+		local icon = Instance.new("ImageLabel")
+		icon.Name = "Image"
+		icon.Size = UDim2.fromScale(1, 1)
+		icon.BackgroundTransparency = 1
+		icon.Image = image
+		icon.ScaleType = Enum.ScaleType.Fit
+		if imageTint then
+			icon.ImageColor3 = imageTint
+		end
+		icon.Parent = slot
+		-- Cover a slow image with the glyph badge rather than replacing it: a
+		-- cold content queue can take far longer than this on join, and an
+		-- image that eventually arrives should still be the one you see.
+		task.delay(6, function()
+			if icon.Parent ~= slot or icon.IsLoaded then
+				return
+			end
+			local badge = glyphBadge(slot, glyph, color, px)
+			icon.Visible = false
+			icon:GetPropertyChangedSignal("IsLoaded"):Once(function()
+				if icon.IsLoaded then
+					badge:Destroy()
+					icon.Visible = true
+				end
+			end)
+		end)
+	else
+		glyphBadge(slot, glyph, color, px)
+	end
+	return slot
 end
 
 function Components.Button(
@@ -162,6 +196,9 @@ function Components.Panel(parent: Instance, name: string, color: Color3?): Frame
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.BackgroundColor3 = color or Theme.Colors.Cream
 	panel.ZIndex = 20
+	-- Sink clicks: an open panel covers HUD buttons, and without this a tap on
+	-- panel dead space falls through to whatever it is hiding.
+	panel.Active = true
 	Components.Corner(panel, Theme.Radius.Large)
 	Components.Stroke(panel, Theme.Colors.Line, 2, 0.12)
 	panel.Parent = parent
@@ -173,6 +210,7 @@ function Components.Panel(parent: Instance, name: string, color: Color3?): Frame
 	shadow.Position = UDim2.new(0.5, 5, 0.5, 7)
 	shadow.Size = UDim2.fromScale(1, 1)
 	shadow.ZIndex = panel.ZIndex - 1
+	shadow.Active = true
 	Components.Corner(shadow, Theme.Radius.Large)
 	shadow.Parent = panel
 	shadow.Visible = panel.Visible
@@ -242,6 +280,212 @@ function Components.SetPanelVisible(panel: Frame, visible: boolean)
 	else
 		panel.Visible = false
 	end
+end
+
+export type IconButtonOpts = {
+	name: string,
+	glyph: string,
+	icon: string?,
+	accent: Color3,
+	size: number,
+	shape: "Square" | "Round",
+	badge: string?,
+	badgePlacement: ("Corner" | "Beside")?,
+	labelSide: "Bottom" | "Left",
+	alwaysShowLabel: boolean?,
+	liftEnabled: boolean?,
+	-- A toggle that is usually on (music) should not sit permanently in the
+	-- raised hover state that marks an open panel: it reads as tint and stroke
+	-- only.
+	persistentToggle: boolean?,
+	layoutOrder: number?,
+}
+
+export type IconButtonHandle = {
+	root: Frame,
+	button: ImageButton,
+	setActive: (active: boolean) -> (),
+	setIcon: (image: string?, glyph: string?) -> (),
+	isActive: () -> boolean,
+}
+
+-- The chunky HUD button (docs/HUD_REDESIGN.md §2b/2c): plate image over a
+-- code-drawn rounded gradient (which doubles as the no-image fallback), glyph
+-- icon, corner badge, hover lift with a name label, and a press dip that
+-- settles back ("pop"). Both the bottom dock and the right rail build from
+-- this; every visual constant comes from Theme.Hud.
+function Components.IconButton(parent: Instance, opts: IconButtonOpts): IconButtonHandle
+	local hud = Theme.Hud
+	local size = opts.size
+	local round = opts.shape == "Round"
+	local lift = opts.liftEnabled ~= false
+
+	local root = Instance.new("Frame")
+	root.Name = opts.name .. "Button"
+	root.Size = UDim2.fromOffset(size, size)
+	root.BackgroundTransparency = 1
+	root.LayoutOrder = opts.layoutOrder or 0
+	root.Parent = parent
+
+	local plate = Instance.new("ImageButton")
+	plate.Name = "Plate"
+	plate.AnchorPoint = Vector2.new(0.5, 0.5)
+	plate.Position = UDim2.fromScale(0.5, 0.5)
+	plate.Size = UDim2.fromOffset(size, size)
+	plate.AutoButtonColor = false
+	plate.BackgroundColor3 = hud.PlateTint
+	plate.ScaleType = Enum.ScaleType.Fit
+	plate.ImageColor3 = hud.PlateTint
+	local plateImage = if round then Theme.Images.PlateRound else Theme.Images.PlateSquare
+	if plateImage ~= "" then
+		plate.Image = plateImage
+	end
+	Components.Corner(plate, if round then math.floor(size / 2) else Theme.Radius.Large)
+	Components.Gradient(plate, hud.PlateTint:Lerp(Theme.Colors.White, 0.35), hud.PlateTint, 90)
+	local stroke = Components.Stroke(plate, Theme.Colors.Cream, 2, hud.StrokeTransparency)
+	plate.Parent = root
+
+	local scale = Instance.new("UIScale")
+	scale.Parent = plate
+
+	local iconPx = math.floor(size * hud.IconRatio)
+	local iconSlot =
+		Components.Icon(plate, opts.glyph, opts.icon, opts.accent, iconPx, hud.IconTint)
+	iconSlot.AnchorPoint = Vector2.new(0.5, 0.5)
+	iconSlot.Position = UDim2.fromScale(0.5, 0.5)
+	iconSlot.ZIndex = plate.ZIndex + 1
+
+	-- "Corner" is the dock's numbered badge sitting on the plate; "Beside" is
+	-- the rail's tiny key pill parked just outside it (spec §2b vs §2c).
+	local beside = opts.badgePlacement == "Beside"
+	local badgeSize = if beside then hud.BadgeSizeBeside else hud.BadgeSize
+	if opts.badge then
+		local badge = Instance.new("Frame")
+		badge.Name = "Badge"
+		badge.Size = UDim2.fromOffset(badgeSize, badgeSize)
+		if beside then
+			badge.AnchorPoint = Vector2.new(1, 0.5)
+			badge.Position = UDim2.new(0, -6, 0.5, 0)
+		else
+			badge.AnchorPoint = Vector2.new(1, 1)
+			badge.Position = UDim2.new(1, 6, 1, 6)
+		end
+		badge.BackgroundColor3 = opts.accent
+		badge.ZIndex = plate.ZIndex + 2
+		Components.Corner(badge, Theme.Radius.Pill)
+		Components.Stroke(badge, Theme.Colors.Cream, 1, 0.25)
+		local badgeText = Components.Label(
+			badge,
+			opts.badge,
+			if beside then hud.BadgeTextSizeBeside else hud.BadgeTextSize,
+			true
+		)
+		badgeText.Size = UDim2.fromScale(1, 1)
+		badgeText.TextColor3 = Theme.Colors.White
+		badgeText.ZIndex = badge.ZIndex + 1
+		badge.Parent = plate
+	end
+
+	local label = Instance.new("TextLabel")
+	label.Name = "NameLabel"
+	label.AutomaticSize = Enum.AutomaticSize.X
+	label.Size = UDim2.fromOffset(0, hud.LabelHeight)
+	label.BackgroundColor3 = Theme.Colors.Espresso
+	label.Font = Theme.Font.Bold
+	label.TextSize = if opts.alwaysShowLabel then hud.LabelTextSizeTouch else hud.LabelTextSize
+	label.TextColor3 = Theme.Colors.Cream
+	label.Text = " " .. opts.name .. " "
+	label.ZIndex = plate.ZIndex + 3
+	if opts.labelSide == "Left" then
+		label.AnchorPoint = Vector2.new(1, 0.5)
+		-- Clear the key pill when one is parked on that same side.
+		label.Position =
+			UDim2.new(0, if beside and opts.badge then -(10 + badgeSize) else -6, 0.5, 0)
+	else
+		label.AnchorPoint = Vector2.new(0.5, 0)
+		label.Position = UDim2.new(0.5, 0, 1, 4)
+	end
+	Components.Corner(label, Theme.Radius.Pill)
+	label.Parent = root
+	local shown = opts.alwaysShowLabel == true
+	label.BackgroundTransparency = if shown then hud.LabelBackgroundTransparency else 1
+	label.TextTransparency = if shown then 0 else 1
+
+	local active = false
+	local hovered = false
+	local persistent = opts.persistentToggle == true
+
+	-- A persistent toggle shows its on-state through tint and stroke only; the
+	-- lift and the pinned name are reserved for "this panel is open".
+	local function raised(): boolean
+		return hovered or (active and not persistent)
+	end
+
+	local function targetScale(): number
+		return if lift and raised() then hud.HoverScale else 1
+	end
+
+	local function setLabelShown(visible: boolean)
+		if opts.alwaysShowLabel then
+			return
+		end
+		TweenService:Create(label, Theme.Motion.Fast, {
+			BackgroundTransparency = if visible then hud.LabelBackgroundTransparency else 1,
+			TextTransparency = if visible then 0 else 1,
+		}):Play()
+	end
+
+	local function settle()
+		TweenService:Create(scale, Theme.Motion.Settle, { Scale = targetScale() }):Play()
+	end
+
+	plate.MouseEnter:Connect(function()
+		hovered = true
+		TweenService:Create(scale, Theme.Motion.Fast, { Scale = targetScale() }):Play()
+		setLabelShown(true)
+	end)
+	plate.MouseLeave:Connect(function()
+		hovered = false
+		settle()
+		setLabelShown(raised())
+	end)
+	plate.MouseButton1Down:Connect(function()
+		TweenService:Create(scale, Theme.Motion.Fast, { Scale = hud.PressScale }):Play()
+	end)
+	plate.MouseButton1Up:Connect(settle)
+
+	local function setActive(value: boolean)
+		active = value
+		settle()
+		setLabelShown(raised())
+		TweenService:Create(stroke, Theme.Motion.Fast, {
+			Color = if active then opts.accent else Theme.Colors.Cream,
+			Transparency = if active then hud.StrokeTransparencyActive else hud.StrokeTransparency,
+		}):Play()
+		TweenService:Create(plate, Theme.Motion.Fast, {
+			ImageColor3 = if active then hud.PlateTintActive else hud.PlateTint,
+			BackgroundColor3 = if active then hud.PlateTintActive else hud.PlateTint,
+		}):Play()
+	end
+
+	local function setIcon(image: string?, glyph: string?)
+		iconSlot:Destroy()
+		iconSlot =
+			Components.Icon(plate, glyph or opts.glyph, image, opts.accent, iconPx, hud.IconTint)
+		iconSlot.AnchorPoint = Vector2.new(0.5, 0.5)
+		iconSlot.Position = UDim2.fromScale(0.5, 0.5)
+		iconSlot.ZIndex = plate.ZIndex + 1
+	end
+
+	return {
+		root = root,
+		button = plate,
+		setActive = setActive,
+		setIcon = setIcon,
+		isActive = function()
+			return active
+		end,
+	}
 end
 
 function Components.CategoryGlyph(category: string): string

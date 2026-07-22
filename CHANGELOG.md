@@ -5,6 +5,83 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — 2026-07-22 — the chunky icon HUD (docs/HUD_REDESIGN.md)
+The menu rework the owner asked for. The old HUD put a stat capsule at the top
+and a small text dock bottom-right; it now reads like a tycoon toolbar.
+- **Bottom-left stat pills** — Money · Reputation · Buzz as stacked rounded
+  pills with a coloured icon disc, stacked above the active-stock dock. Values
+  **tween** to their new number (measured: 16 intermediate frames on a −15 coin
+  purchase) and the pill pops to 1.08 and settles. Nothing snaps. The Level chip
+  is gone from the HUD; level still drives the level-up celebration.
+- **Bottom-centre action dock** — five chunky rounded-square plates: **Build 1,
+  Cookbook 2, Staff 3, Upgrades 4, Shop 5**, each with a numbered badge.
+  Hovering lifts the plate to 1.10 and fades its **name in underneath**;
+  pressing dips to 0.94 and settles back ("pop"); the button whose panel is open
+  stays raised with a bright accent stroke.
+- **Right rail** — Goals `G`, Trophies `T`, Map `M`, Music `B`, Settings `V` as
+  smaller round plates, each with its key in a **tiny pill beside the button**.
+  Music is a toggle: it shows its on-state through stroke and tint (and swaps to
+  a crossed-out note when muted) rather than sitting permanently raised.
+- **`Components.IconButton`** — the dock and the rail are the same component,
+  not hand-rolled markup, so restyling is one edit. `Theme.Hud` holds every
+  size, scale, tint and motion value; the controllers carry no layout literals.
+- **One shortcut table.** `HUD_BUTTONS` in `UIController` declares id, zone,
+  order, key, badge, label and accent together; controllers only attach
+  behaviour via `registerAction(id, callback)`. Buttons without a panel yet
+  (Staff, Upgrades, Map, Settings) say so in a toast instead of doing nothing.
+- **`ResponsiveLayout.hudLayout`** — one function computes every HUD rectangle,
+  and `UIController`, `InventoryController`, `OperationsController`,
+  `CameraController`, `CookingController` and `TutorialController` all read it.
+  They used to each guess, which is what let elements land on top of each other.
+  On narrow screens the dock slides right out of the pill column (11px on a
+  560px phone) rather than restacking the whole left side, and floats above the
+  stock dock when a centred dock would sit on it.
+- **Landscape phones now get phone-sized controls.** `ResponsiveLayout` is
+  landscape-first, so a 668×376 phone reports "Compact" and used to be handed
+  72px desktop plates. Sizing now keys off the short axis (`Theme.Hud.ShortViewport`).
+
+Measured live in Studio, all three modes, zero overlapping elements:
+
+| viewport | mode | world visible | floor |
+| --- | --- | ---: | ---: |
+| 1173×627 | Desktop | **80.3%** | 62% |
+| 668×376 | Compact (landscape phone) | **64.4%** | 62% |
+| 560×365 | Phone | **56.3%** | 55% |
+
+### Fixed — 2026-07-22 — collisions the HUD move exposed
+- **Tutorial card no longer covers the stat pills.** It sat where the pills now
+  live and is opaque, so a new player could not read any currency for the whole
+  of onboarding. It moves to the band under the café-health card, or to the top
+  strip on short viewports.
+- **Tutorial card sizing actually applies.** `applyMinimized` hardcoded 360×72
+  and ran after the responsive pass, silently undoing every narrow-screen size.
+- **Camera pad, café-health card and stat pills stop stacking** on small
+  viewports — the pad reads the shared layout and clamps above whatever is below
+  it, and the health card's geometry now comes from that same function.
+- **Brew panel stops covering the serve button** on desktop (serve moved up with
+  the dock), and is clamped so it can never be pushed off the top of a short
+  screen.
+- **Goals and Trophies no longer both light up.** They open the same panel until
+  Trophies gets its own; only the button actually pressed reads as active.
+- **Panels sink clicks** (`panel.Active`), so a tap on panel dead space no longer
+  falls through to the HUD button underneath it.
+- **A slow-loading icon is no longer discarded.** `Components.Icon` used to
+  destroy the image at exactly 6s if it had not loaded; it now covers it with the
+  glyph badge and swaps the image back in if it arrives.
+
+### Changed — 2026-07-22 — HUD icons are CC0 art we uploaded ourselves
+- **17 images self-uploaded** (`docs/ASSET_LICENSES.md`): glyphs from the
+  **Nieobie Game Icon Pack** (CC0 1.0, pinned at commit `fb27988`, licence read
+  from the repo's own `LICENSE` file) rendered white so `Theme` tints them, and
+  button plates from **Kenney UI Pack 2.0** (CC0 1.0, confirmed in the zip's
+  `License.txt` and at kenney.nl/support). Zero attribution burden.
+- **Retires the Simulator Icon Pack** (`99176447965360`) from the HUD. It is
+  published on the Creator Store three times with byte-identical descriptions,
+  each claiming originality, and our audit of it was a *script* audit, never a
+  *provenance* one. All thirteen icons moved at once rather than mixing packs.
+- Every id is verified rendering live (`IsLoaded` true on all 17), so none landed
+  Restricted under the 2026-05-05 Asset Privacy default.
+
 ### Docs — 2026-07-21 — HUD redesign spec + a truthful status pass
 - **`docs/HUD_REDESIGN.md` (new)** — full spec for the menu rework the owner
   asked for: bottom-left stat pills (money/reputation/buzz), a bottom-centre

@@ -86,14 +86,15 @@ local function makeRow(parent: Instance, definition: any, order: number)
 	ui.rows[definition.id] = { fill = fill, value = value }
 end
 
-local function applyResponsive(_mode: string, viewport: Vector2)
+local function applyResponsive(mode: string, viewport: Vector2)
 	if not ui.card then
 		return
 	end
-	ui.card.Size = UDim2.fromOffset(if viewport.X < 700 then 292 else 304, 50)
-	ui.card.Position = if viewport.X < 700
-		then UDim2.fromOffset(10, 100)
-		else UDim2.fromOffset(270, 62)
+	-- Shared geometry: on narrow screens this card drops into the left column
+	-- alongside the camera pad, which reads these same numbers to stay clear.
+	local layout = ResponsiveLayout.hudLayout(mode :: ResponsiveLayout.Mode, viewport)
+	ui.card.Size = UDim2.fromOffset(layout.healthWidth, layout.healthHeight)
+	ui.card.Position = UDim2.fromOffset(layout.healthLeft, layout.healthTopFromTop)
 end
 
 function OperationsController.Start(_self: any)
