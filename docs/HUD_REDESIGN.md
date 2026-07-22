@@ -136,6 +136,11 @@ keyboard letter shown beside/below it, matching the reference's pattern.
 
 ## 4. 🖼️ Icons — source these yourself
 
+> **✅ Done 2026-07-22.** All 17 images were sourced, licence-re-verified,
+> rendered and self-uploaded; ids are in `Graphics.UI` and recorded in
+> `docs/ASSET_LICENSES.md`. The Simulator Icon Pack is retired from the HUD.
+> The rest of this section is kept as the record of *why* those packs.
+
 **The owner has asked the implementing agent to source the icons, not to wait
 for them.** The research below is already done and licence-verified (2026-07-21,
 parallel scouts + an adversarial licence-verification pass). Do not redo it;
@@ -230,14 +235,56 @@ URL and commit hash before shipping it.
 
 ## 5. Acceptance criteria
 
-- [ ] Money / Reputation / Buzz sit bottom-left as pills; values animate, never snap.
-- [ ] Five chunky buttons centred at the bottom, in the order above.
-- [ ] Hovering a button lifts it **and shows its name underneath**.
-- [ ] Pressing dips then settles ("pop").
-- [ ] Number badges 1–5 present, and those keys open the same panels.
-- [ ] Right rail present with its letter shortcuts working.
-- [ ] The open panel's button reads as active.
-- [ ] Touch layout shows names permanently and stays within the visibility floors.
-- [ ] Every image comes from `Graphics.UI` and is licensed in `ASSET_LICENSES.md`.
-- [ ] Text-glyph fallback still works if an image fails to load.
-- [ ] StyLua + Selene + both Rojo builds green; verified live in Studio, not just built.
+**All met — implemented and measured live in Studio 2026-07-22.**
+
+- [x] Money / Reputation / Buzz sit bottom-left as pills; values animate, never snap.
+      *Measured: a −15 coin purchase tweened through 16 intermediate frames with a 1.08 pill pop.*
+- [x] Five chunky buttons centred at the bottom, in the order above.
+- [x] Hovering a button lifts it **and shows its name underneath**.
+      *Measured: scale 1.00 → 1.10, label TextTransparency 1 → 0.*
+- [x] Pressing dips then settles ("pop"). *Measured: held = 0.940, released = settles.*
+- [x] Number badges 1–5 present, and those keys open the same panels.
+      *Verified via synthetic key input; `4` (no panel yet) toasts instead.*
+- [x] Right rail present with its letter shortcuts working (`G`/`T`/`M`/`B`/`V`).
+- [x] The open panel's button reads as active (raised + accent stroke at 0.05).
+- [x] Touch layout shows names permanently and stays within the visibility floors.
+- [x] Every image comes from `Graphics.UI` and is licensed in `ASSET_LICENSES.md`.
+- [x] Text-glyph fallback still works if an image fails to load — and a *slow*
+      image is no longer thrown away, only covered until it arrives.
+- [x] StyLua + Selene + both Rojo builds green; verified live in Studio.
+
+### Measured world visibility (§3's floors)
+
+Zero overlapping elements in all three modes, across the HUD, the stock dock,
+the café-health card, the camera pad, the order ticket, the serve button and the
+tutorial card:
+
+| viewport | mode | world visible | floor | |
+| --- | --- | ---: | ---: | --- |
+| 1173×627 | Desktop | 80.3% | 62% | PASS |
+| 668×376 | Compact (landscape phone) | 64.4% | 62% | PASS |
+| 560×365 | Phone | 56.3% | 55% | PASS |
+
+Phone is the tight one and is measured *with the onboarding card up*; the phone
+size tokens in `Theme.Hud` (54px plates, 92×28 pills) were tuned against this
+number rather than chosen by eye. Post-onboarding the phone figure is higher.
+
+### Where the layout maths lives
+
+`ResponsiveLayout.hudLayout(mode, viewport)` returns every rectangle the HUD
+occupies, and six controllers read it instead of each guessing. Two rules are
+worth knowing before changing sizes:
+
+1. The **bottom-left belongs to the stock dock**, with the pills stacked on it.
+   A centred action dock that would sit on that column floats just above it.
+2. If the dock still clips the pill column, it **slides right** (11px on a 560px
+   phone) rather than restacking the left side; only when it cannot fit between
+   the pills and the rail do the pills move above the dock band.
+
+### Not done in this pass (deliberately)
+
+- **Panels.** Out of scope per §3 — the owner supplies a screenshot per menu.
+- **Staff, Upgrades, Map, Settings** have no panel yet, so their buttons raise a
+  toast saying so rather than doing nothing.
+- **Trophies** opens the Goals panel (which carries the streak trophies) until it
+  earns its own panel.

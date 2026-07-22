@@ -54,7 +54,30 @@ previously described this as unbuilt — corrected.
 1. **Dashboard Max Players → 10.** Not settable from code. Recorded setting is
    30; leave it and 20 players per server join with no café.
 2. **Create an Open Cloud API key** for `scripts/publish.ps1` — see HANDOFF §2a.
-3. **Supply the HUD icons** listed in [docs/HUD_REDESIGN.md](HUD_REDESIGN.md) §4.
+3. ~~Supply the HUD icons~~ — **done 2026-07-22**: sourced, licence-verified and
+   self-uploaded by the agent (CC0 Nieobie + Kenney), recorded in
+   [docs/ASSET_LICENSES.md](ASSET_LICENSES.md).
+4. **Look at the new HUD and say what to tune.** It is measured and correct, but
+   feel is yours to judge — plate size, how far the buttons lift, badge weight.
+5. **Send a screenshot per menu panel** when you want the panels themselves
+   restyled; that was deliberately out of scope for the HUD pass.
+
+## The HUD was rebuilt (2026-07-22)
+
+Bottom-left stat pills, a bottom-centre dock of five chunky icon buttons with
+numbered shortcuts, and a right rail with letter shortcuts — full detail in
+[docs/HUD_REDESIGN.md](HUD_REDESIGN.md), which now carries the measured results.
+
+Two things to know before touching HUD layout again:
+
+- **`ResponsiveLayout.hudLayout(mode, viewport)` owns every HUD rectangle.** Six
+  controllers read it (UI, Inventory, Operations, Camera, Cooking, Tutorial).
+  Before this, each guessed its own position, which is exactly why the tutorial
+  card ended up on top of the stat pills and the camera pad under them. If you
+  move something, move it there, then re-run the overlap measurement.
+- **Phone sizing is tuned against a measured floor, not taste.** 560×365 lands at
+  56.3% world visible against a 55% floor. Growing the phone plates or pills
+  will break it; the numbers live in `Theme.Hud`.
 
 ## Verification state
 
