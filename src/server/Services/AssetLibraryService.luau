@@ -187,7 +187,8 @@ local function buildFurnitureTemplate(
 	maxSpan: number,
 	yaw: number?,
 	flat: boolean?,
-	widen: number?
+	widen: number?,
+	deepen: number?
 ): Model?
 	local container = loadAndSanitise(assetId)
 	if not container then
@@ -271,6 +272,28 @@ local function buildFurnitureTemplate(
 				else
 					d.Size = Vector3.new(d.Size.X * widen, d.Size.Y, d.Size.Z)
 					d.Position = centre + Vector3.new(rel.X * widen, rel.Y, rel.Z)
+				end
+			end
+		end
+		model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	end
+	-- DEEPEN is widen's companion on the SHORT horizontal axis, for pieces whose
+	-- body is thinner than its footprint. The counter imported only 2 studs deep
+	-- inside a 4-stud cell, so appliances placed on it hung off the front and
+	-- back — a known issue that had no mechanism to fix until now.
+	if deepen and deepen ~= 1 then
+		local cf, size = model:GetBoundingBox()
+		local centre = cf.Position
+		local shortIsX = size.X < size.Z
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local rel = d.Position - centre
+				if shortIsX then
+					d.Size = Vector3.new(d.Size.X * deepen, d.Size.Y, d.Size.Z)
+					d.Position = centre + Vector3.new(rel.X * deepen, rel.Y, rel.Z)
+				else
+					d.Size = Vector3.new(d.Size.X, d.Size.Y, d.Size.Z * deepen)
+					d.Position = centre + Vector3.new(rel.X, rel.Y, rel.Z * deepen)
 				end
 			end
 		end
@@ -523,14 +546,20 @@ function AssetLibraryService.Start(_self: any)
 			end
 		end
 
+		-- Every placed piece renders AssetManifest.displayScale times its
+		-- authored size. Both numbers scale together: height alone would be
+		-- undone by the maxSpan clamp, which exists to keep a model inside its
+		-- grid footprint.
+		local displayScale = AssetManifest.displayScale
 		for catalogId, entry in AssetManifest.furniture do
 			local t = buildFurnitureTemplate(
 				entry.assetId,
-				entry.height,
-				entry.maxSpan,
+				entry.height * displayScale,
+				entry.maxSpan * displayScale,
 				entry.yaw,
 				entry.flat,
-				entry.widen
+				entry.widen,
+				entry.deepen
 			)
 			if t and entry.liftY then
 				t:SetAttribute("liftY", entry.liftY)

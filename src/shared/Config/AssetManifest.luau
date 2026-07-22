@@ -17,6 +17,7 @@ export type FurnitureAsset = {
 	liftY: number?, -- studs above the floor (wall art, clocks, hanging lamps)
 	flat: boolean?, -- rugs/mats: scale by SPAN (not height) and lay the thin axis down
 	widen: number?, -- non-uniform stretch of the LONGEST horizontal axis (wider counter)
+	deepen: number?, -- same, on the SHORT horizontal axis (a counter too thin for its cell)
 }
 
 export type WorldAsset = {
@@ -38,6 +39,15 @@ export type RetroPropSelection = {
 }
 
 local AssetManifest = {
+	-- How large placed furniture renders relative to its authored size (owner
+	-- request 2026-07-22: everything read too small next to a character). It
+	-- multiplies BOTH `height` and `maxSpan` so pieces grow uniformly, and the
+	-- procedural greybox fallback scales by the same figure so a failed asset
+	-- still matches its neighbours. Grid footprints are NOT scaled — a piece
+	-- may now overhang its cells, which is what makes a set look furnished
+	-- rather than parked on tiles.
+	displayScale = 1.5,
+
 	-- Furniture: replaces the matching catalogId's procedural builder when the
 	-- template loads. Keys MUST match Config/Furniture catalog ids. Heights are
 	-- chosen so pieces read at a consistent human scale (a seated customer is
@@ -67,7 +77,18 @@ local AssetManifest = {
 			-- 24 / 9.38 = 2.56 makes the body actually FILL its footprint. At the
 			-- old 2.1 it spanned only 19.7 studs, which left the espresso machine
 			-- (placed at the footprint's right edge) hanging off the counter end.
-			widen = 2.56,
+			--
+			-- Divided by displayScale because `widen` is applied AFTER the
+			-- uniform scale, so it multiplies it: a service bar's LENGTH is
+			-- defined by its 6-cell footprint, not by how chunky everything
+			-- else got. Measured without this: 36 studs inside a 24-stud
+			-- footprint, overhanging 6 studs at each end. maxSpan cannot fix
+			-- this - it clamps before widen and never binds here.
+			widen = 2.56 / 1.5,
+			-- The body imports only ~3.1 studs deep inside a 4-stud cell, so
+			-- appliances standing on it hung off the front and back. Fills the
+			-- cell depth instead (KNOWN_ISSUES: "needs a `deepen` companion").
+			deepen = 3.9 / 3.1,
 		},
 		chair_wood = {
 			assetId = 14269301866,
@@ -159,7 +180,9 @@ local AssetManifest = {
 			assetId = 2052055475,
 			name = "Glass Table (owner pick)",
 			height = 3,
-			maxSpan = 7.4,
+			-- One cell wide, matching the 1x1 footprint (displayScale then
+			-- grows it to fill the space between the chairs).
+			maxSpan = 3.4,
 		},
 		plant_small = {
 			assetId = 111366669245364,

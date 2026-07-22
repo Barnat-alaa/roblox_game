@@ -108,9 +108,12 @@ From the 2026-07-21 audit (parallel readers + critic over the whole repo):
 - **SocialService compliment anti-farm is per-server, in-memory** — defeated by
   rejoining.
 - **AnalyticsService is a log-only stub**, so none of the above is visible at scale.
-- **Counter depth under-fills** — body is 2.0 studs of its 4-stud footprint, so
-  the espresso machine overhangs ~1.1 studs front and back. Needs a `deepen`
-  companion to `widen`.
+- ~~**Counter depth under-fills**~~ — **fixed 2026-07-22.** `deepen` now exists as
+  the companion to `widen`, and the counter body fills its cell depth (3.9 of 4
+  studs). The espresso machine is still wider than the counter it stands on
+  (6.3 vs 3.9 studs, so ~1.2 studs over each side) — that is the *machine* being
+  a big model, not the counter being thin. Shrink `coffee_machine.maxSpan` or
+  raise the counter's `deepen` if it bothers you.
 
 ## Workflow reminders
 
