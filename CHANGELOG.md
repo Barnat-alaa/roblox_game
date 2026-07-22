@@ -5,6 +5,25 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — 2026-07-22 — handoff rewritten around what the game actually is
+- **`docs/GAMEPLAY_DIRECTION.md` (new)** — the loop read out of the services
+  rather than the design docs: the nine things a player can physically do, and
+  the two findings behind them. **There are no ingredients** — `ingredientCost`
+  is a coin deduction with no item, no stock and no supplier anywhere in the
+  codebase — and **the game automates away its own gameplay**, because staff
+  progressively remove every physical action. Ends with seven ranked mechanics
+  inside the ethics rails and an explicit "do not build yet" list.
+- **`docs/SESSION_HANDOFF.md`** — rewritten. Adds a "hard-won facts" section so
+  the next session does not re-derive them: `rbxthumb` serves only 150 and 420,
+  Roblox has no GUI blur, Roblox does not fetch images it is not rendering,
+  automatic production monopolises appliances (`stove_busy`), MCP cannot reach
+  the running singletons, and generated icon sheets are not really transparent.
+- **`HANDOFF.md`** — the UI section described a "compact tycoon UI" with a
+  collapsed action menu and blank `Theme.Images`, none of which is true since
+  the HUD rebuild; the platform line still said 30 plots. Both corrected, the
+  bootstrap prompt rewritten, and §6 now leads with the honest priority: the
+  biggest gap is design, not polish.
+
 ### Fixed — 2026-07-22 — the tutorial dead-ended on step 2
 Owner report: "it only stops at step 2 even though I did it." It was not a
 detection bug — **the step was impossible**.
