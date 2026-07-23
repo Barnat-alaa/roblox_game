@@ -12,6 +12,7 @@ local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local Mastery = require(Shared.Utilities.Mastery)
+local IngredientMath = require(Shared.Utilities.IngredientMath)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
@@ -67,6 +68,7 @@ local function chooseRecipe(
 			and data.unlockedRecipes[recipeId] == true
 			and kitchen.menu[recipeId] == true
 			and StaffService:HasRole(data, recipe.staffRole)
+			and (not Kitchen.enforceIngredients or IngredientMath.has(recipe, data.pantry))
 		then
 			local _, available = KitchenService:GetStockCounts(data, recipeId, now)
 			local target = math.clamp(
@@ -111,6 +113,18 @@ local function startJob(
 		)
 		return false
 	end
+	-- Pantry gate for automatic jobs: on a shortfall the appliance idles to
+	-- "resting" rather than firing a Notify — this scheduler ticks every second,
+	-- so a toast would spam. Dormant until Kitchen.enforceIngredients.
+	if Kitchen.enforceIngredients and not IngredientMath.has(recipe, data.pantry) then
+		KitchenService:UpdateApplianceVisual(
+			player,
+			instanceId,
+			"resting",
+			"Out of ingredients - restock at the market"
+		)
+		return false
+	end
 	local cost = Mastery.batchCost(
 		recipe.ingredientCost * Kitchen.batchCostMultiplier,
 		masteryLevel,
@@ -123,6 +137,11 @@ local function startJob(
 		-- Capacity is server-owned and this path is single-threaded per appliance;
 		-- this is a defensive guard for future parallel schedulers.
 		return false
+	end
+	-- All spends have succeeded; now (and only now) draw the ingredients down, so
+	-- a failed coin/capacity spend above can never leak pantry stock.
+	if Kitchen.enforceIngredients then
+		IngredientMath.consume(recipe, data.pantry)
 	end
 	local quantity =
 		Mastery.servings(recipe.productionYield, masteryLevel, Kitchen.masteryBonusServingAt)

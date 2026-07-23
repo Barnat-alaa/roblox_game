@@ -18,6 +18,13 @@ local Kitchen = {
 	staffLevelSpeedPerLevel = 0.08,
 	manualServingShelfLife = 120,
 
+	-- Ingredient system (docs/GAMEPLAY_DIRECTION.md §2). When false, recipes cost
+	-- coins only and the pantry is inert stock metadata — today's behaviour. The
+	-- backbone (Config/Ingredients, recipe.ingredients, PlayerData.pantry) ships
+	-- first with this OFF so the live loop is unchanged; the Market UI + buy remote
+	-- land in step 2, then this flips ON to make running dry actually stop a cook.
+	enforceIngredients = false,
+
 	-- Buzz and demand
 	buzzStart = 10,
 	buzzMax = 105,

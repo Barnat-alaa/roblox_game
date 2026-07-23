@@ -156,6 +156,7 @@ export type PlayerData = {
 	expansionTier: number, -- 0-based index into World.interiorDepthTiers (buy land → deeper café)
 	regulars: { [string]: RegularEntry }, -- name-keyed returning customers (max 8)
 	inventory: { [string]: number },
+	pantry: { [string]: number }, -- ingredient id → units on hand (see Config/Ingredients)
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },
 	recipeMastery: { [string]: RecipeMasteryEntry },
@@ -173,6 +174,7 @@ export type RecipeDefinition = {
 	displayName: string,
 	category: string,
 	ingredientCost: number,
+	ingredients: { [string]: number }?, -- ingredient id → units per batch (Config/Ingredients); nil = coins-only
 	basePrice: number,
 	preparationTime: number,
 	applianceId: string,
