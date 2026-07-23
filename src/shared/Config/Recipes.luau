@@ -3,12 +3,19 @@ local Types = require(script.Parent.Parent.Types)
 
 -- The five MVP recipes. Expand toward ~20 during month one (see ROADMAP.md).
 -- ingredientCost must stay below basePrice so every serve is profitable.
+--
+-- `ingredients` (ingredient id → units per batch) is the real pantry draw added
+-- for the ingredient system (docs/GAMEPLAY_DIRECTION.md §2). It is data-driven
+-- off Config/Ingredients; amounts are a first pass and get a balance sweep
+-- before Kitchen.enforceIngredients is turned on. Until then ingredientCost
+-- remains the coin sink and these tables are inert stock metadata.
 local Recipes: { [string]: Types.RecipeDefinition } = {
 	espresso = {
 		id = "espresso",
 		displayName = "Espresso",
 		category = "Coffee",
 		ingredientCost = 4,
+		ingredients = { coffee_beans = 2, sugar = 1 },
 		basePrice = 12,
 		preparationTime = 3,
 		applianceId = "coffee_machine",
@@ -29,6 +36,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Cappuccino",
 		category = "Coffee",
 		ingredientCost = 7,
+		ingredients = { coffee_beans = 2, milk = 1, sugar = 1 },
 		basePrice = 20,
 		preparationTime = 5,
 		applianceId = "coffee_machine",
@@ -49,6 +57,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "House Tea",
 		category = "Tea",
 		ingredientCost = 3,
+		ingredients = { tea_leaves = 2, sugar = 1 },
 		basePrice = 10,
 		preparationTime = 4,
 		applianceId = "coffee_machine",
@@ -69,6 +78,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Croissant",
 		category = "Pastry",
 		ingredientCost = 8,
+		ingredients = { flour = 2, butter = 1, eggs = 1 },
 		basePrice = 22,
 		preparationTime = 8,
 		applianceId = "oven",
@@ -89,6 +99,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Café Sandwich",
 		category = "Sandwich",
 		ingredientCost = 11,
+		ingredients = { bread = 2, cheese = 1, tomato = 1, ham = 1 },
 		basePrice = 28,
 		preparationTime = 7,
 		applianceId = "prep_station",
@@ -111,6 +122,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Silky Latte",
 		category = "Coffee",
 		ingredientCost = 9,
+		ingredients = { coffee_beans = 2, milk = 2, sugar = 1 },
 		basePrice = 24,
 		preparationTime = 5,
 		applianceId = "coffee_machine",
@@ -131,6 +143,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Berry Muffin",
 		category = "Pastry",
 		ingredientCost = 10,
+		ingredients = { flour = 2, eggs = 1, berries = 1, sugar = 1 },
 		basePrice = 26,
 		preparationTime = 6,
 		applianceId = "oven",
@@ -151,6 +164,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Garden Iced Tea",
 		category = "Tea",
 		ingredientCost = 6,
+		ingredients = { tea_leaves = 2, lemon = 1, sugar = 1 },
 		basePrice = 16,
 		preparationTime = 4,
 		applianceId = "coffee_machine",
@@ -171,6 +185,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Sunrise Fruit Bowl",
 		category = "Sandwich",
 		ingredientCost = 12,
+		ingredients = { berries = 1, lemon = 1, tomato = 1 },
 		basePrice = 30,
 		preparationTime = 6,
 		applianceId = "prep_station",
@@ -191,6 +206,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Velvet Mocha",
 		category = "Coffee",
 		ingredientCost = 12,
+		ingredients = { coffee_beans = 2, milk = 1, chocolate = 1, sugar = 1 },
 		basePrice = 32,
 		preparationTime = 6,
 		applianceId = "coffee_machine",
@@ -211,6 +227,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Cinnamon Swirl",
 		category = "Pastry",
 		ingredientCost = 14,
+		ingredients = { flour = 2, butter = 1, chocolate = 1, sugar = 1 },
 		basePrice = 36,
 		preparationTime = 8,
 		applianceId = "oven",
@@ -231,6 +248,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Terrace Club",
 		category = "Sandwich",
 		ingredientCost = 16,
+		ingredients = { bread = 3, cheese = 1, tomato = 1, ham = 2 },
 		basePrice = 42,
 		preparationTime = 8,
 		applianceId = "prep_station",
@@ -251,6 +269,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Overnight Roast Blend",
 		category = "Coffee",
 		ingredientCost = 30,
+		ingredients = { coffee_beans = 8, sugar = 2 },
 		basePrice = 50,
 		preparationTime = 10,
 		applianceId = "coffee_machine",
@@ -271,6 +290,7 @@ local Recipes: { [string]: Types.RecipeDefinition } = {
 		displayName = "Morning Quiche",
 		category = "Pastry",
 		ingredientCost = 20,
+		ingredients = { flour = 2, eggs = 2, cheese = 1, ham = 1 },
 		basePrice = 48,
 		preparationTime = 9,
 		applianceId = "oven",

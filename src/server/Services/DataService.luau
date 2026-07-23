@@ -129,6 +129,25 @@ local function defaultProfile(): Types.PlayerData
 		daily = { dateKey = "", goals = {}, streak = 0 },
 		trophies = {},
 		inventory = { table_round = 2, chair_wood = 4, plant_small = 1 },
+		-- Starter pantry: generous so the café keeps cooking the moment ingredient
+		-- enforcement (Kitchen.enforceIngredients) is turned on. Existing saves
+		-- inherit this same seed via reconcile (it fills missing TOP-LEVEL keys).
+		pantry = {
+			coffee_beans = 40,
+			milk = 20,
+			tea_leaves = 30,
+			sugar = 40,
+			flour = 20,
+			eggs = 15,
+			butter = 12,
+			bread = 12,
+			cheese = 10,
+			tomato = 10,
+			ham = 10,
+			berries = 8,
+			lemon = 8,
+			chocolate = 6,
+		},
 		-- Seed kitchen sits a few cells into the room, clear of the front door
 		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {
@@ -243,6 +262,24 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 	operations.lastDirtAt = tonumber(operations.lastDirtAt) or now
 	if typeof(operations.lastOffline) ~= "table" then
 		operations.lastOffline = nil
+	end
+
+	-- Pantry (ingredient stock) is a top-level map, so reconcile already fills
+	-- it for saves that predate the field; this guard is purely defensive
+	-- against a corrupt value and floors/drops anything non-numeric or <= 0.
+	local pantry = (data :: any).pantry
+	if typeof(pantry) ~= "table" then
+		pantry = {}
+		local mutableData: any = data
+		mutableData.pantry = pantry
+	end
+	for item, qty in pantry do
+		local n = tonumber(qty)
+		if n == nil or n <= 0 then
+			pantry[item] = nil
+		else
+			pantry[item] = math.floor(n)
+		end
 	end
 
 	-- Schema 1 stored only a number. Convert it into a fresh timestamped lot so

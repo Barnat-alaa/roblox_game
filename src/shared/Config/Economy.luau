@@ -27,6 +27,16 @@ local Economy = {
 	-- Anti-spam: max accepted requests per key per window
 	maxRequestsPerWindow = 10,
 	rateWindowSeconds = 1,
+
+	-- Market bulk-buy tiers for ingredients (docs/GAMEPLAY_DIRECTION.md §2). The
+	-- market never forces tiny purchases; "Max" (buy all you can afford) is
+	-- computed client-side. bulkDiscountPerTier makes the bigger crate cheaper
+	-- per unit: unit price × (1 - bulkDiscountPerTier × tierIndex), floored at
+	-- bulkMinPriceFraction. Server recomputes the total; the client total is
+	-- never trusted.
+	bulkTiers = { 25, 50, 100, 250 },
+	bulkDiscountPerTier = 0.05,
+	bulkMinPriceFraction = 0.6,
 }
 
 return Economy

@@ -33,6 +33,7 @@ local FRIENDLY_ERROR = {
 	stove_busy = "That appliance is already cooking.",
 	not_ready = "Not ready yet - give it a moment.",
 	cant_afford_ingredients = "Not enough coins for ingredients.",
+	out_of_ingredients = "Out of ingredients - restock at the market.",
 	busy_cooking = "It is mid-batch - collect the food first.",
 	wrong_appliance = "That recipe needs a different appliance.",
 	menu_full = "Your menu is full - switch one item off first.",

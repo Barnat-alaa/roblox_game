@@ -18,6 +18,7 @@ local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Mastery = require(Shared.Utilities.Mastery)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
+local IngredientMath = require(Shared.Utilities.IngredientMath)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
@@ -741,6 +742,14 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "too_far" })
 		return
 	end
+	-- Pantry gate. Checked BEFORE the coin spend so a shortfall stops the cook
+	-- cleanly; the actual decrement happens AFTER the spend succeeds (below) so a
+	-- failed debit never eats ingredients. Dormant until Kitchen.enforceIngredients.
+	if Kitchen.enforceIngredients and not IngredientMath.has(recipe, data.pantry) then
+		Remotes.event("Notify")
+			:FireClient(player, { kind = "error", reason = "out_of_ingredients" })
+		return
+	end
 	local effTime, effCost, _ = KitchenService:effectiveFor(data, recipe)
 	if not EconomyService:TrySpendCoins(player, effCost) then
 		Remotes.event("Notify"):FireClient(player, {
@@ -748,6 +757,9 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 			reason = "cant_afford_ingredients",
 		})
 		return
+	end
+	if Kitchen.enforceIngredients then
+		IngredientMath.consume(recipe, data.pantry)
 	end
 
 	kitchen.cooks[instanceId] = {
