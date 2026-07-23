@@ -18,6 +18,40 @@ spoilage punishment, no fake urgency — *fresh bonuses* instead of rot.
 
 ---
 
+## ⭐ ACTIVE BUILD — 2026-07-23 — Direction phases A–D
+
+_This is the current build plan and it supersedes the S-steps and Phase order
+below for day-to-day work. Full spec: **docs/GAMEPLAY_DIRECTION.md** (what/why);
+exact code hooks: **docs/IMPLEMENTATION_MAP.md** (where). Owner-chosen feature set,
+built data-driven so it grows for years without rewrites._
+
+The four features that turn "serve coffee" into a management + collection +
+social game, each giving the player short-, medium- and long-term goals:
+
+| Phase | Ship | Fixes / adds |
+| --- | --- | --- |
+| **A** | **Ingredients** (real pantry, market, bulk buy) + **Staff** (start small, hire, upgrade 10→100%) | fixes the two diagnosed problems: ingredients don't exist, and the game automates away its own gameplay |
+| **B** | **VIP customers** + earned **gift box** | something to chase every session; a reason to improve the café |
+| **C** | **Neighbour help + friendships** + **mischief** (smell bomb / recruit) | other players become allies and rivals |
+| **D** | **Monetisation** (cosmetics, membership, battle pass, accelerators) | only after A–C prove the loop is fun; every Robux SKU also earnable with coins |
+
+**Phase A is sequenced** (see the direction doc §6):
+1. **Ingredients backbone** — `Config/Ingredients`, `recipe.ingredients`,
+   `PlayerData.pantry` + save-healing, consumption behind a `Kitchen.enforceIngredients`
+   flag so it ships dormant and loop-safe. _(in progress — `feat/ingredients-backbone`)_
+2. **Market UI + buy remote** — travel-to-market, bulk tiers, locked-blur cards,
+   pantry drawer; flip the flag on.
+3. **Staff data model** — `hired` flag, level-as-upgrade-track, level-scaled
+   capacity/recovery; seed only Barista + Waiter.
+4. **Staff panel UI** — 4 cards (blurred locks), hire, 10→100% bar, live capacity
+   bar, upgrade celebration.
+
+Non-negotiables carried from below: server-authoritative, data-driven, no loot
+boxes, no pay-to-win, no fake-urgency, and **tested in Roblox Studio before every
+merge**.
+
+---
+
 ## 🎮 Gameplay vision — see docs/GAMEPLAY_UPGRADES.md
 
 _The full backlog of what makes the game addictive & interactive (juice,
