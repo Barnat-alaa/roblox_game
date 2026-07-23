@@ -37,6 +37,7 @@ local Economy = {
 	bulkTiers = { 25, 50, 100, 250 },
 	bulkDiscountPerTier = 0.05,
 	bulkMinPriceFraction = 0.6,
+	maxIngredientBuy = 999, -- server cap on a single bulk order (guards a forged qty)
 }
 
 return Economy

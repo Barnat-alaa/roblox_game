@@ -15,6 +15,7 @@ local EVENTS = {
 	"PlaceFurniture", -- c->s: request a placement
 	"RemoveFurniture", -- c->s: pick up a placed item
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
+	"MarketBuyIngredient", -- c->s: buy ingredients in bulk {ingredientId, qty}
 	"StartCooking", -- c->s: begin a manual brew for an order (server starts its clock)
 	"FinishCooking", -- c->s: stop the brew bar (server judges the timing)
 	"StartCook", -- c->s: start a stove batch {applianceInstanceId, recipeId}
