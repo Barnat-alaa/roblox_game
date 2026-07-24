@@ -38,6 +38,9 @@ local Economy = {
 	bulkDiscountPerTier = 0.05,
 	bulkMinPriceFraction = 0.6,
 	maxIngredientBuy = 999, -- server cap on a single bulk order (guards a forged qty)
+	-- Inventory warnings (docs/CORE_LOOP_SPEC.md §3b): at or below this many units
+	-- an ingredient reads "Low"; at 0 it reads "OUT — buy now".
+	lowIngredientThreshold = 5,
 }
 
 return Economy

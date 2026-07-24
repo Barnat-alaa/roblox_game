@@ -152,6 +152,19 @@ local function rebuild()
 		title.TextTruncate = Enum.TextTruncate.AtEnd
 		title.ZIndex = 23
 
+		-- The required level (the 4th recipe fact — CORE_LOOP_SPEC §1), shown on
+		-- every card so you always see what a dish needs, unlocked or not.
+		local levelPill = Components.Label(card, "LV " .. tostring(recipe.requiredLevel), 12, true)
+		levelPill.Size = UDim2.fromOffset(64, 24)
+		levelPill.Position = UDim2.new(1, -74, 0, 10)
+		levelPill.BackgroundTransparency = 0
+		levelPill.BackgroundColor3 = if item.unlocked
+			then Theme.Colors.MintDark
+			else Theme.Colors.Roast
+		levelPill.TextColor3 = Theme.Colors.White
+		levelPill.ZIndex = 23
+		Components.Corner(levelPill, Theme.Radius.Pill)
+
 		local detail = Components.Label(card, "", 11, false)
 		detail.Size = UDim2.new(1, -82, 0, 54)
 		detail.Position = UDim2.fromOffset(68, 32)
