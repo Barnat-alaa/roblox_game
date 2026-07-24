@@ -24,6 +24,8 @@ local World = require(Shared.Config.World)
 local StaffDefinitions = require(Shared.Config.Staff)
 local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
+local Remotes = require(Shared.Network.Remotes)
+local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -41,6 +43,10 @@ local CafeService: any
 local KitchenService: any
 local AssetLibraryService: any
 local CafeOperationsService: any
+local EconomyService: any
+
+local staffLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 
 local CHECK_INTERVAL = 5
 local STAFF_WALK_SPEED = 11
@@ -71,7 +77,9 @@ function StaffService.CountRole(_self: any, data: Types.PlayerData, role: string
 	local count = 0
 	for _, member in data.staff do
 		local definition = StaffDefinitions[member.typeId]
-		if definition and definition.role == role then
+		-- hired ~= false so legacy members (no flag) still count; a locked role
+		-- (hired = false) exists in data for the hire UI but is not on the crew.
+		if definition and definition.role == role and member.hired ~= false then
 			count += 1
 		end
 	end
@@ -772,6 +780,110 @@ local function ensureCrew(player: Player)
 	end
 end
 
+-- ————— hire & upgrade (A7 staff panel) —————
+
+-- Hire a locked role: flip its seeded member to hired (or insert one for a future
+-- role not in the seed) after charging the coin cost. ensureCrew spawns the NPC.
+function StaffService.HireStaff(_self: any, player: Player, typeId: string): boolean
+	local def = StaffDefinitions[typeId]
+	if not def then
+		return false
+	end
+	local data = DataService:GetProfile(player)
+	if not data then
+		return false
+	end
+	local locked: Types.StaffMember? = nil
+	for _, m in data.staff do
+		if m.typeId == typeId then
+			if m.hired ~= false then
+				return false -- already on the crew
+			end
+			locked = m
+		end
+	end
+	if not EconomyService:TrySpendCoins(player, def.hireCost) then
+		Remotes.event("Notify")
+			:FireClient(player, { kind = "error", reason = "insufficient_coins" })
+		return false
+	end
+	if locked then
+		locked.hired = true
+	else
+		table.insert(data.staff, {
+			id = "staff_" .. typeId .. "_" .. tostring(#data.staff + 1),
+			typeId = typeId,
+			level = 1,
+			experience = 0,
+			hired = true,
+		})
+	end
+	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, { kind = "staff_hired", name = def.displayName })
+	return true
+end
+
+-- Level one hired staffer up by one (cost scales with level), capped at maxLevel.
+function StaffService.UpgradeStaff(_self: any, player: Player, staffId: string): boolean
+	local data = DataService:GetProfile(player)
+	if not data then
+		return false
+	end
+	local member: Types.StaffMember? = nil
+	for _, m in data.staff do
+		if m.id == staffId and m.hired ~= false then
+			member = m
+			break
+		end
+	end
+	if not member then
+		return false
+	end
+	local def = StaffDefinitions[member.typeId]
+	if not def then
+		return false
+	end
+	local level = math.max(1, math.floor(tonumber(member.level) or 1))
+	if level >= def.maxLevel then
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "max_level" })
+		return false
+	end
+	local cost = EconomyConfig.staffUpgradeCostBase * level
+	if not EconomyService:TrySpendCoins(player, cost) then
+		Remotes.event("Notify")
+			:FireClient(player, { kind = "error", reason = "insufficient_coins" })
+		return false
+	end
+	member.level = level + 1
+	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "staff_upgraded",
+		name = def.displayName,
+		level = member.level,
+	})
+	return true
+end
+
+local function handleHire(player: Player, typeId: unknown)
+	if typeof(typeId) ~= "string" then
+		return
+	end
+	if not staffLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	StaffService:HireStaff(player, typeId :: string)
+end
+
+local function handleUpgrade(player: Player, staffId: unknown)
+	if typeof(staffId) ~= "string" then
+		return
+	end
+	if not staffLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	StaffService:UpgradeStaff(player, staffId :: string)
+end
+
 function StaffService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	OrderService = ServiceRegistry.get("OrderService")
@@ -779,9 +891,12 @@ function StaffService.Init(_self: any)
 	KitchenService = ServiceRegistry.get("KitchenService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
+	EconomyService = ServiceRegistry.get("EconomyService")
 end
 
 function StaffService.Start(_self: any)
+	Remotes.event("HireStaff").OnServerEvent:Connect(handleHire)
+	Remotes.event("UpgradeStaff").OnServerEvent:Connect(handleUpgrade)
 	task.spawn(function()
 		while true do
 			task.wait(CHECK_INTERVAL)
@@ -853,6 +968,7 @@ function StaffService.Start(_self: any)
 			crewByUser[player.UserId] = nil
 		end
 		messQueues[player.UserId] = nil
+		staffLimiter:clear(player.UserId)
 	end)
 
 	-- Crews spawned before the async asset load finishes are procedural; drop

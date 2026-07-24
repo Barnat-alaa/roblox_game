@@ -38,6 +38,11 @@ local Economy = {
 	bulkDiscountPerTier = 0.05,
 	bulkMinPriceFraction = 0.6,
 	maxIngredientBuy = 999, -- server cap on a single bulk order (guards a forged qty)
+
+	-- Staff upgrades (docs/GAMEPLAY_DIRECTION.md §1): the coin cost to take a
+	-- staffer from level L to L+1 is staffUpgradeCostBase * L, so each step costs
+	-- more (100, 200, … 900 → ~4,500 coins to max a staffer from Lv1 to Lv10).
+	staffUpgradeCostBase = 100,
 	-- Inventory warnings (docs/CORE_LOOP_SPEC.md §3b): at or below this many units
 	-- an ingredient reads "Low"; at 0 it reads "OUT — buy now".
 	lowIngredientThreshold = 5,
