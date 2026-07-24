@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local Operations = require(Shared.Config.Operations)
 local OperationsMath = require(Shared.Utilities.OperationsMath)
+local IngredientMath = require(Shared.Utilities.IngredientMath)
 local Recipes = require(Shared.Config.Recipes)
 local StaffDefinitions = require(Shared.Config.Staff)
 local Kitchen = require(Shared.Config.Kitchen)
@@ -337,6 +338,64 @@ local function spawnDirt(player: Player)
 	end
 end
 
+-- Plan-model offline earnings (CORE_LOOP_SPEC §4d): each producer role gets its
+-- per-hour work-minutes × hours-away ÷ 20, split across the plan in proportion to
+-- each recipe's share of the planned minutes, capped by pantry ingredients (which
+-- it consumes). Returns coins earned; mutates data.pantry.
+local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number): number
+	local earningSeconds = math.min(offlineSeconds, Operations.maxOfflineEarningHours * 3600)
+	local hours = earningSeconds / 3600
+	local divisor = math.max(1, Operations.offlineTimeMultiplier)
+	local total = 0
+	local plan = (data :: any).productionPlan
+	if typeof(plan) ~= "table" then
+		return 0
+	end
+	for role, recipes in plan do
+		if typeof(recipes) == "table" and StaffService:HasRole(data, role) then
+			local budget = StaffService:GetWorkMinutesPerHour(data, role) * hours / divisor
+			local totalWeight = 0
+			for recipeId, count in recipes do
+				local recipe = Recipes[recipeId]
+				local minutes = recipe and tonumber(recipe.productionMinutes)
+				if
+					minutes
+					and (tonumber(count) or 0) > 0
+					and data.unlockedRecipes[recipeId] == true
+				then
+					totalWeight += (tonumber(count) or 0) * minutes
+				end
+			end
+			if totalWeight > 0 then
+				for recipeId, count in recipes do
+					local recipe = Recipes[recipeId]
+					local minutes = recipe and tonumber(recipe.productionMinutes)
+					if
+						minutes
+						and (tonumber(count) or 0) > 0
+						and data.unlockedRecipes[recipeId] == true
+					then
+						local weight = (tonumber(count) or 0) * minutes
+						local servings = math.floor((budget * weight / totalWeight) / minutes)
+						for _ = 1, servings do
+							if IngredientMath.has(recipe, data.pantry) then
+								IngredientMath.consume(recipe, data.pantry)
+								total += math.max(
+									1,
+									math.floor(recipe.basePrice * Kitchen.servingPayoutFraction)
+								)
+							else
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return math.floor(total)
+end
+
 function CafeOperationsService.ResumeAfterOffline(_self: any, player: Player, now: number): any
 	if resumed[player.UserId] then
 		local data = DataService:GetProfile(player)
@@ -363,37 +422,45 @@ function CafeOperationsService.ResumeAfterOffline(_self: any, player: Player, no
 		job.completesAt += slowExtra
 	end
 
-	local rates = OperationsMath.calculate(
-		data,
-		Recipes,
-		StaffDefinitions,
-		Kitchen.staffLevelSpeedPerLevel,
-		Kitchen.batchCostMultiplier,
-		Kitchen.servingPayoutFraction,
-		Operations.offlineEarningsDivisor
-	)
-	local earningSeconds = math.min(offlineSeconds, Operations.maxOfflineEarningHours * 3600)
-	local effectiveMinutes = earningSeconds / 60 / Operations.offlineTimeMultiplier
-	local requiredWaiter = effectiveMinutes
-		* rates.waiterUtilization
-		* Operations.serviceCapacityPerWorkMinute
-	local waiterAvailable = state.staffCapacity.Waiter or 0
-	local capacityScale = if requiredWaiter > 0
-		then math.min(1, waiterAvailable / requiredWaiter)
-		else 0
-	local earnings = math.max(0, math.floor(rates.netPerMinute * effectiveMinutes * capacityScale))
-	if requiredWaiter > 0 then
-		state.staffCapacity.Waiter = math.max(0, waiterAvailable - requiredWaiter * capacityScale)
-	end
-	local activeRoles: { [string]: boolean } = {}
-	for recipeId, product in rates.products do
-		if product.productionPerMinute > 0 then
-			activeRoles[Recipes[recipeId].staffRole] = true
+	local earnings = 0
+	if Kitchen.useProductionPlan then
+		earnings = settlePlanOffline(data, offlineSeconds)
+	else
+		local rates = OperationsMath.calculate(
+			data,
+			Recipes,
+			StaffDefinitions,
+			Kitchen.staffLevelSpeedPerLevel,
+			Kitchen.batchCostMultiplier,
+			Kitchen.servingPayoutFraction,
+			Operations.offlineEarningsDivisor
+		)
+		local earningSeconds = math.min(offlineSeconds, Operations.maxOfflineEarningHours * 3600)
+		local effectiveMinutes = earningSeconds / 60 / Operations.offlineTimeMultiplier
+		local requiredWaiter = effectiveMinutes
+			* rates.waiterUtilization
+			* Operations.serviceCapacityPerWorkMinute
+		local waiterAvailable = state.staffCapacity.Waiter or 0
+		local capacityScale = if requiredWaiter > 0
+			then math.min(1, waiterAvailable / requiredWaiter)
+			else 0
+		earnings = math.max(0, math.floor(rates.netPerMinute * effectiveMinutes * capacityScale))
+		if requiredWaiter > 0 then
+			state.staffCapacity.Waiter =
+				math.max(0, waiterAvailable - requiredWaiter * capacityScale)
 		end
-	end
-	for role in activeRoles do
-		local cost = effectiveMinutes * Operations.productionCapacityPerWorkMinute * capacityScale
-		state.staffCapacity[role] = math.max(0, (state.staffCapacity[role] or 0) - cost)
+		local activeRoles: { [string]: boolean } = {}
+		for recipeId, product in rates.products do
+			if product.productionPerMinute > 0 then
+				activeRoles[Recipes[recipeId].staffRole] = true
+			end
+		end
+		for role in activeRoles do
+			local cost = effectiveMinutes
+				* Operations.productionCapacityPerWorkMinute
+				* capacityScale
+			state.staffCapacity[role] = math.max(0, (state.staffCapacity[role] or 0) - cost)
+		end
 	end
 	if earnings > 0 then
 		EconomyService:AddCoins(player, earnings)
