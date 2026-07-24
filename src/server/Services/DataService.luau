@@ -67,11 +67,31 @@ local loading: { [number]: boolean } = {}
 local saveBlocked: { [number]: boolean } = {}
 
 local function starterStaff(): { Types.StaffMember }
+	-- All four start hired for now; the "start with only Barista + Waiter, hire
+	-- the rest" gating lands with the Staff panel (roadmap A7).
 	return {
-		{ id = "staff_barista_mia", typeId = "barista_mia", level = 1, experience = 0 },
-		{ id = "staff_cook_sam", typeId = "cook_sam", level = 1, experience = 0 },
-		{ id = "staff_waiter_noah", typeId = "waiter_noah", level = 1, experience = 0 },
-		{ id = "staff_cleaner_pia", typeId = "cleaner_pia", level = 1, experience = 0 },
+		{
+			id = "staff_barista_mia",
+			typeId = "barista_mia",
+			level = 1,
+			experience = 0,
+			hired = true,
+		},
+		{ id = "staff_cook_sam", typeId = "cook_sam", level = 1, experience = 0, hired = true },
+		{
+			id = "staff_waiter_noah",
+			typeId = "waiter_noah",
+			level = 1,
+			experience = 0,
+			hired = true,
+		},
+		{
+			id = "staff_cleaner_pia",
+			typeId = "cleaner_pia",
+			level = 1,
+			experience = 0,
+			hired = true,
+		},
 	}
 end
 
@@ -180,6 +200,12 @@ local function defaultProfile(): Types.PlayerData
 		unlockedRecipes = { espresso = true, tea = true },
 		recipeMastery = {},
 		staff = starterStaff(),
+		-- Default auto-production plan (used when Kitchen.useProductionPlan is on):
+		-- a Lv1 Barista's 15 work-min/hr spent on 10 espresso + 3 tea (14.5 min).
+		productionPlan = {
+			Barista = { espresso = 10, tea = 3 },
+			Cook = {},
+		},
 		operations = defaultOperations(),
 		settings = { musicVolume = 0.6, sfxVolume = 0.8, reducedEffects = false },
 		stats = {
@@ -280,6 +306,27 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 		else
 			pantry[item] = math.floor(n)
 		end
+	end
+
+	-- Heal staff: legacy members predate the `hired` flag, so default them to
+	-- hired (their NPCs were already active). reconcile can't reach array elements.
+	local staffList = (data :: any).staff
+	if typeof(staffList) == "table" then
+		for _, member in staffList do
+			if typeof(member) == "table" then
+				member.level = math.max(1, math.floor(tonumber(member.level) or 1))
+				member.experience = math.max(0, tonumber(member.experience) or 0)
+				if typeof(member.hired) ~= "boolean" then
+					member.hired = true
+				end
+			end
+		end
+	end
+
+	-- productionPlan is a top-level map (reconcile fills it from defaultProfile);
+	-- this guard just ensures it is a table before the scheduler reads it.
+	if typeof((data :: any).productionPlan) ~= "table" then
+		(data :: any).productionPlan = {}
 	end
 
 	-- Schema 1 stored only a number. Convert it into a fresh timestamped lot so
