@@ -81,11 +81,24 @@ local function rebuild()
 	local level = tonumber(profile.level) or 1
 	local coins = tonumber(profile.coins) or 0
 	local pantry = profile.pantry or {}
+	local lowThreshold = tonumber(Economy.lowIngredientThreshold) or 5
+	local outCount = 0
 
 	for order, id in sortedIngredientIds() do
 		local def = Ingredients[id]
 		local locked = level < def.unlockLevel
 		local owned = math.floor(tonumber(pantry[id]) or 0)
+		-- Stock state drives the critical warning (CORE_LOOP_SPEC §3b). Locked
+		-- ingredients you can't use yet never read as "OUT".
+		local stockState = "ok"
+		if not locked then
+			if owned <= 0 then
+				stockState = "out"
+				outCount += 1
+			elseif owned <= lowThreshold then
+				stockState = "low"
+			end
+		end
 
 		local card = Instance.new("Frame")
 		card.Name = id
@@ -116,26 +129,38 @@ local function rebuild()
 		title.TextTruncate = Enum.TextTruncate.AtEnd
 		title.ZIndex = 23
 
-		-- Rarity + how many you own = the inventory, right here on the buy row.
-		local sub = Components.Label(
-			card,
-			string.format("%s  •  Owned: %d", def.rarity, owned),
-			11,
-			false
-		)
+		-- Rarity + how many you own = the inventory, right here on the buy row;
+		-- turns orange when low, red when out, so you know to restock.
+		local subText = string.format("%s  •  Owned: %d", def.rarity, owned)
+		local subColor = if locked then Theme.Colors.PaperDark else Theme.Colors.Muted
+		if stockState == "out" then
+			subText = "⚠ OUT — buy now"
+			subColor = Theme.Colors.Danger
+		elseif stockState == "low" then
+			subText = string.format("⚠ Low — %d left", owned)
+			subColor = Theme.Colors.Coral
+		end
+		local sub = Components.Label(card, subText, 11, stockState ~= "ok")
 		sub.Size = UDim2.new(1, -168, 0, 18)
 		sub.Position = UDim2.fromOffset(68, 30)
 		sub.TextXAlignment = Enum.TextXAlignment.Left
-		sub.TextColor3 = if locked then Theme.Colors.PaperDark else Theme.Colors.Muted
+		sub.TextColor3 = subColor
 		sub.ZIndex = 23
 
-		-- Owned count as a pill on the right (the at-a-glance inventory number).
+		-- Owned count as a pill on the right (the at-a-glance inventory number),
+		-- colour-coded to the stock state.
 		local ownedPill = Components.Label(card, "x" .. tostring(owned), 13, true)
 		ownedPill.Size = UDim2.fromOffset(70, 26)
 		ownedPill.Position = UDim2.new(1, -80, 0, 10)
 		ownedPill.BackgroundTransparency = 0
-		ownedPill.BackgroundColor3 = if owned > 0 then accent else Theme.Colors.PaperDark
-		ownedPill.TextColor3 = if owned > 0 then Theme.Colors.White else Theme.Colors.Muted
+		ownedPill.BackgroundColor3 = if stockState == "out"
+			then Theme.Colors.Danger
+			elseif stockState == "low" then Theme.Colors.Honey
+			elseif owned > 0 then accent
+			else Theme.Colors.PaperDark
+		ownedPill.TextColor3 = if stockState == "out" or owned > 0
+			then Theme.Colors.White
+			else Theme.Colors.Muted
 		ownedPill.ZIndex = 23
 		Components.Corner(ownedPill, Theme.Radius.Pill)
 
@@ -202,6 +227,28 @@ local function rebuild()
 				end
 			end)
 		end
+	end
+
+	-- Critical banner at the top of the list when anything is out of stock.
+	if outCount > 0 then
+		local banner = Instance.new("Frame")
+		banner.Name = "OutOfStockBanner"
+		banner.Size = UDim2.new(1, -6, 0, 34)
+		banner.BackgroundColor3 = Theme.Colors.Danger
+		banner.LayoutOrder = 0
+		banner.ZIndex = 24
+		Components.Corner(banner, Theme.Radius.Medium)
+		banner.Parent = ui.list
+		local plural = if outCount == 1 then "" else "s"
+		local label = Components.Label(
+			banner,
+			string.format("⚠ %d ingredient%s OUT — restock below", outCount, plural),
+			13,
+			true
+		)
+		label.Size = UDim2.fromScale(1, 1)
+		label.TextColor3 = Theme.Colors.White
+		label.ZIndex = 25
 	end
 end
 
