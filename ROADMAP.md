@@ -43,20 +43,21 @@ social game, each giving the player short-, medium- and long-term goals:
 2. ✅ **Market buy path** (#19) — `MarketBuyIngredient` remote + `MarketMath` pricing.
 3. ✅ **Market UI + Cookbook trim** (#20) — dock button (owner's icon), bulk-buy +
    inventory panel, cookbook shows machine + ingredients. Studio-verified.
-4. 🔴 **Recipe/inventory polish** — show the **required level** on cookbook cards
-   (the 4th recipe fact); **zero/low critical warning** on market rows + a HUD
-   "out of X" alert (`CORE_LOOP_SPEC` §1, §3b).
-5. 🔴 **Staff data model** — `hired` flag, level, per-role `workMinutesPerHour`
-   curve (Lv1 = 15 min/hr); seed Barista + Waiter only; unify the 3 hardcoded role
-   lists so new roles are pure config.
-6. 🔴 **New auto-production** — replace the capacity meter with the **minutes-per-
-   hour allocation** model: a `productionPlan` per staff, `productionMinutes` per
-   recipe, online real-time + **offline ÷20** simulation (`CORE_LOOP_SPEC` §4–§5).
-   Then flip `enforceIngredients` on.
-7. 🔴 **Staff panel UI** — cards (blurred locks), hire, the min/hr upgrade track,
-   the allocation-plan editor with a minute bar, upgrade celebration.
-8. 🔴 **Ingredient monetisation** — idempotent `ProcessReceipt`, Robux bundles /
-   instant-unlock, every SKU also coin/level-earnable (`CORE_LOOP_SPEC` §3c).
+4. ✅ **Recipe/inventory polish** (#22) — required-level pill on cookbook cards;
+   zero/low OUT warnings on the market rows + banner.
+5. ✅ **Staff data model** (#23) — `hired` flag, level, per-role `workMinutesPerHour`
+   curve (Lv1 = 15 min/hr), `productionPlan`, `productionMinutes`.
+6. ✅ **New auto-production** (#24, #25) — the **minutes-per-hour allocation** model:
+   `productionPlan` per staff, online real-time + **offline ÷20**, the plan editor in
+   the Auto Production drawer; `useProductionPlan` + `enforceIngredients` now LIVE.
+   Adversarial-reviewed + fixed. _(Balance of per-serving ingredient margins is a
+   pending playtest tuning pass.)_
+7. 🔜 **Staff panel UI** — cards (blurred locks), hire locked roles, the min/hr
+   upgrade track, upgrade celebration. Seed flips to Barista+Waiter only; gate
+   `CountRole` on `hired`.
+8. 🔴 **Monetisation** — full plan + **prices** in `docs/MONETISATION.md`
+   (owner creates the Robux products; I wire the idempotent `ProcessReceipt`,
+   `Config/Products`, and the shop cards). Every SKU also coin/level-earnable.
 
 Non-negotiables carried from below: server-authoritative, data-driven, no loot
 boxes, no pay-to-win, no fake-urgency, and **tested in Roblox Studio before every
