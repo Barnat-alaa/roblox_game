@@ -48,6 +48,7 @@ local Theme = {
 		Cookbook = "CB",
 		Build = "BU",
 		Shop = "SH",
+		Market = "MK",
 		Staff = "CR",
 		Upgrades = "UP",
 		Trophies = "TR",

@@ -13,6 +13,7 @@ local AssetManifest = require(Shared.Config.AssetManifest)
 local Graphics = require(Shared.Config.Graphics)
 local Furniture = require(Shared.Config.Furniture)
 local Recipes = require(Shared.Config.Recipes)
+local Ingredients = require(Shared.Config.Ingredients)
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -109,6 +110,15 @@ local HUD_BUTTONS: { HudButtonDefinition } = {
 		badge = "5",
 		label = "Shop",
 		accent = Theme.Colors.Berry,
+	},
+	{
+		id = "Market",
+		zone = "Dock",
+		order = 6,
+		key = Enum.KeyCode.Six,
+		badge = "6",
+		label = "Market",
+		accent = Theme.Colors.Roast,
 	},
 	{
 		id = "Goals",
@@ -994,6 +1004,12 @@ function UIController.Start(_self: any)
 			)
 		elseif msg.kind == "purchased" then
 			UIController.toast("Purchased - open Build to place it")
+		elseif msg.kind == "ingredient_bought" then
+			local def = (Ingredients :: any)[msg.item]
+			local name = if def then def.displayName else tostring(msg.item)
+			UIController.toast(
+				"Bought " .. tostring(msg.qty) .. "x " .. name .. "  -$" .. tostring(msg.cost)
+			)
 		elseif msg.kind == "order_cancelled" then
 			clearOrder(if typeof(msg.orderId) == "string" then msg.orderId else nil)
 			UIController.toast("The customer left")
