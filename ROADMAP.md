@@ -22,8 +22,10 @@ spoilage punishment, no fake urgency — *fresh bonuses* instead of rot.
 
 _This is the current build plan and it supersedes the S-steps and Phase order
 below for day-to-day work. Full spec: **docs/GAMEPLAY_DIRECTION.md** (what/why);
-exact code hooks: **docs/IMPLEMENTATION_MAP.md** (where). Owner-chosen feature set,
-built data-driven so it grows for years without rewrites._
+exact code hooks: **docs/IMPLEMENTATION_MAP.md** (where); recipe/ingredient/
+production **design + balance numbers**: **docs/CORE_LOOP_SPEC.md** (owner reviews
+before the 🔴 steps ship). Owner-chosen feature set, built data-driven so it grows
+for years without rewrites._
 
 The four features that turn "serve coffee" into a management + collection +
 social game, each giving the player short-, medium- and long-term goals:
@@ -35,16 +37,26 @@ social game, each giving the player short-, medium- and long-term goals:
 | **C** | **Neighbour help + friendships** + **mischief** (smell bomb / recruit) | other players become allies and rivals |
 | **D** | **Monetisation** (cosmetics, membership, battle pass, accelerators) | only after A–C prove the loop is fun; every Robux SKU also earnable with coins |
 
-**Phase A is sequenced** (see the direction doc §6):
-1. **Ingredients backbone** — `Config/Ingredients`, `recipe.ingredients`,
-   `PlayerData.pantry` + save-healing, consumption behind a `Kitchen.enforceIngredients`
-   flag so it ships dormant and loop-safe. _(in progress — `feat/ingredients-backbone`)_
-2. **Market UI + buy remote** — travel-to-market, bulk tiers, locked-blur cards,
-   pantry drawer; flip the flag on.
-3. **Staff data model** — `hired` flag, level-as-upgrade-track, level-scaled
-   capacity/recovery; seed only Barista + Waiter.
-4. **Staff panel UI** — 4 cards (blurred locks), hire, 10→100% bar, live capacity
-   bar, upgrade celebration.
+**Phase A is sequenced.** Numbers for the 🔴 steps live in `docs/CORE_LOOP_SPEC.md`.
+1. ✅ **Ingredients backbone** (#18) — `Config/Ingredients`, `recipe.ingredients`,
+   `PlayerData.pantry` + healing, consumption behind `Kitchen.enforceIngredients`.
+2. ✅ **Market buy path** (#19) — `MarketBuyIngredient` remote + `MarketMath` pricing.
+3. ✅ **Market UI + Cookbook trim** (#20) — dock button (owner's icon), bulk-buy +
+   inventory panel, cookbook shows machine + ingredients. Studio-verified.
+4. 🔴 **Recipe/inventory polish** — show the **required level** on cookbook cards
+   (the 4th recipe fact); **zero/low critical warning** on market rows + a HUD
+   "out of X" alert (`CORE_LOOP_SPEC` §1, §3b).
+5. 🔴 **Staff data model** — `hired` flag, level, per-role `workMinutesPerHour`
+   curve (Lv1 = 15 min/hr); seed Barista + Waiter only; unify the 3 hardcoded role
+   lists so new roles are pure config.
+6. 🔴 **New auto-production** — replace the capacity meter with the **minutes-per-
+   hour allocation** model: a `productionPlan` per staff, `productionMinutes` per
+   recipe, online real-time + **offline ÷20** simulation (`CORE_LOOP_SPEC` §4–§5).
+   Then flip `enforceIngredients` on.
+7. 🔴 **Staff panel UI** — cards (blurred locks), hire, the min/hr upgrade track,
+   the allocation-plan editor with a minute bar, upgrade celebration.
+8. 🔴 **Ingredient monetisation** — idempotent `ProcessReceipt`, Robux bundles /
+   instant-unlock, every SKU also coin/level-earnable (`CORE_LOOP_SPEC` §3c).
 
 Non-negotiables carried from below: server-authoritative, data-driven, no loot
 boxes, no pay-to-win, no fake-urgency, and **tested in Roblox Studio before every
