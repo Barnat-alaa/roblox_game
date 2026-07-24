@@ -351,6 +351,8 @@ local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number)
 	if typeof(plan) ~= "table" then
 		return 0
 	end
+	-- Only settle recipes that are on the menu (orderable) — mirror the online path.
+	local menu = (data.kitchen and data.kitchen.menu) or {}
 	for role, recipes in plan do
 		if typeof(recipes) == "table" and StaffService:HasRole(data, role) then
 			local budget = StaffService:GetWorkMinutesPerHour(data, role) * hours / divisor
@@ -362,6 +364,7 @@ local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number)
 					minutes
 					and (tonumber(count) or 0) > 0
 					and data.unlockedRecipes[recipeId] == true
+					and menu[recipeId] == true
 				then
 					totalWeight += (tonumber(count) or 0) * minutes
 				end
@@ -374,6 +377,7 @@ local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number)
 						minutes
 						and (tonumber(count) or 0) > 0
 						and data.unlockedRecipes[recipeId] == true
+						and menu[recipeId] == true
 					then
 						local weight = (tonumber(count) or 0) * minutes
 						local servings = math.floor((budget * weight / totalWeight) / minutes)

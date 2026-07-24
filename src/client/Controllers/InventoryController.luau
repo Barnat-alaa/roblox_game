@@ -350,27 +350,43 @@ local function updateProductionRow(recipeId: string)
 	if KitchenConfig.useProductionPlan then
 		-- Plan editor: the +/- set servings-per-hour; the row shows the recipe's
 		-- minute cost and how much of the staff's hourly budget the plan uses.
+		-- Appointment recipes (no productionMinutes, e.g. Overnight Roast) aren't
+		-- part of the plan, so they show as informational with no steppers.
 		local recipe = Recipes[recipeId]
 		local role = recipe.staffRole
 		local isUnlocked = profile and profile.unlockedRecipes[recipeId] == true
-		row.target.Text = tostring(planCount(role, recipeId))
-		row.minus.Active = isUnlocked
-		row.plus.Active = isUnlocked
+		local isAppointment = recipe.productionMinutes == nil
+		local editable = isUnlocked and not isAppointment
+		row.minus.Active = editable
+		row.plus.Active = editable
+		row.minus.Visible = not isAppointment
+		row.plus.Visible = not isAppointment
+		row.target.Visible = not isAppointment
 		row.toggle.Visible = false
 		row.priority.Visible = false
-		row.status.Text = if isUnlocked then role else "LOCKED"
-		row.status.TextColor3 = if isUnlocked then Theme.Colors.MintDark else Theme.Colors.Muted
-		row.meta.Text = string.format(
-			"%s min each  •  %s: %s / %s min-per-hr used",
-			oneDecimal(recipe.productionMinutes or 0),
-			role,
-			oneDecimal(roleUsedMinutes(role)),
-			oneDecimal(roleBudget(role))
-		)
-		row.offline.Text = string.format(
-			"Cooks while online  •  offline earns at 1/%d rate",
-			Operations.offlineTimeMultiplier
-		)
+		if editable or not isUnlocked then
+			row.target.Text = tostring(planCount(role, recipeId))
+		end
+		row.status.Text = if not isUnlocked
+			then "LOCKED"
+			elseif isAppointment then "APPOINTMENT"
+			else role
+		row.status.TextColor3 = if editable then Theme.Colors.MintDark else Theme.Colors.Muted
+		row.meta.Text = if isAppointment
+			then "Overnight appointment — start it by hand at the machine"
+			else string.format(
+				"%s min each  •  %s: %s / %s min-per-hr used",
+				oneDecimal(recipe.productionMinutes :: number),
+				role,
+				oneDecimal(roleUsedMinutes(role)),
+				oneDecimal(roleBudget(role))
+			)
+		row.offline.Text = if isAppointment
+			then ""
+			else string.format(
+				"Cooks while online  •  offline earns at 1/%d rate",
+				Operations.offlineTimeMultiplier
+			)
 		return
 	end
 	local unlocked = profile and profile.unlockedRecipes[recipeId] == true
@@ -613,11 +629,10 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	minus.ZIndex = 23
 	minus.Activated:Connect(function()
 		if KitchenConfig.useProductionPlan then
-			local role = recipe.staffRole
 			Remotes.event("SetProductionPlan"):FireServer({
-				role = role,
+				role = recipe.staffRole,
 				recipeId = recipeId,
-				count = math.max(0, planCount(role, recipeId) - 1),
+				delta = -1,
 			})
 		else
 			local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
@@ -637,11 +652,10 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	plus.ZIndex = 23
 	plus.Activated:Connect(function()
 		if KitchenConfig.useProductionPlan then
-			local role = recipe.staffRole
 			Remotes.event("SetProductionPlan"):FireServer({
-				role = role,
+				role = recipe.staffRole,
 				recipeId = recipeId,
-				count = planCount(role, recipeId) + 1,
+				delta = 1,
 			})
 		else
 			local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
