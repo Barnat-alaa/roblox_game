@@ -95,6 +95,26 @@ function StaffService.GetRoleSpeed(_self: any, data: Types.PlayerData, role: str
 	return best
 end
 
+-- Highest level among this role's HIRED staff (min 1). `hired ~= false` so
+-- legacy members (no flag) and new hires both count.
+function StaffService.GetRoleLevel(_self: any, data: Types.PlayerData, role: string): number
+	local best = 1
+	for _, member in data.staff do
+		local definition = StaffDefinitions[member.typeId]
+		if definition and definition.role == role and member.hired ~= false then
+			best = math.max(best, math.max(1, math.floor(tonumber(member.level) or 1)))
+		end
+	end
+	return best
+end
+
+-- Work-minutes this role produces per hour in the plan model (CORE_LOOP_SPEC §4a):
+-- Barista Lv1 = 15 → Lv10 = 60.
+function StaffService.GetWorkMinutesPerHour(self: any, data: Types.PlayerData, role: string): number
+	local level = StaffService.GetRoleLevel(self, data, role)
+	return Kitchen.workMinutesBase + (level - 1) * Kitchen.workMinutesPerLevel
+end
+
 local function crewList(crew: Crew): { StaffNpc }
 	local list = {}
 	for _, npc in { crew.barista, crew.cook, crew.waiter, crew.cleaner } do

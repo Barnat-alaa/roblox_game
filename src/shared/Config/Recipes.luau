@@ -329,4 +329,28 @@ for id, recipe in Recipes do
 	recipe.icon = ICONS[id] or "🍽️"
 end
 
+-- Work-minutes one batch costs a staffer in the plan model (CORE_LOOP_SPEC §4b).
+-- A recipe omitted here (slow_roast) is an appointment cook, run outside the
+-- per-hour minute budget.
+local PRODUCTION_MINUTES: { [string]: number } = {
+	espresso = 1,
+	tea = 1.5,
+	cappuccino = 1.5,
+	latte = 2,
+	iced_tea = 1.5,
+	mocha = 2,
+	croissant = 2,
+	muffin = 2.5,
+	cinnamon_roll = 3,
+	quiche = 4,
+	sandwich = 2,
+	fruit_salad = 1.5,
+	club_sandwich = 3,
+}
+for id, minutes in PRODUCTION_MINUTES do
+	if Recipes[id] then
+		Recipes[id].productionMinutes = minutes
+	end
+end
+
 return Recipes

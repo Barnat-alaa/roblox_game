@@ -25,6 +25,16 @@ local Kitchen = {
 	-- land in step 2, then this flips ON to make running dry actually stop a cook.
 	enforceIngredients = false,
 
+	-- New auto-production model (docs/CORE_LOOP_SPEC.md §4). Each producer staff
+	-- works `workMinutesBase + (level-1)*workMinutesPerLevel` minutes per hour
+	-- (Barista Lv1 = 15 → Lv10 = 60) and the player allocates those minutes across
+	-- products via `PlayerData.productionPlan`. Ships OFF: while false the old
+	-- target-stock/priority scheduler runs unchanged. The scheduler logic lands
+	-- behind this flag, then it flips on together with enforceIngredients.
+	useProductionPlan = false,
+	workMinutesBase = 15,
+	workMinutesPerLevel = 5,
+
 	-- Buzz and demand
 	buzzStart = 10,
 	buzzMax = 105,

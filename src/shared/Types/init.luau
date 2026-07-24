@@ -32,6 +32,7 @@ export type StaffMember = {
 	typeId: string,
 	level: number,
 	experience: number,
+	hired: boolean, -- false = a locked role shown in the hire UI but not working yet
 }
 
 export type PlayerSettings = {
@@ -161,6 +162,9 @@ export type PlayerData = {
 	unlockedRecipes: { [string]: boolean },
 	recipeMastery: { [string]: RecipeMasteryEntry },
 	staff: { StaffMember },
+	-- Auto-production plan: staff role → recipeId → how many to make per hour.
+	-- The player allocates each staffer's work-minutes across their products.
+	productionPlan: { [string]: { [string]: number } },
 	kitchen: KitchenState,
 	operations: OperationsState,
 	daily: DailyState,
@@ -186,6 +190,7 @@ export type RecipeDefinition = {
 	servings: number, -- counter stock added per collected batch
 	productionTime: number, -- seconds per automatic staff batch at level 1
 	productionYield: number, -- servings created by one automatic batch
+	productionMinutes: number?, -- work-minutes one batch costs a staffer (new plan model; nil = appointment recipe, outside the per-hour budget)
 	spoilTime: number, -- shelf life in seconds while the cafe is online
 	serveTime: number, -- waiter service cycle in seconds at level 1
 	staffRole: string, -- Barista for drinks, Cook for food
