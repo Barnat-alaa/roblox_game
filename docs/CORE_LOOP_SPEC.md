@@ -192,12 +192,12 @@ minute budget. Example, **Barista Lv 1 (15 min/hr)**:
   makes the upgrade track meaningful. Idle over a full night nets a small **~48
   coin** "welcome back," so it's a nudge to return, never a replacement for playing
   (respects `ECONOMY_BALANCE.md`: "automation must not trivialise the economy").
-- **Open balance questions (for you):**
-  1. Is **÷20 offline** too stingy (a night = ~48 coins at Lv 1)? Easy to loosen.
-  2. Is **60 min/hr at Lv 10** (never resting) the right ceiling, or should max be
-     ~45 so there's always a reason to play hands-on?
-  3. Should **Cook** share ONE budget across Oven + Prep, or should a future
-     **Chef** (oven) and **Cook** (prep) each have their own? (§5.)
+- **Balance decisions — CONFIRMED by owner 2026-07-24:**
+  1. **÷20 offline** — kept as-is (idle stays a small welcome-back nudge).
+  2. **60 min/hr at Lv 10** — kept (a maxed staffer works the full hour; 15→60 curve).
+  3. **One Cook, one budget** across Oven + Prep (split into Chef/Cook later).
+  4. **Keep Flour** (shared palette) — no separate "Dough" ingredient; croissant =
+     Flour + Butter + Eggs.
 
 ---
 
