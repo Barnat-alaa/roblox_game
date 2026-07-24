@@ -6,8 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Graphics = require(Shared.Config.Graphics)
 local Recipes = require(Shared.Config.Recipes)
-local Kitchen = require(Shared.Config.Kitchen)
-local Mastery = require(Shared.Utilities.Mastery)
+local Furniture = require(Shared.Config.Furniture)
+local Ingredients = require(Shared.Config.Ingredients)
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -21,13 +21,33 @@ local ui: { [string]: any } = {}
 local selectedCategory = "All"
 local cards: { [string]: Frame } = {}
 
-local function formatTime(seconds: number): string
-	if seconds >= 3600 then
-		return string.format("%dh %dm", seconds // 3600, (seconds % 3600) // 60)
-	elseif seconds >= 60 then
-		return string.format("%dm %ds", seconds // 60, seconds % 60)
+-- The machine + ingredients a recipe needs — the only info the cookbook shows
+-- now (owner: "only the associated ingredients and machines you need").
+local function machineName(applianceId: string): string
+	local def = Furniture[applianceId]
+	return if def then def.displayName else applianceId
+end
+
+local function ingredientsText(recipe: any): string
+	local needs = recipe.ingredients
+	if typeof(needs) ~= "table" or next(needs) == nil then
+		return "No ingredients needed"
 	end
-	return tostring(seconds) .. "s"
+	local ids = {}
+	for id in needs do
+		table.insert(ids, id)
+	end
+	table.sort(ids, function(a, b)
+		return a < b
+	end)
+	local parts = {}
+	for _, id in ids do
+		local def = Ingredients[id]
+		local name = if def then def.displayName else id
+		local icon = if def then def.icon .. " " else ""
+		table.insert(parts, string.format("%s%s x%d", icon, name, needs[id]))
+	end
+	return table.concat(parts, "   ")
 end
 
 local function categoryMatches(recipeId: string): boolean
@@ -86,12 +106,11 @@ local function rebuild()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = ui.list
 
-	local masteryMap = profile.recipeMastery or {}
 	for order, item in sortedRecipes(profile) do
 		local recipe = item.recipe
 		local card = Instance.new("Frame")
 		card.Name = item.id
-		card.Size = UDim2.new(1, -6, 0, 82)
+		card.Size = UDim2.new(1, -6, 0, 92)
 		card.BackgroundColor3 = if item.unlocked
 			then Theme.Colors.Paper
 			else Color3.fromRGB(78, 65, 61)
@@ -134,48 +153,22 @@ local function rebuild()
 		title.ZIndex = 23
 
 		local detail = Components.Label(card, "", 11, false)
-		detail.Size = UDim2.new(1, -82, 0, 38)
-		detail.Position = UDim2.fromOffset(68, 34)
+		detail.Size = UDim2.new(1, -82, 0, 54)
+		detail.Position = UDim2.fromOffset(68, 32)
 		detail.TextXAlignment = Enum.TextXAlignment.Left
+		detail.TextYAlignment = Enum.TextYAlignment.Top
 		detail.TextWrapped = true
 		detail.TextColor3 = if item.unlocked then Theme.Colors.Muted else Theme.Colors.PaperDark
 		detail.ZIndex = 23
 
 		if item.unlocked then
-			local entry = masteryMap[item.id]
-			local level = (entry and tonumber(entry.masteryLevel)) or 0
-			local cooked = (entry and tonumber(entry.timesCooked)) or 0
-			local effectiveTime =
-				Mastery.cookTime(recipe.cookTime, level, Kitchen.masteryTimeReductionPerStar)
-			local effectiveCost = Mastery.batchCost(
-				recipe.ingredientCost * Kitchen.batchCostMultiplier,
-				level,
-				Kitchen.masteryCostReductionPerStar
-			)
-			local effectiveServings =
-				Mastery.servings(recipe.servings, level, Kitchen.masteryBonusServingAt)
+			-- Only what the owner asked for: the machine + the ingredients needed.
+			detail.RichText = true
 			detail.Text = string.format(
-				"$%d batch  |  %s  |  %d servings\nCooked %d times",
-				effectiveCost,
-				formatTime(effectiveTime),
-				effectiveServings,
-				cooked
+				"<b>Machine:</b> %s\n<b>Needs:</b> %s",
+				machineName(recipe.applianceId),
+				ingredientsText(recipe)
 			)
-			local mastery = Components.Label(
-				card,
-				tostring(level) .. "/" .. tostring(#recipe.masteryThresholds),
-				12,
-				true
-			)
-			mastery.Size = UDim2.fromOffset(70, 28)
-			mastery.Position = UDim2.new(1, -80, 0, 10)
-			mastery.BackgroundTransparency = 0
-			mastery.BackgroundColor3 = if level >= #recipe.masteryThresholds
-				then Theme.Colors.Honey
-				else Theme.Colors.PaperDark
-			mastery.TextColor3 = Theme.Colors.Espresso
-			mastery.ZIndex = 23
-			Components.Corner(mastery, Theme.Radius.Pill)
 		else
 			detail.Text = string.format(
 				"Unlock at level %d with %d reputation",
@@ -215,7 +208,7 @@ function CookbookController.Start(_self: any)
 	local _, close = Components.PanelHeader(
 		panel,
 		"CAFE COOKBOOK",
-		"Recipes, batch numbers, and mastery",
+		"What each dish needs: machine + ingredients",
 		Theme.Colors.MintDark
 	)
 	close.Activated:Connect(function()
