@@ -44,6 +44,7 @@ local Graphics = {
 		Staff = "rbxassetid://130832227566122",
 		Upgrades = "rbxassetid://98681656717864",
 		Shop = "rbxassetid://114379023520936",
+		Market = "rbxassetid://90121225847460",
 		-- Right rail
 		Goals = "rbxassetid://72112954485657",
 		Trophies = "rbxassetid://137488539860322",
@@ -72,6 +73,7 @@ local Graphics = {
 		Staff = true,
 		Upgrades = true,
 		Shop = true,
+		Market = true,
 		Goals = true,
 		Trophies = true,
 		Map = true,
