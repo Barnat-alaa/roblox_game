@@ -34,6 +34,25 @@ local resumed: { [number]: boolean } = {}
 local settingsLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 
+-- Runtime, per-user, per-role hour tracker for the plan model (CORE_LOOP_SPEC §4).
+-- Not persisted: an hour's work-minute budget resets each real hour and on rejoin.
+type PlanHour = { hourStart: number, minutesUsed: number, produced: { [string]: number } }
+local planHours: { [number]: { [string]: PlanHour } } = {}
+
+local function roleHour(userId: number, role: string, now: number): PlanHour
+	local byUser = planHours[userId]
+	if not byUser then
+		byUser = {}
+		planHours[userId] = byUser
+	end
+	local h = byUser[role]
+	if not h or now - h.hourStart >= 3600 then
+		h = { hourStart = now, minutesUsed = 0, produced = {} }
+		byUser[role] = h
+	end
+	return h
+end
+
 local function incomingFor(kitchen: Types.KitchenState, recipeId: string): number
 	local incoming = 0
 	for _, job in kitchen.jobs do
@@ -173,6 +192,93 @@ local function startJob(
 	return true
 end
 
+-- Plan model (CORE_LOOP_SPEC §4): pick the next serving this machine should make
+-- from the player's productionPlan — the recipe with the most remaining hourly
+-- quota that still fits the role's work-minute budget, has ingredients in the
+-- pantry, and has counter room. Returns the recipe + the role that makes it.
+local function chooseFromPlan(
+	player: Player,
+	data: Types.PlayerData,
+	kitchen: Types.KitchenState,
+	machineId: string,
+	now: number
+): (Types.RecipeDefinition?, string?)
+	local plan = data.productionPlan or {}
+	local best: Types.RecipeDefinition? = nil
+	local bestRole: string? = nil
+	local bestRemaining = 0
+	for recipeId, recipe in Recipes do
+		local minutes = tonumber(recipe.productionMinutes)
+		if
+			recipe.applianceId == machineId
+			and minutes ~= nil
+			and data.unlockedRecipes[recipeId] == true
+			and StaffService:HasRole(data, recipe.staffRole)
+		then
+			local role = recipe.staffRole
+			local rolePlan = plan[role]
+			local target = if typeof(rolePlan) == "table"
+				then math.floor(tonumber(rolePlan[recipeId]) or 0)
+				else 0
+			if target > 0 then
+				local h = roleHour(player.UserId, role, now)
+				local made = h.produced[recipeId] or 0
+				local workLeft = StaffService:GetWorkMinutesPerHour(data, role) - h.minutesUsed
+				local _, available = KitchenService:GetStockCounts(data, recipeId, now)
+				local room = Kitchen.maxStockPerRecipe - available - incomingFor(kitchen, recipeId)
+				local remaining = target - made
+				if
+					remaining > bestRemaining
+					and (minutes :: number) <= workLeft + 0.001
+					and room >= 1
+					and IngredientMath.has(recipe, data.pantry)
+				then
+					best = recipe
+					bestRole = role
+					bestRemaining = remaining
+				end
+			end
+		end
+	end
+	return best, bestRole
+end
+
+-- Start one plan serving: consumes the ingredients + the role's work-minutes, and
+-- cooks for productionMinutes (no coin charge — ingredients were bought at market).
+local function startPlanJob(
+	player: Player,
+	data: Types.PlayerData,
+	kitchen: Types.KitchenState,
+	instanceId: string,
+	recipe: Types.RecipeDefinition,
+	role: string,
+	now: number
+)
+	local minutes = tonumber(recipe.productionMinutes) or 1
+	IngredientMath.consume(recipe, data.pantry)
+	local h = roleHour(player.UserId, role, now)
+	h.minutesUsed += minutes
+	h.produced[recipe.id] = (h.produced[recipe.id] or 0) + 1
+	kitchen.nextJobId += 1
+	kitchen.jobs[instanceId] = {
+		jobId = "job_" .. tostring(kitchen.nextJobId),
+		recipeId = recipe.id,
+		applianceInstanceId = instanceId,
+		startedAt = now,
+		completesAt = now + minutes * 60,
+		duration = minutes * 60,
+		yield = 1,
+		staffRole = role,
+	}
+	KitchenService:UpdateApplianceVisual(
+		player,
+		instanceId,
+		"cooking",
+		recipe.displayName .. " AUTO"
+	)
+	DataService:Push(player)
+end
+
 local function completeJobs(player: Player, kitchen: Types.KitchenState, now: number)
 	for instanceId, job in kitchen.jobs do
 		local recipe = Recipes[job.recipeId]
@@ -209,9 +315,18 @@ local function scheduleIdleAppliances(
 			and kitchen.cooks[placed.instanceId] == nil
 			and kitchen.jobs[placed.instanceId] == nil
 		then
-			local recipe = chooseRecipe(data, kitchen, definition.id, now)
-			if recipe then
-				startJob(player, data, kitchen, placed.instanceId, recipe, now)
+			if Kitchen.useProductionPlan then
+				local recipe, role = chooseFromPlan(player, data, kitchen, definition.id, now)
+				if recipe and role then
+					startPlanJob(player, data, kitchen, placed.instanceId, recipe, role, now)
+				else
+					KitchenService:UpdateApplianceVisual(player, placed.instanceId, "resting", nil)
+				end
+			else
+				local recipe = chooseRecipe(data, kitchen, definition.id, now)
+				if recipe then
+					startJob(player, data, kitchen, placed.instanceId, recipe, now)
+				end
 			end
 		end
 	end
@@ -304,6 +419,68 @@ local function handlePriority(player: Player, recipeId: unknown, priority: unkno
 	DataService:Push(player)
 end
 
+-- Set how many of one recipe a staff role makes per hour (the plan editor). The
+-- server rejects a plan that would exceed the role's work-minute budget.
+local function handleSetPlan(player: Player, payload: unknown)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	local p = payload :: any
+	if
+		typeof(p.role) ~= "string"
+		or typeof(p.recipeId) ~= "string"
+		or typeof(p.count) ~= "number"
+	then
+		return
+	end
+	if p.count ~= p.count or math.abs(p.count) > 100000 then
+		return
+	end
+	if not settingsLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	local data = DataService:GetProfile(player)
+	local recipe = Recipes[p.recipeId]
+	if
+		not data
+		or not recipe
+		or recipe.productionMinutes == nil
+		or recipe.staffRole ~= p.role
+		or data.unlockedRecipes[p.recipeId] ~= true
+	then
+		return
+	end
+	local minutes = recipe.productionMinutes :: number
+	if typeof(data.productionPlan) ~= "table" then
+		(data :: any).productionPlan = {}
+	end
+	if typeof(data.productionPlan[p.role]) ~= "table" then
+		data.productionPlan[p.role] = {}
+	end
+	local count = math.clamp(math.floor(p.count), 0, 500)
+	local budget = StaffService:GetWorkMinutesPerHour(data, p.role)
+	local usedByOthers = 0
+	for rid, c in data.productionPlan[p.role] do
+		if rid ~= p.recipeId then
+			local r = Recipes[rid]
+			if r and r.productionMinutes then
+				usedByOthers += (tonumber(c) or 0) * (r.productionMinutes :: number)
+			end
+		end
+	end
+	if usedByOthers + count * minutes > budget + 0.001 then
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "plan_full" })
+		return
+	end
+	data.productionPlan[p.role][p.recipeId] = count
+	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "plan_changed",
+		recipe = p.recipeId,
+		count = count,
+	})
+end
+
 function ProductionService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	EconomyService = ServiceRegistry.get("EconomyService")
@@ -317,6 +494,7 @@ function ProductionService.Start(_self: any)
 	Remotes.event("SetMenuRecipe").OnServerEvent:Connect(handleMenu)
 	Remotes.event("SetTargetStock").OnServerEvent:Connect(handleTarget)
 	Remotes.event("SetProductionPriority").OnServerEvent:Connect(handlePriority)
+	Remotes.event("SetProductionPlan").OnServerEvent:Connect(handleSetPlan)
 	task.spawn(function()
 		while true do
 			task.wait(Kitchen.productionTickSeconds)
@@ -332,6 +510,7 @@ function ProductionService.Start(_self: any)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		resumed[player.UserId] = nil
+		planHours[player.UserId] = nil
 		settingsLimiter:clear(player.UserId)
 	end)
 	Log.info("ProductionService ready (continuous FIFO stock loop)")
