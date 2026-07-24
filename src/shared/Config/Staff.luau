@@ -1,6 +1,8 @@
 --!strict
--- Staff is a Week-3 system. This seed data exists so the architecture is complete
--- and StaffService has something to read when we build automation.
+-- Staff roster (docs/GAMEPLAY_DIRECTION.md §1). The café opens with only a
+-- Barista and a Waiter; the rest are hired for coins (or accelerated with Robux,
+-- A8) and each staffer is upgraded level-by-level to raise their per-hour output.
+-- Data-driven: adding a role is a new row here.
 
 export type StaffDefinition = {
 	id: string,
@@ -8,6 +10,10 @@ export type StaffDefinition = {
 	role: string,
 	baseSpeed: number,
 	baseSalary: number,
+	blurb: string, -- one line shown on the staff card
+	hireCost: number, -- coins to hire (0 = starts on the crew)
+	startsHired: boolean, -- seeded onto the crew for a brand-new café
+	maxLevel: number, -- upgrade ceiling
 }
 
 local Staff: { [string]: StaffDefinition } = {
@@ -17,13 +23,10 @@ local Staff: { [string]: StaffDefinition } = {
 		role = "Barista",
 		baseSpeed = 1,
 		baseSalary = 20,
-	},
-	cook_sam = {
-		id = "cook_sam",
-		displayName = "Sam",
-		role = "Cook",
-		baseSpeed = 1,
-		baseSalary = 22,
+		blurb = "Brews coffee & tea at the machine",
+		hireCost = 0,
+		startsHired = true,
+		maxLevel = 10,
 	},
 	waiter_noah = {
 		id = "waiter_noah",
@@ -31,6 +34,21 @@ local Staff: { [string]: StaffDefinition } = {
 		role = "Waiter",
 		baseSpeed = 1,
 		baseSalary = 18,
+		blurb = "Carries orders to the tables",
+		hireCost = 0,
+		startsHired = true,
+		maxLevel = 10,
+	},
+	cook_sam = {
+		id = "cook_sam",
+		displayName = "Sam",
+		role = "Cook",
+		baseSpeed = 1,
+		baseSalary = 22,
+		blurb = "Bakes pastries & preps food",
+		hireCost = 600,
+		startsHired = false,
+		maxLevel = 10,
 	},
 	cleaner_pia = {
 		id = "cleaner_pia",
@@ -38,6 +56,10 @@ local Staff: { [string]: StaffDefinition } = {
 		role = "Cleaner",
 		baseSpeed = 1,
 		baseSalary = 16,
+		blurb = "Clears dirt & dirty plates",
+		hireCost = 400,
+		startsHired = false,
+		maxLevel = 10,
 	},
 }
 

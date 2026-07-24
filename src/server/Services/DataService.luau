@@ -67,8 +67,10 @@ local loading: { [number]: boolean } = {}
 local saveBlocked: { [number]: boolean } = {}
 
 local function starterStaff(): { Types.StaffMember }
-	-- All four start hired for now; the "start with only Barista + Waiter, hire
-	-- the rest" gating lands with the Staff panel (roadmap A7).
+	-- A brand-new café opens with only Barista + Waiter; Cook + Cleaner start
+	-- LOCKED (hired = false) and are hired for coins in the Staff panel (A7).
+	-- Existing saves keep whatever they had — migrate defaults legacy staff to
+	-- hired = true, so no one loses a crew member.
 	return {
 		{
 			id = "staff_barista_mia",
@@ -77,7 +79,6 @@ local function starterStaff(): { Types.StaffMember }
 			experience = 0,
 			hired = true,
 		},
-		{ id = "staff_cook_sam", typeId = "cook_sam", level = 1, experience = 0, hired = true },
 		{
 			id = "staff_waiter_noah",
 			typeId = "waiter_noah",
@@ -85,12 +86,13 @@ local function starterStaff(): { Types.StaffMember }
 			experience = 0,
 			hired = true,
 		},
+		{ id = "staff_cook_sam", typeId = "cook_sam", level = 1, experience = 0, hired = false },
 		{
 			id = "staff_cleaner_pia",
 			typeId = "cleaner_pia",
 			level = 1,
 			experience = 0,
-			hired = true,
+			hired = false,
 		},
 	}
 end

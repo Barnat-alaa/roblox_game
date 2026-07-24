@@ -36,6 +36,7 @@ local FRIENDLY_ERROR = {
 	cant_afford_ingredients = "Not enough coins for ingredients.",
 	out_of_ingredients = "Out of ingredients - restock at the market.",
 	plan_full = "That staff member's hours are full - lower another product first.",
+	max_level = "That staff member is already at the max level.",
 	busy_cooking = "It is mid-batch - collect the food first.",
 	wrong_appliance = "That recipe needs a different appliance.",
 	menu_full = "Your menu is full - switch one item off first.",
@@ -91,7 +92,6 @@ local HUD_BUTTONS: { HudButtonDefinition } = {
 		badge = "3",
 		label = "Staff",
 		accent = Theme.Colors.Blue,
-		comingSoon = "Mia, Noah and Pia run themselves for now - staff management is on the way.",
 	},
 	{
 		id = "Upgrades",
@@ -1010,6 +1010,12 @@ function UIController.Start(_self: any)
 			local name = if def then def.displayName else tostring(msg.item)
 			UIController.toast(
 				"Bought " .. tostring(msg.qty) .. "x " .. name .. "  -$" .. tostring(msg.cost)
+			)
+		elseif msg.kind == "staff_hired" then
+			UIController.toast("⭐ " .. tostring(msg.name) .. " joined your crew!")
+		elseif msg.kind == "staff_upgraded" then
+			UIController.toast(
+				"⭐ " .. tostring(msg.name) .. " upgraded to level " .. tostring(msg.level) .. "!"
 			)
 		elseif msg.kind == "order_cancelled" then
 			clearOrder(if typeof(msg.orderId) == "string" then msg.orderId else nil)
