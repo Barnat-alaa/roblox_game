@@ -751,14 +751,17 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 		return
 	end
 	local effTime, effCost, _ = KitchenService:effectiveFor(data, recipe)
-	if not EconomyService:TrySpendCoins(player, effCost) then
-		Remotes.event("Notify"):FireClient(player, {
-			kind = "error",
-			reason = "cant_afford_ingredients",
-		})
-		return
-	end
-	if Kitchen.enforceIngredients then
+	-- When ingredients are enforced they ARE the cost (already paid at the market),
+	-- so a manual cook draws the pantry only — charging effCost too would double-bill.
+	if not Kitchen.enforceIngredients then
+		if not EconomyService:TrySpendCoins(player, effCost) then
+			Remotes.event("Notify"):FireClient(player, {
+				kind = "error",
+				reason = "cant_afford_ingredients",
+			})
+			return
+		end
+	else
 		IngredientMath.consume(recipe, data.pantry)
 	end
 

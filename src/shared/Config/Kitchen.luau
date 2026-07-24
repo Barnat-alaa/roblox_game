@@ -23,7 +23,7 @@ local Kitchen = {
 	-- backbone (Config/Ingredients, recipe.ingredients, PlayerData.pantry) ships
 	-- first with this OFF so the live loop is unchanged; the Market UI + buy remote
 	-- land in step 2, then this flips ON to make running dry actually stop a cook.
-	enforceIngredients = false,
+	enforceIngredients = true,
 
 	-- New auto-production model (docs/CORE_LOOP_SPEC.md §4). Each producer staff
 	-- works `workMinutesBase + (level-1)*workMinutesPerLevel` minutes per hour
@@ -31,7 +31,7 @@ local Kitchen = {
 	-- products via `PlayerData.productionPlan`. Ships OFF: while false the old
 	-- target-stock/priority scheduler runs unchanged. The scheduler logic lands
 	-- behind this flag, then it flips on together with enforceIngredients.
-	useProductionPlan = false,
+	useProductionPlan = true,
 	workMinutesBase = 15,
 	workMinutesPerLevel = 5,
 

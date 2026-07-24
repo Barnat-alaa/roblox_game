@@ -93,6 +93,42 @@ local function hasRole(role: string): boolean
 	return false
 end
 
+-- Plan model helpers (CORE_LOOP_SPEC §4): a role's level, its per-hour work-minute
+-- budget, the plan count for one recipe, and how much of the budget the plan uses.
+local function roleLevel(role: string): number
+	local best = 1
+	for _, member in (profile and profile.staff) or {} do
+		local definition = Staff[member.typeId]
+		if definition and definition.role == role and member.hired ~= false then
+			best = math.max(best, math.floor(tonumber(member.level) or 1))
+		end
+	end
+	return best
+end
+
+local function roleBudget(role: string): number
+	return KitchenConfig.workMinutesBase + (roleLevel(role) - 1) * KitchenConfig.workMinutesPerLevel
+end
+
+local function planCount(role: string, recipeId: string): number
+	local rolePlan = ((profile and profile.productionPlan) or {})[role]
+	return if typeof(rolePlan) == "table" then math.floor(tonumber(rolePlan[recipeId]) or 0) else 0
+end
+
+local function roleUsedMinutes(role: string): number
+	local used = 0
+	local rolePlan = ((profile and profile.productionPlan) or {})[role]
+	if typeof(rolePlan) == "table" then
+		for rid, c in rolePlan do
+			local r = Recipes[rid]
+			if r and r.productionMinutes then
+				used += (tonumber(c) or 0) * (r.productionMinutes :: number)
+			end
+		end
+	end
+	return used
+end
+
 local function incomingFor(recipeId: string): (number, number?)
 	local quantity = 0
 	local soonest: number? = nil
@@ -311,6 +347,48 @@ local function updateProductionRow(recipeId: string)
 	if not row then
 		return
 	end
+	if KitchenConfig.useProductionPlan then
+		-- Plan editor: the +/- set servings-per-hour; the row shows the recipe's
+		-- minute cost and how much of the staff's hourly budget the plan uses.
+		-- Appointment recipes (no productionMinutes, e.g. Overnight Roast) aren't
+		-- part of the plan, so they show as informational with no steppers.
+		local recipe = Recipes[recipeId]
+		local role = recipe.staffRole
+		local isUnlocked = profile and profile.unlockedRecipes[recipeId] == true
+		local isAppointment = recipe.productionMinutes == nil
+		local editable = isUnlocked and not isAppointment
+		row.minus.Active = editable
+		row.plus.Active = editable
+		row.minus.Visible = not isAppointment
+		row.plus.Visible = not isAppointment
+		row.target.Visible = not isAppointment
+		row.toggle.Visible = false
+		row.priority.Visible = false
+		if editable or not isUnlocked then
+			row.target.Text = tostring(planCount(role, recipeId))
+		end
+		row.status.Text = if not isUnlocked
+			then "LOCKED"
+			elseif isAppointment then "APPOINTMENT"
+			else role
+		row.status.TextColor3 = if editable then Theme.Colors.MintDark else Theme.Colors.Muted
+		row.meta.Text = if isAppointment
+			then "Overnight appointment — start it by hand at the machine"
+			else string.format(
+				"%s min each  •  %s: %s / %s min-per-hr used",
+				oneDecimal(recipe.productionMinutes :: number),
+				role,
+				oneDecimal(roleUsedMinutes(role)),
+				oneDecimal(roleBudget(role))
+			)
+		row.offline.Text = if isAppointment
+			then ""
+			else string.format(
+				"Cooks while online  •  offline earns at 1/%d rate",
+				Operations.offlineTimeMultiplier
+			)
+		return
+	end
 	local unlocked = profile and profile.unlockedRecipes[recipeId] == true
 	local active = unlocked and (kitchen().menu or {})[recipeId] == true
 	local target = tonumber((kitchen().targetStock or {})[recipeId]) or 0
@@ -362,18 +440,28 @@ end
 local function updateAll()
 	updateDock()
 	if ui.productionSummary and profile then
-		local rates = operationRates()
-		local operations = profile.operations or {}
-		local capacity = operations.staffCapacity or {}
-		ui.productionSummary.Text = string.format(
-			"SHIFT FORECAST  •  ONLINE NET $%s/min  •  OFFLINE $%s/min\nWAITER LOAD %d%%  |  BARISTA %d%%  |  WAITER %d%%  |  OFFLINE IS %d× SLOWER",
-			oneDecimal(rates.netPerMinute),
-			oneDecimal(rates.offlineNetPerMinute),
-			math.floor(rates.waiterUtilization * 100),
-			math.floor(tonumber(capacity.Barista) or 0),
-			math.floor(tonumber(capacity.Waiter) or 0),
-			Operations.offlineTimeMultiplier
-		)
+		if KitchenConfig.useProductionPlan then
+			ui.productionSummary.Text = string.format(
+				"PRODUCTION PLAN  •  set how many of each your staff make per hour\nBARISTA %s / %s min-per-hr  |  COOK %s / %s min-per-hr",
+				oneDecimal(roleUsedMinutes("Barista")),
+				oneDecimal(roleBudget("Barista")),
+				oneDecimal(roleUsedMinutes("Cook")),
+				oneDecimal(roleBudget("Cook"))
+			)
+		else
+			local rates = operationRates()
+			local operations = profile.operations or {}
+			local capacity = operations.staffCapacity or {}
+			ui.productionSummary.Text = string.format(
+				"SHIFT FORECAST  •  ONLINE NET $%s/min  •  OFFLINE $%s/min\nWAITER LOAD %d%%  |  BARISTA %d%%  |  WAITER %d%%  |  OFFLINE IS %d× SLOWER",
+				oneDecimal(rates.netPerMinute),
+				oneDecimal(rates.offlineNetPerMinute),
+				math.floor(rates.waiterUtilization * 100),
+				math.floor(tonumber(capacity.Barista) or 0),
+				math.floor(tonumber(capacity.Waiter) or 0),
+				Operations.offlineTimeMultiplier
+			)
+		end
 	end
 	for _, id in RECIPE_IDS do
 		updateStockRow(id)
@@ -540,8 +628,16 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	minus.TextSize = 18
 	minus.ZIndex = 23
 	minus.Activated:Connect(function()
-		local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
-		Remotes.event("SetTargetStock"):FireServer(recipeId, current - recipe.productionYield)
+		if KitchenConfig.useProductionPlan then
+			Remotes.event("SetProductionPlan"):FireServer({
+				role = recipe.staffRole,
+				recipeId = recipeId,
+				delta = -1,
+			})
+		else
+			local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
+			Remotes.event("SetTargetStock"):FireServer(recipeId, current - recipe.productionYield)
+		end
 	end)
 	local target = Components.Label(row, "0", 15, true)
 	target.Size = UDim2.fromOffset(52, 44)
@@ -555,8 +651,16 @@ local function makeProductionRow(parent: Instance, recipeId: string, order: numb
 	plus.TextSize = 18
 	plus.ZIndex = 23
 	plus.Activated:Connect(function()
-		local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
-		Remotes.event("SetTargetStock"):FireServer(recipeId, current + recipe.productionYield)
+		if KitchenConfig.useProductionPlan then
+			Remotes.event("SetProductionPlan"):FireServer({
+				role = recipe.staffRole,
+				recipeId = recipeId,
+				delta = 1,
+			})
+		else
+			local current = tonumber((kitchen().targetStock or {})[recipeId]) or 0
+			Remotes.event("SetTargetStock"):FireServer(recipeId, current + recipe.productionYield)
+		end
 	end)
 	local priority = Components.Button(row, "P1", Theme.Colors.Honey, UDim2.fromOffset(52, 44))
 	priority.Position = UDim2.new(1, -60, 0, 70)

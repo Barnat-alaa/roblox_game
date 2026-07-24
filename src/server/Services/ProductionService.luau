@@ -213,6 +213,7 @@ local function chooseFromPlan(
 			recipe.applianceId == machineId
 			and minutes ~= nil
 			and data.unlockedRecipes[recipeId] == true
+			and kitchen.menu[recipeId] == true
 			and StaffService:HasRole(data, recipe.staffRole)
 		then
 			local role = recipe.staffRole
@@ -429,11 +430,11 @@ local function handleSetPlan(player: Player, payload: unknown)
 	if
 		typeof(p.role) ~= "string"
 		or typeof(p.recipeId) ~= "string"
-		or typeof(p.count) ~= "number"
+		or typeof(p.delta) ~= "number"
 	then
 		return
 	end
-	if p.count ~= p.count or math.abs(p.count) > 100000 then
+	if p.delta ~= p.delta or math.abs(p.delta) > 100000 then
 		return
 	end
 	if not settingsLimiter:check(player.UserId, os.clock()) then
@@ -457,7 +458,10 @@ local function handleSetPlan(player: Player, payload: unknown)
 	if typeof(data.productionPlan[p.role]) ~= "table" then
 		data.productionPlan[p.role] = {}
 	end
-	local count = math.clamp(math.floor(p.count), 0, 500)
+	-- Delta (not absolute) so rapid +/- taps accumulate instead of collapsing to a
+	-- single step (each FireServer reads the already-updated plan on the server).
+	local current = math.floor(tonumber(data.productionPlan[p.role][p.recipeId]) or 0)
+	local count = math.clamp(current + math.floor(p.delta), 0, 500)
 	local budget = StaffService:GetWorkMinutesPerHour(data, p.role)
 	local usedByOthers = 0
 	for rid, c in data.productionPlan[p.role] do
@@ -473,6 +477,10 @@ local function handleSetPlan(player: Player, payload: unknown)
 		return
 	end
 	data.productionPlan[p.role][p.recipeId] = count
+	-- Keep the customer-facing menu in sync: a recipe is orderable iff the plan
+	-- makes it — otherwise the plan produces stock no customer can buy.
+	local kitchen = KitchenService:GetKitchen(data)
+	kitchen.menu[p.recipeId] = count > 0
 	DataService:Push(player)
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "plan_changed",
