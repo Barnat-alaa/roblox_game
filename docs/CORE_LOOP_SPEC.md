@@ -3,8 +3,9 @@
 _Created 2026-07-24 at the owner's request. This is the **design + balance
 document to review before building.** Every number here is a **proposed choice**
 you can approve or change — the point is that you see exactly what I picked and
-whether it's balanced, *before* it ships. Nothing in §4 (the new auto-production
-model) is built yet; §1–§3 are partly built and flagged._
+whether it's balanced, *before* it ships. §1–§4 are now **built and LIVE**
+(`Kitchen.useProductionPlan` + `enforceIngredients` ON); §1 was balanced
+2026-07-25 (this pass) and the numbers below reflect that._
 
 **How to read it**
 - **Status** on each system: ✅ exists · 🟡 partly exists · 🔴 new/redesign.
@@ -13,41 +14,57 @@ model) is built yet; §1–§3 are partly built and flagged._
 
 ---
 
-## 1. Every recipe carries four facts 🟡
+## 1. Every recipe carries four facts ✅ (balanced 2026-07-25)
 
-You asked each recipe to define: **(1) required level, (2) the machine, (3) the
-staff, (4) the ingredients** (a recipe can need several — e.g. a croissant needs
-more than one). All four already exist in data; the only gap is **showing the
-required level in the Cookbook** (today it shows machine + ingredients but the
-level only appears on *locked* recipes).
+Each recipe defines **(1) required level, (2) the machine, (3) the staff, (4) the
+ingredients** — all in data, and the Cookbook shows the required-level pill.
 
-| Recipe | Lvl | Machine | Staff | Ingredients (per batch) | Sells | Margin* |
-| --- | ---: | --- | --- | --- | ---: | ---: |
-| Espresso | 1 | Coffee Machine | Barista | Coffee Beans ×2, Sugar ×1 | 12 | 8 |
-| House Tea | 1 | Coffee Machine | Barista | Tea Leaves ×2, Sugar ×1 | 10 | 7 |
-| Cappuccino | 2 | Coffee Machine | Barista | Coffee Beans ×2, Milk ×1, Sugar ×1 | 20 | 13 |
-| Café Sandwich | 2 | Prep Station | Cook | Bread ×2, Cheese ×1, Tomato ×1, Ham ×1 | 28 | 17 |
-| Croissant | 3 | Stone Oven | Cook | Flour ×2, Butter ×1, Eggs ×1 | 22 | 14 |
-| Silky Latte | 4 | Coffee Machine | Barista | Coffee Beans ×2, Milk ×2, Sugar ×1 | 24 | 15 |
-| Berry Muffin | 4 | Stone Oven | Cook | Flour ×2, Eggs ×1, Berries ×1, Sugar ×1 | 26 | 16 |
-| Garden Iced Tea | 5 | Coffee Machine | Barista | Tea Leaves ×2, Lemon ×1, Sugar ×1 | 16 | 10 |
-| Sunrise Fruit Bowl | 5 | Prep Station | Cook | Berries ×1, Lemon ×1, Tomato ×1 | 30 | 18 |
-| Velvet Mocha | 6 | Coffee Machine | Barista | Coffee Beans ×2, Milk ×1, Chocolate ×1, Sugar ×1 | 32 | 20 |
-| Cinnamon Swirl | 6 | Stone Oven | Cook | Flour ×2, Butter ×1, Chocolate ×1, Sugar ×1 | 36 | 22 |
-| Terrace Club | 7 | Prep Station | Cook | Bread ×3, Cheese ×1, Tomato ×1, Ham ×2 | 42 | 26 |
-| Overnight Roast | 8 | Coffee Machine | Barista | Coffee Beans ×8, Sugar ×2 | 50 | 20 |
-| Morning Quiche | 9 | Stone Oven | Cook | Flour ×2, Eggs ×2, Cheese ×1, Ham ×1 | 48 | 28 |
+**How a serving earns.** Auto-production (the plan model, §4) makes recipes **one
+serving at a time**, drawing that recipe's `ingredients` table from the pantry —
+so **ingredient amounts are PER SERVING**. Each serving sells for
+`floor(basePrice × Kitchen.servingPayoutFraction)` (= half the menu price today),
+and the ingredients were pre-paid at the market. The real margin is therefore
+**serving pay − ingredient cost**, and the 2026-07-25 balance pass retuned every
+recipe to a healthy **42–58%** (50–65% once you bulk-buy). *(Before the pass the
+tables were authored per-batch but consumed per-serving, so the cheapest recipes
+sat at a 0-coin margin — the bug this pass fixed.)*
 
-_*Margin = sell price − the ingredient coin cost (`ingredientCost`), before tips
-and the manual-cook bonus. Every recipe is profitable._
+| Recipe | Lvl | Machine | Staff | Ingredients (per serving) | Menu | Serving | Cost | Margin |
+| --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: |
+| Espresso | 1 | Coffee Machine | Barista | Coffee Beans ×1, Sugar ×1 | 12 | 6 | 3 | 3 (50%) |
+| House Tea | 1 | Coffee Machine | Barista | Tea Leaves ×1, Sugar ×1 | 12 | 6 | 3 | 3 (50%) |
+| Cappuccino | 2 | Coffee Machine | Barista | Coffee Beans ×1, Milk ×1, Sugar ×1 | 20 | 10 | 5 | 5 (50%) |
+| Café Sandwich | 2 | Prep Station | Cook | Bread ×1, Cheese ×1, Tomato ×1, Ham ×1 | 28 | 14 | 8 | 6 (43%) |
+| Croissant | 3 | Stone Oven | Cook | Flour ×1, Butter ×1, Eggs ×1 | 24 | 12 | 7 | 5 (42%) |
+| Silky Latte | 4 | Coffee Machine | Barista | Coffee Beans ×1, Milk ×2, Sugar ×1 | 24 | 12 | 7 | 5 (42%) |
+| Berry Muffin | 4 | Stone Oven | Cook | Flour ×1, Eggs ×1, Berries ×1 | 26 | 13 | 7 | 6 (46%) |
+| Garden Iced Tea | 5 | Coffee Machine | Barista | Tea Leaves ×1, Lemon ×1 | 18 | 9 | 5 | 4 (44%) |
+| Sunrise Fruit Bowl | 5 | Prep Station | Cook | Berries ×1, Lemon ×1, Tomato ×1 | 30 | 15 | 8 | 7 (47%) |
+| Velvet Mocha | 6 | Coffee Machine | Barista | Coffee Beans ×1, Milk ×1, Chocolate ×1, Sugar ×1 | 32 | 16 | 9 | 7 (44%) |
+| Cinnamon Swirl | 6 | Stone Oven | Cook | Flour ×1, Butter ×1, Chocolate ×1, Sugar ×1 | 36 | 18 | 10 | 8 (44%) |
+| Terrace Club | 7 | Prep Station | Cook | Bread ×2, Cheese ×1, Tomato ×1, Ham ×2 | 42 | 21 | 12 | 9 (43%) |
+| Overnight Roast † | 8 | Coffee Machine | Barista | Coffee Beans ×8, Sugar ×2 | 50 | 25 | 18 | ~24 |
+| Morning Quiche | 9 | Stone Oven | Cook | Flour ×1, Eggs ×2, Cheese ×1, Ham ×1 | 48 | 24 | 10 | 14 (58%) |
+
+_**Menu** = `basePrice` (what the cookbook shows). **Serving** =
+`floor(basePrice × 0.5)`, the coins one served serving pays (before tips + the
+manual-cook bonus). **Cost** = market value of the per-serving ingredient table
+at base unit price (`ingredientCost` mirrors it). **Margin** = Serving − Cost.
+Every recipe is profitable; bulk-buying widens each margin further._
+
+_† **Overnight Roast** is the 8-hour appointment: cooked as ONE 40-serving batch
+(never in the per-hour plan), so its table is **per batch** — the Cost/Margin
+above are per batch (≈0.45 coins of ingredients per serving)._
 
 - **Choice — "croissant needs dough":** you named *dough + butter*. I kept the
   base palette (Flour + Butter + Eggs) rather than adding a separate "Dough"
   ingredient, because Flour already feeds all four pastries and a small shared
   palette keeps the market readable. **If you'd rather have "Croissant Dough" as
   its own item, it's a one-row change** — say the word.
-- **Choice — show all four facts in the Cookbook:** add the required level to
-  each recipe card (currently only machine + ingredients show). Small change.
+- **Balance pass (2026-07-25):** tables are now per-serving; House Tea 10→12,
+  Garden Iced Tea 16→18 and Croissant 22→24 got small menu-price nudges; Cheese
+  and Ham (tagged *common*) dropped 3→2 to match the other commons. Guarded by
+  `tests/Recipes.spec.luau`. See §4e for the income this produces.
 
 ---
 
@@ -87,9 +104,9 @@ per-unit discount for bigger crates.
 | Tea Leaves | common | 1 | 2 | teas |
 | Milk | common | 2 | 2 | cappuccino, latte, mocha |
 | Bread | common | 2 | 2 | sandwiches |
-| Cheese | common | 2 | 3 | sandwiches, quiche |
+| Cheese | common | 2 | 2 | sandwiches, quiche |
 | Tomato | common | 2 | 2 | sandwiches, fruit bowl |
-| Ham | common | 2 | 3 | sandwiches, quiche |
+| Ham | common | 2 | 2 | sandwiches, quiche |
 | Flour | uncommon | 3 | 2 | all 4 pastries |
 | Eggs | uncommon | 3 | 2 | croissant, muffin, quiche |
 | Butter | uncommon | 3 | 3 | croissant, cinnamon roll |
@@ -180,24 +197,34 @@ minute budget. Example, **Barista Lv 1 (15 min/hr)**:
 
 ### 4e. Worked example — is it balanced?
 
-| Scenario | Plan | Output/hr | Gross margin/hr |
+Espresso after the 2026-07-25 pass: a serving pays `floor(12 × 0.5) = 6` and
+costs **3** coins of ingredients (2.5 with bulk) → **~3–4 net per serving**.
+
+| Scenario | Plan | Output/hr | Net coins/hr |
 | --- | --- | --- | ---: |
-| Barista **Lv 1** (15 min) online | 15 espresso | 15 | **~120** |
-| Barista **Lv 5** (35 min) online | 35 espresso | 35 | ~280 |
-| Barista **Lv 10** (60 min) online | 60 espresso | 60 | ~480 |
-| Barista **Lv 1** offline 8 h (÷20) | 15 espresso | 15×8÷20 = **6 in 8 h** | ~48 / 8 h |
+| Barista **Lv 1** (15 min) online | 15 espresso | 15 | **~50** |
+| Barista **Lv 5** (35 min) online | 35 espresso | 35 | ~120 |
+| Barista **Lv 10** (60 min) online | 60 espresso | 60 | ~210 |
+| Barista **Lv 1** offline 8 h (÷20) | 15 espresso | 15×8÷20 = **6 in 8 h** | ~18 / 8 h |
 
 - **Reading it:** a fresh café earns **~120 coins/hr** of hands-off barista output
-  at Lv 1, rising to ~480/hr at Lv 10 — a **4× reward** for maxing a staffer, which
-  makes the upgrade track meaningful. Idle over a full night nets a small **~48
+  at Lv 1, rising to ~210/hr at Lv 10 — a **~4× reward** for maxing a staffer, which
+  keeps the upgrade track meaningful. Idle over a full night nets a small **~18
   coin** "welcome back," so it's a nudge to return, never a replacement for playing
   (respects `ECONOMY_BALANCE.md`: "automation must not trivialise the economy").
+  Espresso is the cheapest recipe; a mixed, upgraded kitchen out-earns this floor
+  by a wide margin (Quiche nets ~14/serving).
 - **Balance decisions — CONFIRMED by owner 2026-07-24:**
   1. **÷20 offline** — kept as-is (idle stays a small welcome-back nudge).
   2. **60 min/hr at Lv 10** — kept (a maxed staffer works the full hour; 15→60 curve).
   3. **One Cook, one budget** across Oven + Prep (split into Chef/Cook later).
   4. **Keep Flour** (shared palette) — no separate "Dough" ingredient; croissant =
      Flour + Butter + Eggs.
+  5. **Contained income (2026-07-25)** — a serving stays at ½ the menu price; the
+     balance pass fixed thin margins by retuning per-serving ingredient tables to
+     42–58%, **not** by raising payout, so shop / upgrade / monetisation prices
+     stay valid. Lifting serving pay to the full menu price (≈2× income) was
+     considered and deferred — it needs a full economy rebalance.
 
 ---
 
@@ -221,16 +248,17 @@ minute budget. Example, **Barista Lv 1 (15 min/hr)**:
 | # | Item | Status |
 | --- | --- | --- |
 | 1 | Recipe: level / machine / staff / ingredients in data | ✅ have |
-| 2 | Show the **required level** on Cookbook cards | 🔴 small add |
+| 2 | Show the **required level** on Cookbook cards | ✅ done (#22) |
 | 3 | Machine↔product↔staff map consistent | ✅ verified |
 | 4 | Ingredient palette + unlock levels + bulk market | ✅ have (#18–20) |
 | 5 | Live **Owned** count in inventory | ✅ have |
-| 6 | **Zero/low critical warning** (row + HUD) | 🔴 new |
-| 7 | Ingredient **monetisation** (bundles / instant-unlock, idempotent) | 🔴 new |
-| 8 | **New auto-production** (min/hr per level, allocate plan) | 🔴 redesign |
-| 9 | **Offline ÷20** simulation on the new model | 🟡 divisor exists, rewire |
-| 10 | Chef/Cook capacity defined | 🔴 new (this doc) |
-| 11 | Turn ingredient **enforcement** on (`Kitchen.enforceIngredients`) | 🟡 flag off |
+| 6 | **Zero/low critical warning** (row + HUD) | ✅ done (#22) |
+| 7 | Ingredient **monetisation** (bundles / instant-unlock, idempotent) | ✅ done (#28) |
+| 8 | **New auto-production** (min/hr per level, allocate plan) | ✅ LIVE (#24/#25) |
+| 9 | **Offline ÷20** simulation on the new model | ✅ LIVE |
+| 10 | Chef/Cook capacity defined | ✅ defined (§5) |
+| 11 | Turn ingredient **enforcement** on (`Kitchen.enforceIngredients`) | ✅ ON |
+| 12 | **Per-serving margin balance** — every recipe 42–58% | ✅ done (2026-07-25) |
 
 ---
 

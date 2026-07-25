@@ -70,7 +70,7 @@ local Ingredients: { [string]: IngredientDefinition } = {
 		icon = "🧀",
 		rarity = "common",
 		unlockLevel = 2,
-		unitPrice = 3,
+		unitPrice = 2,
 	},
 	tomato = {
 		id = "tomato",
@@ -86,7 +86,7 @@ local Ingredients: { [string]: IngredientDefinition } = {
 		icon = "🍖",
 		rarity = "common",
 		unlockLevel = 2,
-		unitPrice = 3,
+		unitPrice = 2,
 	},
 	flour = {
 		id = "flour",

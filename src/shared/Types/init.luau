@@ -181,7 +181,7 @@ export type RecipeDefinition = {
 	displayName: string,
 	category: string,
 	ingredientCost: number,
-	ingredients: { [string]: number }?, -- ingredient id → units per batch (Config/Ingredients); nil = coins-only
+	ingredients: { [string]: number }?, -- ingredient id → units PER SERVING (Config/Ingredients); nil = coins-only. slow_roast is per-batch (8h appointment)
 	basePrice: number,
 	preparationTime: number,
 	applianceId: string,

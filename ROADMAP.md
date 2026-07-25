@@ -50,8 +50,8 @@ social game, each giving the player short-, medium- and long-term goals:
 6. ✅ **New auto-production** (#24, #25) — the **minutes-per-hour allocation** model:
    `productionPlan` per staff, online real-time + **offline ÷20**, the plan editor in
    the Auto Production drawer; `useProductionPlan` + `enforceIngredients` now LIVE.
-   Adversarial-reviewed + fixed. _(Balance of per-serving ingredient margins is a
-   pending playtest tuning pass.)_
+   Adversarial-reviewed + fixed. _(Per-serving ingredient margins balanced
+   2026-07-25 — all recipes 42–58%, guarded by `tests/Recipes.spec`.)_
 7. ✅ **Staff panel UI** (#27) — hire locked roles + min/hr upgrade track; café
    starts Barista+Waiter only, `CountRole` gates on `hired`.
 8. ✅ **Monetisation** (#28) — `Config/Products` (real IDs), idempotent
@@ -59,8 +59,9 @@ social game, each giving the player short-, medium- and long-term goals:
    `RobuxShopController` Store (rail key **P**) with native purchase prompts.
    Prices/plan in `docs/MONETISATION.md`.
 
-**Phase A is COMPLETE.** Pending polish (not blocking): production per-serving
-**balance** pass; the remaining **VIP** perks (walk-speed, daily bonus, name
+**Phase A is COMPLETE.** The production per-serving **balance** pass is DONE
+(2026-07-25 — every recipe nets 42–58%, guarded by `tests/Recipes.spec`). Pending
+polish (not blocking): the remaining **VIP** perks (walk-speed, daily bonus, name
 colour, storage) + **Auto-Collect** effect on manual cooks; **real-purchase
 testing** of A8 in the published place. Next: **Phase B (VIP customers + gift box)**.
 

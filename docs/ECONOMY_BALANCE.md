@@ -11,18 +11,26 @@ these numbers in logic.
 - Inventory: 2 round tables, 4 wooden chairs, 1 potted plant.
 - Pre-placed: coffee machine + service counter.
 
-## Recipes (margin = basePrice − ingredientCost)
-| Recipe | Ingredient | Price | Margin | Lvl | Rep |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Espresso | 4 | 12 | **8** | 1 | 0 |
-| House Tea | 3 | 10 | **7** | 1 | 0 |
-| Cappuccino | 7 | 20 | **13** | 2 | 30 |
-| Café Sandwich | 11 | 28 | **17** | 2 | 40 |
-| Croissant | 8 | 22 | **14** | 3 | 80 |
+## Recipes (per-serving economics)
 
-Every serve is profitable. Manual cook adds `+floor(basePrice × 0.15)`. Tip: 25%
-chance of `floor(basePrice × 0.20 × customerTipMultiplier)` (regular 1.0, student
-0.7, tourist 1.5). Each serve also grants +2 reputation, +10 xp.
+A served serving pays `floor(basePrice × Kitchen.servingPayoutFraction)` (= ½ the
+menu price today) and draws its **per-serving** `ingredients` table from the
+pantry (pre-paid at the market). Real margin = **serving pay − ingredient cost**.
+The full authoritative table (all 14 recipes, retuned to 42–58% on 2026-07-25)
+lives in `docs/CORE_LOOP_SPEC.md` §1; the starters:
+
+| Recipe | Ingr cost | Menu | Serving pay | Margin | Lvl | Rep |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Espresso | 3 | 12 | 6 | **3 (50%)** | 1 | 0 |
+| House Tea | 3 | 12 | 6 | **3 (50%)** | 1 | 0 |
+| Cappuccino | 5 | 20 | 10 | **5 (50%)** | 2 | 30 |
+| Café Sandwich | 8 | 28 | 14 | **6 (43%)** | 2 | 40 |
+| Croissant | 7 | 24 | 12 | **5 (42%)** | 3 | 80 |
+
+Every serve is profitable; bulk-buying widens each margin. Manual cook adds
+`+floor(basePrice × 0.15)`. Tip: 25% chance of
+`floor(basePrice × 0.20 × customerTipMultiplier)` (regular 1.0, student 0.7,
+tourist 1.5). Each serve also grants +2 reputation, +10 xp.
 
 ## Progression
 - **XP per level:** 0, 60, 150, 300, 520, 820, 1220, 1750, 2400, 3200 (≈10 serves → L2).
