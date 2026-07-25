@@ -35,6 +35,19 @@ local Kitchen = {
 	workMinutesBase = 15,
 	workMinutesPerLevel = 5,
 
+	-- Auto-collect finished MANUAL cooks straight into stock the moment their
+	-- timer ends, instead of waiting for the player to press Collect (owner
+	-- request 2026-07-26 — "make it automatic"). The 1s kitchen tick performs the
+	-- collect, so it is always prompt and the fresh bonus always lands. Set false
+	-- to restore the press-to-collect ritual.
+	autoCollectCooks = true,
+
+	-- Finished-food display: instead of piling every dish on the service counter,
+	-- show one wall shelf per UNLOCKED recipe — a permanent food prop + a live
+	-- "xN" count — on the wall opposite the front kitchen. New shelves appear as
+	-- recipes unlock. Set false to fall back to the counter pile.
+	useFoodShelves = true,
+
 	-- Buzz and demand
 	buzzStart = 10,
 	buzzMax = 105,

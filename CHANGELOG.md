@@ -5,6 +5,27 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — auto-collect finished cooks + wall food shelves
+Two owner requests:
+- **Auto-collect finished cooks.** A finished manual cook now drops straight into
+  stock the moment its timer ends — no more walking over to Collect. The 1s
+  kitchen tick performs it (always prompt, so the fresh bonus always lands);
+  `handleCollectCook`'s grant body was extracted into a shared `finishCook` used
+  by both the manual remote and the tick. Config flag `Kitchen.autoCollectCooks`
+  (default on). *Note: this makes the Auto-Collect gamepass redundant — repurpose
+  it in the Phase D monetisation pass.*
+- **Wall food shelves.** Instead of piling every dish on the service counter, each
+  UNLOCKED recipe gets its own shelf on the wall opposite the front kitchen — a
+  permanent food prop + a live "xN" count + the dish name. Shelves appear as
+  recipes unlock and read front→back by level; the counter no longer shows the
+  pile. New `refreshFoodShelves` / `buildShelf` in KitchenService (props cloned
+  once, counts relabelled on refresh); refreshed on join, on unlock
+  (`ProgressionService`), and on every stock change. Config flag
+  `Kitchen.useFoodShelves` (default on). Placement/scale are tunable constants.
+Verified in Studio: a manual cook auto-collected (`batch_collected` fired from the
+tick with no click, machine returned to idle), shelves built with correct
+props/counts/positions, clean boot, TestEZ 87 pass.
+
 ### Balance — 2026-07-25 — production per-serving margins fixed
 The auto-production plan draws a recipe's `ingredients` table per **single
 serving**, but the tables were authored per-batch, so with `enforceIngredients` +

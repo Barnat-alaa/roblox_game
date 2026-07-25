@@ -22,6 +22,7 @@ ProgressionService.Name = "ProgressionService"
 local DataService: any
 local EconomyService: any
 local AnalyticsService: any
+local KitchenService: any
 
 local stepLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -61,6 +62,8 @@ function ProgressionService.CheckRecipeUnlocks(_self: any, player: Player)
 	end
 	if changed then
 		DataService:Push(player)
+		-- Pop a shelf for the newly unlocked dish right away.
+		KitchenService:RefreshDisplay(player)
 	end
 end
 
@@ -109,6 +112,7 @@ function ProgressionService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	EconomyService = ServiceRegistry.get("EconomyService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 end
 
 function ProgressionService.Start(_self: any)
