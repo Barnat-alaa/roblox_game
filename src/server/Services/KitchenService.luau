@@ -19,6 +19,7 @@ local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Mastery = require(Shared.Utilities.Mastery)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
 local IngredientMath = require(Shared.Utilities.IngredientMath)
+local Grid = require(Shared.Utilities.Grid)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
@@ -41,6 +42,7 @@ local CafeOperationsService: any
 local nextAutomaticServeAt: { [number]: number } = {}
 local setCookVisuals: (Player, string, string, string?) -> ()
 local refreshCounterDisplay: (Player) -> ()
+local refreshFoodShelves: (Player) -> ()
 
 local cookLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
@@ -105,6 +107,12 @@ end
 
 function KitchenService.SyncStock(_self: any, data: Types.PlayerData, now: number?)
 	syncStock(kitchenOf(data), now or os.time())
+end
+
+-- Rebuild the visible stock display (the wall food shelves, or the legacy counter
+-- pile). Safe to call before the plot exists — it no-ops until geometry is ready.
+function KitchenService.RefreshDisplay(_self: any, player: Player)
+	refreshCounterDisplay(player)
 end
 
 local function findPlacedAppliance(
@@ -403,7 +411,7 @@ local FOOD_COLORS: { [string]: Color3 } = {
 
 -- Place every food model by its real bounds rather than its imported pivot.
 -- This works for cups, teapots, pastries, plates, and fallback cylinders.
-local function placeFoodMarker(display: Folder, slotCf: CFrame, recipe: Types.RecipeDefinition)
+local function placeFoodMarker(display: Instance, slotCf: CFrame, recipe: Types.RecipeDefinition)
 	local prop: Model? = if AssetLibraryService
 		then AssetLibraryService:GetProp(recipe.category, recipe.id)
 		else nil
@@ -446,6 +454,20 @@ refreshCounterDisplay = function(player: Player)
 	local data = DataService:GetProfile(player)
 	local folder = CafeService:GetFurnitureFolder(player)
 	if not data or not folder then
+		return
+	end
+	if Kitchen.useFoodShelves then
+		-- Shelves are the stock display now; keep the service counter clear of the
+		-- old pile (destroy any stale one left from before the flag flipped).
+		refreshFoodShelves(player)
+		for _, child in folder:GetChildren() do
+			if child:IsA("Model") and child.Name == "counter" then
+				local stale = child:FindFirstChild("StockDisplay")
+				if stale then
+					stale:Destroy()
+				end
+			end
+		end
 		return
 	end
 	local counter: Model? = nil
@@ -496,6 +518,150 @@ refreshCounterDisplay = function(player: Player)
 				local slotCf = topCf * CFrame.new(x, 0, 0.4)
 				placeFoodMarker(display, slotCf, recipe)
 			end
+		end
+	end
+end
+
+-- ————— wall food shelves: one per unlocked recipe (owner request 2026-07-26) —————
+-- Instead of piling every dish on the service counter, each unlocked recipe gets a
+-- small shelf on the far wall opposite the front kitchen: a permanent food prop +
+-- a live "xN" count. The prop is cloned ONCE per shelf and reused; a refresh only
+-- re-labels the counts. Shelves live in the furniture folder so they persist across
+-- stock changes and rebuild for the next owner on claim.
+
+local SHELF_WALL_X = Grid.PLOT_WIDTH * Grid.CELL_SIZE -- far interior wall (local X)
+local SHELF_COLS = 7 -- shelves per row before a second row stacks above
+local SHELF_START_Z = 22 -- first column sits just behind the front kitchen
+local SHELF_STEP_Z = 8 -- stud gap between columns along the wall
+local SHELF_ROW_Y = { 3.4, 7.0 } -- lower + upper row heights (ceiling is 12)
+local SHELF_DEPTH = 2.4 -- how far the ledge reaches out from the wall
+
+local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: number): Model
+	local col = slot % SHELF_COLS
+	local row = math.floor(slot / SHELF_COLS)
+	local y = SHELF_ROW_Y[math.min(row + 1, #SHELF_ROW_Y)]
+	local z = SHELF_START_Z + col * SHELF_STEP_Z
+	local ledgeX = SHELF_WALL_X - SHELF_DEPTH / 2 - 0.5
+
+	local shelf = Instance.new("Model")
+	shelf.Name = "Shelf_" .. recipe.id
+	shelf:SetAttribute("recipeId", recipe.id)
+
+	local back = Instance.new("Part")
+	back.Name = "Back"
+	back.Size = Vector3.new(0.4, 3.0, 3.6)
+	back.Anchored = true
+	back.CanCollide = false
+	back.CanQuery = false
+	back.CanTouch = false
+	back.Color = Color3.fromRGB(224, 206, 176)
+	back.Material = Enum.Material.SmoothPlastic
+	back.CFrame = origin * CFrame.new(SHELF_WALL_X - 0.2, y + 1.0, z)
+	back.Parent = shelf
+
+	local ledge = Instance.new("Part")
+	ledge.Name = "Ledge"
+	ledge.Size = Vector3.new(SHELF_DEPTH, 0.3, 3.4)
+	ledge.Anchored = true
+	ledge.CanCollide = false
+	ledge.CanQuery = false
+	ledge.CanTouch = false
+	ledge.Color = Color3.fromRGB(212, 151, 76)
+	ledge.Material = Enum.Material.Wood
+	ledge.CFrame = origin * CFrame.new(ledgeX, y, z)
+	ledge.Parent = shelf
+
+	-- Permanent food "photo": the dish prop, bottom-aligned on the ledge top.
+	placeFoodMarker(shelf, origin * CFrame.new(ledgeX, y + 0.15, z), recipe)
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "Label"
+	billboard.Size = UDim2.fromScale(4, 1.4)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.0, 0)
+	billboard.MaxDistance = 90
+	billboard.Adornee = ledge
+	billboard.Parent = ledge
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "Name"
+	nameLabel.Size = UDim2.fromScale(1, 0.55)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Font = Enum.Font.GothamMedium
+	nameLabel.TextScaled = true
+	nameLabel.TextColor3 = Color3.fromRGB(255, 244, 216)
+	nameLabel.TextStrokeTransparency = 0.35
+	nameLabel.Text = recipe.displayName
+	nameLabel.Parent = billboard
+
+	local countLabel = Instance.new("TextLabel")
+	countLabel.Name = "Count"
+	countLabel.Position = UDim2.fromScale(0, 0.55)
+	countLabel.Size = UDim2.fromScale(1, 0.45)
+	countLabel.BackgroundTransparency = 1
+	countLabel.Font = Enum.Font.GothamBold
+	countLabel.TextScaled = true
+	countLabel.TextColor3 = Color3.fromRGB(235, 245, 235)
+	countLabel.TextStrokeTransparency = 0.35
+	countLabel.Text = "x0"
+	countLabel.Parent = billboard
+
+	return shelf
+end
+
+refreshFoodShelves = function(player: Player)
+	local data = DataService:GetProfile(player)
+	local origin = CafeService:GetPlotOrigin(player)
+	local folder = CafeService:GetFurnitureFolder(player)
+	if not data or not origin or not folder then
+		return
+	end
+	local kitchen = kitchenOf(data)
+
+	local rack = folder:FindFirstChild("FoodShelfRack")
+	if not rack then
+		local newRack = Instance.new("Folder")
+		newRack.Name = "FoodShelfRack"
+		newRack.Parent = folder
+		rack = newRack
+	end
+
+	-- Stable order: earliest-unlocked first, so shelves read front→back by level
+	-- and a later unlock only ever appends.
+	local unlocked: { Types.RecipeDefinition } = {}
+	for recipeId, recipe in Recipes do
+		if data.unlockedRecipes[recipeId] == true then
+			table.insert(unlocked, recipe)
+		end
+	end
+	table.sort(unlocked, function(a, b)
+		if a.requiredLevel ~= b.requiredLevel then
+			return a.requiredLevel < b.requiredLevel
+		end
+		return a.id < b.id
+	end)
+
+	for _, recipe in unlocked do
+		local shelf = rack:FindFirstChild("Shelf_" .. recipe.id)
+		if not shelf then
+			-- Slot = shelves already placed, so a new unlock takes the next free
+			-- spot and never shifts the existing ones.
+			shelf = buildShelf(recipe, origin, #rack:GetChildren())
+			shelf.Parent = rack
+		end
+		local count = math.floor(tonumber(kitchen.stock[recipe.id]) or 0)
+		local ledge = shelf:FindFirstChild("Ledge")
+		local label = ledge and ledge:FindFirstChild("Label")
+		local countLabel = label and label:FindFirstChild("Count")
+		if countLabel and countLabel:IsA("TextLabel") then
+			countLabel.Text = "x" .. tostring(count)
+			countLabel.TextColor3 = if count <= 0
+				then Color3.fromRGB(232, 120, 120)
+				elseif count <= EconomyConfig.lowIngredientThreshold then Color3.fromRGB(
+					240,
+					200,
+					110
+				)
+				else Color3.fromRGB(235, 245, 235)
 		end
 	end
 end
@@ -782,41 +948,25 @@ local function handleStartCook(player: Player, instanceId: unknown, recipeId: un
 	end
 end
 
-local function handleCollectCook(player: Player, instanceId: unknown)
-	if typeof(instanceId) ~= "string" then
-		return
-	end
-	if not cookLimiter:check(player.UserId, os.clock()) then
-		return
-	end
-	local data = DataService:GetProfile(player)
-	if not data then
-		return
-	end
-	local kitchen = kitchenOf(data)
-	local cook = kitchen.cooks[instanceId]
-	if not cook then
-		return
-	end
-	local recipe = Recipes[cook.recipeId]
-	if not recipe then -- config drift: refund nothing, just clear
-		kitchen.cooks[instanceId] = nil
-		DataService:Push(player)
-		return
-	end
-	local duration = tonumber(cook.duration) or recipe.cookTime
-	local elapsed = os.time() - cook.startedAt
-	if elapsed < duration then
-		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_ready" })
-		return
-	end
-
+-- The grant path shared by a manual Collect and the auto-collect tick: adds the
+-- finished batch to stock, pays the fresh bonus, advances mastery, and juices the
+-- moment. Callers guarantee the cook exists and its timer has already finished.
+local function finishCook(
+	player: Player,
+	data: Types.PlayerData,
+	kitchen: Types.KitchenState,
+	instanceId: string,
+	cook: any,
+	recipe: Types.RecipeDefinition,
+	now: number,
+	elapsed: number,
+	duration: number
+)
 	-- Grant BEFORE clearing so nothing else pays this batch.
 	kitchen.cooks[instanceId] = nil
 	local entry = masteryOf(data, cook.recipeId)
 	local servings =
 		Mastery.servings(recipe.servings, entry.masteryLevel, Kitchen.masteryBonusServingAt)
-	local now = os.time()
 	local total = InventoryMath.count(kitchen, cook.recipeId, now)
 	local added = math.clamp(servings, 0, Kitchen.maxStockPerRecipe - total)
 	InventoryMath.addLot(kitchen, cook.recipeId, added, now, now + recipe.spoilTime)
@@ -908,6 +1058,41 @@ local function handleCollectCook(player: Player, instanceId: unknown)
 	end
 end
 
+-- Manual Collect remote: validate, then hand the batch to finishCook. With
+-- Kitchen.autoCollectCooks on, the 1s tick usually beats the player to it — this
+-- stays for the flag-off ritual and is a harmless no-op if already collected.
+local function handleCollectCook(player: Player, instanceId: unknown)
+	if typeof(instanceId) ~= "string" then
+		return
+	end
+	if not cookLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+	local kitchen = kitchenOf(data)
+	local cook = kitchen.cooks[instanceId]
+	if not cook then
+		return
+	end
+	local recipe = Recipes[cook.recipeId]
+	if not recipe then -- config drift: refund nothing, just clear
+		kitchen.cooks[instanceId] = nil
+		DataService:Push(player)
+		return
+	end
+	local duration = tonumber(cook.duration) or recipe.cookTime
+	local now = os.time()
+	local elapsed = now - cook.startedAt
+	if elapsed < duration then
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "not_ready" })
+		return
+	end
+	finishCook(player, data, kitchen, instanceId :: string, cook, recipe, now, elapsed, duration)
+end
+
 -- ————— timers loop: keep stove billboards fresh, restore after rejoin —————
 
 local function tickTimers()
@@ -927,6 +1112,19 @@ local function tickTimers()
 							then string.format("%s %d:%02d", recipe.displayName, mins, secs)
 							else string.format("%s %ds", recipe.displayName, secs)
 						setCookVisuals(player, instanceId, "cooking", text)
+					elseif Kitchen.autoCollectCooks then
+						local now = os.time()
+						finishCook(
+							player,
+							data,
+							kitchen,
+							instanceId,
+							cook,
+							recipe,
+							now,
+							now - cook.startedAt,
+							duration
+						)
 					else
 						setCookVisuals(player, instanceId, "ready", recipe.displayName .. " READY!")
 					end
@@ -971,7 +1169,16 @@ function KitchenService.Start(_self: any)
 					if data then
 						CafeService:SetSignBuzz(player, tonumber(data.buzz) or Kitchen.buzzStart)
 					end
-					return
+					break
+				end
+				task.wait(0.2)
+			end
+			-- Build the food shelves once the plot geometry exists: a fresh café
+			-- shows every unlocked dish at x0 as a permanent wall display.
+			for _ = 1, 50 do
+				if CafeService:GetPlotOrigin(player) then
+					refreshCounterDisplay(player)
+					break
 				end
 				task.wait(0.2)
 			end
