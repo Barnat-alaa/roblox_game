@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Balance — 2026-07-25 — production per-serving margins fixed
+The auto-production plan draws a recipe's `ingredients` table per **single
+serving**, but the tables were authored per-batch, so with `enforceIngredients` +
+`useProductionPlan` live the cheapest recipes served at a **0-coin margin** (House
+Tea, Garden Iced Tea) or +1 (Espresso). Contained fix — income level unchanged
+(a serving still pays ½ the menu price):
+- `Config/Recipes` — ingredient tables retuned to genuine **per-serving** amounts;
+  `ingredientCost` realigned to the per-serving market value; small menu-price
+  nudges (House Tea 10→12, Garden Iced Tea 16→18, Croissant 22→24). `slow_roast`
+  stays per-batch (8h appointment, never in the plan).
+- `Config/Ingredients` — Cheese and Ham (tagged *common*) 3→2 to match the other
+  commons.
+- Every plan recipe now nets **42–58%** per serving (50–65% with bulk buying), no
+  break-even recipes; verified in Studio (TestEZ 87✓ + clean live boot).
+- `tests/Recipes.spec.luau` (new) locks in the invariant so a future edit can
+  never reship a break-even recipe. Docs: `CORE_LOOP_SPEC` §1/§4e, `ECONOMY_BALANCE`.
+
 ### Docs — 2026-07-23 — gameplay direction set to the owner's chosen features
 `docs/GAMEPLAY_DIRECTION.md` rewritten from a menu of options into the committed
 next-build spec, each feature named against the service it hooks into:
