@@ -158,6 +158,9 @@ export type PlayerData = {
 	regulars: { [string]: RegularEntry }, -- name-keyed returning customers (max 8)
 	inventory: { [string]: number },
 	pantry: { [string]: number }, -- ingredient id → units on hand (see Config/Ingredients)
+	grantedReceipts: { [string]: boolean }, -- Robux PurchaseId → granted (ProcessReceipt idempotency)
+	boosts: { [string]: number }, -- boost key → os.time() expiry (2× coins/reputation)
+	ownedPasses: { [string]: boolean }, -- pass key → owned (VIP, Auto-Collect), cached on join
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },
 	recipeMastery: { [string]: RecipeMasteryEntry },

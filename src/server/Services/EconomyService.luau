@@ -47,11 +47,17 @@ function EconomyService.AddCoins(_self: any, player: Player, amount: number)
 	if not data then
 		return
 	end
-	data.coins += amount
-	data.stats.totalCoinsEarned += amount
+	-- Double Coins boost (Robux, A8): 2× all coin income while active.
+	local granted = amount
+	local boosts = (data :: any).boosts
+	if typeof(boosts) == "table" and (tonumber(boosts.coins) or 0) > os.time() then
+		granted = amount * 2
+	end
+	data.coins += granted
+	data.stats.totalCoinsEarned += granted
 	DataService:Push(player)
 	if GoalService then
-		GoalService:Bump(player, "earn_coins", amount)
+		GoalService:Bump(player, "earn_coins", granted)
 	end
 end
 
@@ -62,6 +68,11 @@ function EconomyService.AddReputation(_self: any, player: Player, amount: number
 	local data = DataService:GetProfile(player)
 	if not data then
 		return
+	end
+	-- Double Reputation boost (Robux, A8).
+	local boosts = (data :: any).boosts
+	if typeof(boosts) == "table" and (tonumber(boosts.reputation) or 0) > os.time() then
+		amount = amount * 2
 	end
 	data.reputation += amount
 	data.cafeStars = ProgressionService:StarsFor(data.reputation)

@@ -49,6 +49,7 @@ local Theme = {
 		Build = "BU",
 		Shop = "SH",
 		Market = "MK",
+		Store = "R$",
 		Staff = "CR",
 		Upgrades = "UP",
 		Trophies = "TR",
