@@ -52,12 +52,17 @@ social game, each giving the player short-, medium- and long-term goals:
    the Auto Production drawer; `useProductionPlan` + `enforceIngredients` now LIVE.
    Adversarial-reviewed + fixed. _(Balance of per-serving ingredient margins is a
    pending playtest tuning pass.)_
-7. 🔜 **Staff panel UI** — cards (blurred locks), hire locked roles, the min/hr
-   upgrade track, upgrade celebration. Seed flips to Barista+Waiter only; gate
-   `CountRole` on `hired`.
-8. 🔴 **Monetisation** — full plan + **prices** in `docs/MONETISATION.md`
-   (owner creates the Robux products; I wire the idempotent `ProcessReceipt`,
-   `Config/Products`, and the shop cards). Every SKU also coin/level-earnable.
+7. ✅ **Staff panel UI** (#27) — hire locked roles + min/hr upgrade track; café
+   starts Barista+Waiter only, `CountRole` gates on `hired`.
+8. ✅ **Monetisation** (#28) — `Config/Products` (real IDs), idempotent
+   `MonetizationService.ProcessReceipt`, boosts (2× coins/rep), VIP offline cap,
+   `RobuxShopController` Store (rail key **P**) with native purchase prompts.
+   Prices/plan in `docs/MONETISATION.md`.
+
+**Phase A is COMPLETE.** Pending polish (not blocking): production per-serving
+**balance** pass; the remaining **VIP** perks (walk-speed, daily bonus, name
+colour, storage) + **Auto-Collect** effect on manual cooks; **real-purchase
+testing** of A8 in the published place. Next: **Phase B (VIP customers + gift box)**.
 
 Non-negotiables carried from below: server-authoritative, data-driven, no loot
 boxes, no pay-to-win, no fake-urgency, and **tested in Roblox Studio before every
