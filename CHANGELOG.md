@@ -5,6 +5,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — Phase B: brainrot VIP customer + earned gift box
+The first Phase B feature (docs/GAMEPLAY_DIRECTION.md §3). A rare "brainrot"
+celebrity (owner-chosen Creator Store asset 112586636995159) walks the boulevard
+to the busiest café on the server and leaves an EARNED gift box:
+- **New server-level `VipService`** (not a per-café branch): on a 90–180s timer it
+  scores every OPEN café by Buzz, picks the busiest, and struts one VIP to its
+  entrance. Pays the owner a premium order (+coins/+rep), then drops a gift box the
+  owner opens with E for a weighted reward. One VIP at a time; own
+  `workspace.VipGuests` folder; gated on `Config/Vip.enabled`.
+- **The brainrot is a non-humanoid display model** (AnimationController, no
+  Humanoid), so AssetLibraryService loads it as a scaled, **script-stripped** prop
+  (`GetVip`) and VipService welds it onto an invisible Humanoid to walk it with
+  NpcNav — kept OUTSIDE at the entrance (too wide for the door; the direction
+  allows "table or café entrance").
+- **`Config/Gifts`** weighted reward table (coins/reputation now; furniture / skins
+  / crates / boosts append as rows) rolled by `RewardMath.rollGift`. A GIFT, not a
+  loot box: earned by play, opened for free — odds never touch money (HANDOFF §1).
+- **`Config/Vip`** holds all cadence / scoring / premium / model-scale tuning.
+Verified in Studio: the VIP scored the café by Buzz, walked in, paid +120 coins,
+and dropped an owner-only gift box; `rollGift` distribution correct; clean boot,
+no errors. Brainrot scale/offset are config knobs to tune by eye in a playtest.
+
 ### Feature — 2026-07-26 — auto-collect finished cooks + wall food shelves
 Two owner requests:
 - **Auto-collect finished cooks.** A finished manual cook now drops straight into
