@@ -170,6 +170,10 @@ local function defaultProfile(): Types.PlayerData
 			lemon = 8,
 			chocolate = 6,
 		},
+		-- Monetisation state (top-level maps → reconcile heals old saves).
+		grantedReceipts = {},
+		boosts = {},
+		ownedPasses = {},
 		-- Seed kitchen sits a few cells into the room, clear of the front door
 		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {

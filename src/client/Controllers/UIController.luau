@@ -169,6 +169,15 @@ local HUD_BUTTONS: { HudButtonDefinition } = {
 		accent = Theme.Colors.Roast,
 		comingSoon = "The settings panel is on the way.",
 	},
+	{
+		id = "Store",
+		zone = "Rail",
+		order = 6,
+		key = Enum.KeyCode.P,
+		badge = "P",
+		label = "Store",
+		accent = Theme.Colors.Honey,
+	},
 }
 
 -- Stat pills, bottom-left, stacked above the stock dock. Semantic colours are
@@ -1011,6 +1020,8 @@ function UIController.Start(_self: any)
 			UIController.toast(
 				"Bought " .. tostring(msg.qty) .. "x " .. name .. "  -$" .. tostring(msg.cost)
 			)
+		elseif msg.kind == "robux_reward" then
+			UIController.toast("✨ " .. tostring(msg.name) .. " — thank you! Reward added.")
 		elseif msg.kind == "staff_hired" then
 			UIController.toast("⭐ " .. tostring(msg.name) .. " joined your crew!")
 		elseif msg.kind == "staff_upgraded" then

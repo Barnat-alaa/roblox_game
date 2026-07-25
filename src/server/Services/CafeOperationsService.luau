@@ -343,7 +343,12 @@ end
 -- each recipe's share of the planned minutes, capped by pantry ingredients (which
 -- it consumes). Returns coins earned; mutates data.pantry.
 local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number): number
-	local earningSeconds = math.min(offlineSeconds, Operations.maxOfflineEarningHours * 3600)
+	-- VIP Membership (Robux, A8) extends the offline earning cap 8h → 12h.
+	local passes = (data :: any).ownedPasses
+	local maxHours = if typeof(passes) == "table" and passes.vip == true
+		then 12
+		else Operations.maxOfflineEarningHours
+	local earningSeconds = math.min(offlineSeconds, maxHours * 3600)
 	local hours = earningSeconds / 3600
 	local divisor = math.max(1, Operations.offlineTimeMultiplier)
 	local total = 0
