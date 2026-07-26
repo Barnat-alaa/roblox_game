@@ -19,6 +19,7 @@ local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
 local World = require(Shared.Config.World)
+local Vip = require(Shared.Config.Vip)
 local Grid = require(Shared.Utilities.Grid)
 local RewardMath = require(Shared.Utilities.RewardMath)
 local Types = require(Shared.Types)
@@ -41,6 +42,7 @@ local StaffService: any
 local GoalService: any
 local AssetLibraryService: any
 local CafeOperationsService: any
+local AnalyticsService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -164,6 +166,8 @@ type ActiveCustomer = {
 	tableLabel: string?,
 	resolvedPay: number?,
 	resolvedManual: boolean?,
+	isVip: boolean?, -- the brainrot VIP: uses the welded rig + gift box on serve
+	forcedRecipe: string?, -- VIP orders this exact (RARE) dish, not a random pick
 }
 
 local queues: { [number]: { ActiveCustomer } } = {}
@@ -171,6 +175,7 @@ local customersByOrder: { [string]: ActiveCustomer } = {}
 local allCustomers: { [ActiveCustomer]: boolean } = {}
 local rng = Random.new()
 local customersFolder: Folder
+local vipActive = false -- at most one brainrot VIP on the whole server at a time
 
 -- Personal-service COMBO (S2 gameplay): chaining hands-on actions (serving
 -- orders, cleaning tables) within 45s builds a streak that pays bonus coins —
@@ -574,6 +579,112 @@ local function spawnCustomerModel(
 	return buildNpcModel(def, style, name)
 end
 
+-- ————— the brainrot VIP, as a real seated customer (Bug 2, 2026-07-26) —————
+-- The VIP now behaves like any walk-in — enters, sits, orders a RARE dish, and
+-- WAITS to be served — instead of the old standalone instant-serve path. It is
+-- just an ActiveCustomer with isVip + a forced recipe + the welded brainrot rig.
+-- VipService stays the scheduler (picks the #1-Buzz café, calls SpawnVip).
+
+-- The VIP's own customer profile: a single, patient, generous guest (its reward
+-- is the earned gift box, not the tip roll — see eatMeal). Kept out of
+-- Config/Customers so the normal spawner never rolls it.
+local VIP_DEF: Types.CustomerDefinition = {
+	id = "vip",
+	displayName = "VIP",
+	patiencePenaltyPerSecond = 0.2,
+	tipMultiplier = 2.0,
+	color = Color3.fromRGB(255, 210, 120),
+}
+
+-- Build the VIP as the non-humanoid brainrot display model welded onto an
+-- invisible Humanoid rig (mirrors the old VipService walker) so the shared
+-- customer lifecycle can drive it. Returns nils if the brainrot asset has not
+-- finished loading, so the caller simply skips this VIP attempt.
+local function spawnVipModel(name: string): (Model?, Humanoid?, BasePart?, TextLabel?)
+	local brainrot = if AssetLibraryService then AssetLibraryService:GetVip() else nil
+	if not brainrot or not brainrot.PrimaryPart then
+		if brainrot then
+			brainrot:Destroy()
+		end
+		return nil, nil, nil, nil
+	end
+
+	local model = Instance.new("Model")
+	model.Name = "BrainrotVip"
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.Transparency = 1
+	root.TopSurface = Enum.SurfaceType.Smooth
+	root.BottomSurface = Enum.SurfaceType.Smooth
+	root.Parent = model
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RequiresNeck = false
+	humanoid.BreakJointsOnDeath = false
+	humanoid.HipHeight = Vip.hipHeight
+	humanoid.WalkSpeed = WALK_SPEED -- match the crowd; the VIP is a patron now
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+	humanoid.Parent = model
+	model.PrimaryPart = root
+
+	-- Sit the brainrot on the root so its feet meet the ground, then weld every
+	-- part rigidly to the root (its scripts were stripped on load — a solid rig).
+	local _, size = brainrot:GetBoundingBox()
+	brainrot:PivotTo(root.CFrame * CFrame.new(0, size.Y / 2 - Vip.hipHeight + Vip.rigYOffset, 0))
+	for _, d in brainrot:GetDescendants() do
+		if d:IsA("BasePart") then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = root
+			weld.Part1 = d
+			weld.Parent = root
+		end
+	end
+	brainrot.Parent = model
+
+	-- An invisible "Head" the shared bubble/mood billboards adornee (the brainrot
+	-- prop has no Head of its own); attachMood also looks up a child named "Head".
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(1, 1, 1)
+	head.Transparency = 1
+	head.CanCollide = false
+	head.CanQuery = false
+	head.Massless = true
+	head.CFrame = root.CFrame * CFrame.new(0, 2, 0)
+	head.Parent = model
+	local headWeld = Instance.new("WeldConstraint")
+	headWeld.Part0 = root
+	headWeld.Part1 = head
+	headWeld.Parent = root
+
+	local label = attachBubbles(head, name)
+	return model, humanoid, root, label
+end
+
+-- The RARE dish the VIP orders: the fanciest UNLOCKED, on-menu recipe that is
+-- NOT a Coffee/Tea drink. Falls back to the priciest on-menu dish if the café
+-- has only drinks unlocked, so the VIP always orders something it can be served.
+local function pickVipRecipe(data: Types.PlayerData): string?
+	local bestRare: string?, bestRarePrice = nil, -1
+	local bestAny: string?, bestAnyPrice = nil, -1
+	for recipeId, unlocked in data.unlockedRecipes do
+		local r = Recipes[recipeId]
+		if unlocked and r and KitchenService:IsOnMenu(data, recipeId) then
+			if r.basePrice > bestAnyPrice then
+				bestAny, bestAnyPrice = recipeId, r.basePrice
+			end
+			local isDrink = r.category == "Coffee" or r.category == "Tea"
+			if not isDrink and r.basePrice > bestRarePrice then
+				bestRare, bestRarePrice = recipeId, r.basePrice
+			end
+		end
+	end
+	return bestRare or bestAny
+end
+
 -- 35% of spawns are RETURNING regulars once the café has some: same name,
 -- and they'll order their favourite dish (Café World B8).
 local function pickRegular(data: Types.PlayerData?): (string?, string?)
@@ -627,56 +738,68 @@ end
 
 -- ————— seated dining (Phase 2; plate visuals live in PlateFactory) —————
 
--- instanceId → true, per user, for chairs currently holding a diner.
-local occupiedSeats: { [number]: { [string]: boolean } } = {}
+-- Which chairs are occupied is DERIVED from the live diners, never held in a
+-- side table. Any customer still alive, not leaving, and holding a seatId is
+-- sitting in that chair. The old mutable "taken" map LEAKED reservations
+-- whenever a customer coroutine ended without hitting releaseSeat — an error
+-- mid-visit, a furniture re-place changing instanceIds, or a player leaving all
+-- stranded a seat as "taken" forever, so new arrivals found the café full while
+-- the chairs sat visibly empty (owner bug, 2026-07-26). Deriving occupancy from
+-- reality on every scan cannot drift, so a genuinely-free chair is always taken.
+local function occupiedSeatIds(userId: number, exclude: ActiveCustomer?): { [string]: boolean }
+	local held: { [string]: boolean } = {}
+	for other in allCustomers do
+		if
+			other ~= exclude
+			and other.userId == userId
+			and not other.leaving
+			and other.seatId ~= nil
+		then
+			held[other.seatId :: string] = true
+		end
+	end
+	return held
+end
 
--- Pick a free placed chair; returns its world CFrame + instanceId.
-local function claimSeat(player: Player): (CFrame?, string?, string?)
+-- Pick a genuinely-free placed chair; returns its world CFrame + instanceId.
+local function claimSeat(player: Player, cust: ActiveCustomer): (CFrame?, string?, string?)
 	local data = DataService:GetProfile(player)
 	local origin = CafeService:GetPlotOrigin(player)
 	if not data or not origin then
 		return nil, nil, nil
 	end
-	local taken = occupiedSeats[player.UserId]
-	if not taken then
-		taken = {}
-		occupiedSeats[player.UserId] = taken
-	end
+	local taken = occupiedSeatIds(player.UserId, cust)
 	local seatNumber = 0
 	for _, placed in data.placedFurniture do
 		local def = Furniture[placed.catalogId]
 		if def and def.seatCount > 0 then
 			seatNumber += 1
-		end
-		local w, d = 0, 0
-		if def then
-			w, d = Grid.footprintSize(def.width, def.depth, placed.rotation)
-		end
-		local seatX = placed.gridX + w / 2
-		local seatZ = placed.gridY + d / 2
-		local inKitchen = seatX < World.kitchenWidthCells and seatZ < World.kitchenDepthCells
-		if def and def.seatCount > 0 and not inKitchen and not taken[placed.instanceId] then
-			taken[placed.instanceId] = true
-			local cf = Grid.cellToWorld(
-				origin,
-				placed.gridX,
-				placed.gridY,
-				def.width,
-				def.depth,
-				placed.rotation,
-				def.height
-			)
-			return cf, placed.instanceId, "TABLE " .. tostring(seatNumber)
+			local w, d = Grid.footprintSize(def.width, def.depth, placed.rotation)
+			local seatX = placed.gridX + w / 2
+			local seatZ = placed.gridY + d / 2
+			local inKitchen = seatX < World.kitchenWidthCells and seatZ < World.kitchenDepthCells
+			if not inKitchen and not taken[placed.instanceId] then
+				local cf = Grid.cellToWorld(
+					origin,
+					placed.gridX,
+					placed.gridY,
+					def.width,
+					def.depth,
+					placed.rotation,
+					def.height
+				)
+				return cf, placed.instanceId, "TABLE " .. tostring(seatNumber)
+			end
 		end
 	end
 	return nil, nil, nil
 end
 
-local function releaseSeat(player: Player, seatId: string?)
-	local taken = occupiedSeats[player.UserId]
-	if taken and seatId then
-		taken[seatId] = nil
-	end
+-- Free this diner's chair immediately (occupancy is derived from seatId, so
+-- clearing it is the whole release).
+local function releaseSeat(cust: ActiveCustomer)
+	cust.seatId = nil
+	cust.seatCf = nil
 end
 
 -- Drop a collectible tip at the seat: the owner taps it for coins + a burst.
@@ -744,6 +867,102 @@ local function dropTip(player: Player, seatCf: CFrame, amount: number)
 	end)
 end
 
+-- The EARNED VIP gift box, dropped at the table when the VIP is served (moved
+-- here from the old standalone VipService). A GIFT, not a loot box: opened for
+-- free, its weighted odds never touch money (Config/Gifts, HANDOFF §1). Modelled
+-- on dropTip — the shared prompt/claim/despawn pattern (a factory is owed once a
+-- fourth copy appears; see IMPLEMENTATION_MAP "known risks").
+local function dropVipGift(player: Player, seatCf: CFrame)
+	local folder = CafeService:GetFurnitureFolder(player)
+	local plotModel = folder and folder.Parent
+	if not plotModel then
+		return
+	end
+	local boxCf = CFrame.new(seatCf.Position + seatCf.LookVector * 1.6 + Vector3.new(0, 1.5, 0))
+
+	local box = Instance.new("Part")
+	box.Name = "VipGift"
+	box.Size = Vector3.new(2.4, 2.4, 2.4)
+	box.Color = Color3.fromRGB(230, 90, 140)
+	box.Material = Enum.Material.SmoothPlastic
+	box.Anchored = true
+	box.CanCollide = false
+	box.CFrame = boxCf
+
+	local ribbon = Instance.new("Part")
+	ribbon.Name = "Ribbon"
+	ribbon.Size = Vector3.new(2.55, 0.4, 2.55)
+	ribbon.Color = Color3.fromRGB(255, 220, 120)
+	ribbon.Material = Enum.Material.SmoothPlastic
+	ribbon.Anchored = true
+	ribbon.CanCollide = false
+	ribbon.CFrame = boxCf
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = box
+	weld.Part1 = ribbon
+	weld.Parent = box
+	ribbon.Parent = box
+
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromScale(4.5, 1.4)
+	gui.StudsOffset = Vector3.new(0, 2.2, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 90
+	gui.Parent = box
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.TextColor3 = Color3.fromRGB(255, 235, 170)
+	label.TextStrokeTransparency = 0.3
+	label.Text = "🎁 VIP Gift — open!"
+	label.Parent = gui
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Open gift"
+	prompt.ObjectText = "VIP Gift"
+	prompt.HoldDuration = 0.4
+	prompt.MaxActivationDistance = 12
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = box
+
+	local claimed = false
+	prompt.Triggered:Connect(function(who)
+		-- Only the café owner opens the gift left in their own café.
+		if claimed or who ~= player then
+			return
+		end
+		claimed = true
+		local reward = RewardMath.rollGift(rng:NextNumber(), rng:NextNumber())
+		if reward.kind == "reputation" then
+			EconomyService:AddReputation(who, reward.amount)
+		else
+			EconomyService:AddCoins(who, reward.amount)
+		end
+		Fx.coinBurst(box.Position, 14)
+		Fx.floatText(
+			box.Position + Vector3.new(0, 1.6, 0),
+			"🎁 +" .. tostring(reward.amount) .. " " .. reward.label
+		)
+		if AnalyticsService then
+			AnalyticsService:Track(
+				who,
+				"vip_gift_opened",
+				{ kind = reward.kind, amount = reward.amount }
+			)
+		end
+		box:Destroy()
+	end)
+
+	box.Parent = plotModel
+	task.delay(Vip.giftDespawnSeconds, function()
+		if box.Parent ~= nil then
+			box:Destroy()
+		end
+	end)
+end
+
 -- The full dining moment after the correct table receives its dish.
 local function eatMeal(
 	player: Player,
@@ -760,7 +979,7 @@ local function eatMeal(
 		)
 	end
 
-	local seatCf, seatId = cust.seatCf, cust.seatId
+	local seatCf = cust.seatCf
 	if seatCf and not cust.leaving and cust.root.Parent ~= nil then
 		if not cust.root.Anchored then
 			walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
@@ -868,8 +1087,18 @@ local function eatMeal(
 					end
 				end
 
-				-- Tips are the seated-dining exclusive: reward for having chairs.
-				if recipe then
+				-- The VIP leaves the EARNED gift box (its premium) plus a small
+				-- reputation bump for the visit; everyone else may leave a tip —
+				-- the seated-dining exclusive that rewards having chairs.
+				if cust.isVip then
+					dropVipGift(player, seatCf)
+					EconomyService:AddReputation(player, Vip.premiumReputation)
+					Fx.floatText(
+						seatCf.Position + Vector3.new(0, 5, 0),
+						"⭐ The VIP loved it! +" .. tostring(Vip.premiumReputation) .. " rep",
+						Color3.fromRGB(255, 220, 120)
+					)
+				elseif recipe then
 					local tip = RewardMath.tipAmount(
 						recipe,
 						rng:NextInteger(1, 100),
@@ -880,9 +1109,10 @@ local function eatMeal(
 					end
 				end
 
-				-- Remember this diner as a REGULAR: next time they may come
-				-- back by name asking for today's dish (persisted, max 8).
-				local data = DataService:GetProfile(player)
+				-- Remember this diner as a REGULAR: next time they may come back
+				-- by name asking for today's dish (persisted, max 8). The VIP is a
+				-- one-off server event, never a named regular.
+				local data = if cust.isVip then nil else DataService:GetProfile(player)
 				if data then
 					if typeof((data :: any).regulars) ~= "table" then
 						(data :: any).regulars = {}
@@ -915,9 +1145,7 @@ local function eatMeal(
 		-- No chair free: a quick standing bite at the window.
 		task.wait(2.2)
 	end
-	releaseSeat(player, seatId)
-	cust.seatCf = nil
-	cust.seatId = nil
+	releaseSeat(cust)
 
 	if cust.root.Parent ~= nil then
 		cust.bubble.Text = if announcedPay ~= nil
@@ -973,7 +1201,13 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 		cust.model:Destroy()
 		return
 	end
-	if cust.regular then
+	if cust.isVip then
+		Fx.floatText(
+			cust.root.Position + Vector3.new(0, 6, 0),
+			"⭐ A VIP has arrived!",
+			Color3.fromRGB(255, 220, 120)
+		)
+	elseif cust.regular then
 		Fx.floatText(
 			cust.root.Position + Vector3.new(0, 5, 0),
 			"💚 " .. cust.name .. " is back!",
@@ -1023,7 +1257,7 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 		return
 	end
 
-	local seatCf, seatId, tableLabel = claimSeat(player)
+	local seatCf, seatId, tableLabel = claimSeat(player, cust)
 	if not seatCf or not seatId then
 		stormOut(cust, Kitchen.buzzPerWalkout, "😡 NO EMPTY CHAIR!")
 		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
@@ -1038,7 +1272,7 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	cust.tableLabel = tableLabel
 	walkTo(cust, Vector3.new(seatCf.Position.X, 2, seatCf.Position.Z))
 	if cust.leaving or cust.root.Parent == nil then
-		releaseSeat(player, seatId)
+		releaseSeat(cust)
 		cust.model:Destroy()
 		return
 	end
@@ -1054,8 +1288,13 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	if cust.favourite and data and KitchenService:IsOnMenu(data, cust.favourite) then
 		recipeId = cust.favourite
 	end
+	-- The VIP orders the exact RARE dish chosen at spawn (overrides any pick),
+	-- as long as it is still on the menu.
+	if cust.forcedRecipe and data and KitchenService:IsOnMenu(data, cust.forcedRecipe) then
+		recipeId = cust.forcedRecipe
+	end
 	if not recipeId then
-		releaseSeat(player, seatId)
+		releaseSeat(cust)
 		cust.root.Anchored = false
 		depart(cust, streetExit)
 		return
@@ -1063,7 +1302,7 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	local orderId =
 		OrderService:CreateOrder(player, recipeId, cust.def.id, seatId, tableLabel, cust.root)
 	if not orderId then
-		releaseSeat(player, seatId)
+		releaseSeat(cust)
 		cust.root.Anchored = false
 		depart(cust, streetExit)
 		return
@@ -1095,7 +1334,7 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	customersByOrder[orderId] = nil
 	if cust.leaving then
 		OrderService:CancelOrder(orderId)
-		releaseSeat(player, seatId)
+		releaseSeat(cust)
 		cust.root.Anchored = false
 		depart(cust, streetExit)
 		return
@@ -1112,15 +1351,82 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	stormOut(cust, Kitchen.buzzPerWalkout, "😡 MY ORDER NEVER CAME!")
 	KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 	CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionWalkoutLoss)
-	releaseSeat(player, seatId)
-	cust.seatId = nil
-	cust.seatCf = nil
+	releaseSeat(cust)
 	cust.root.Anchored = false
 	if cust.anim then
 		cust.anim.setSeated(false)
 	end
 	task.wait(1.5)
 	depart(cust, streetExit)
+end
+
+-- Spawn the brainrot VIP as a real customer at `target`'s café (called by
+-- VipService, the scheduler that picks the #1-Buzz café). Returns false — so
+-- VipService just retries next interval — if a VIP is already out, the profile/
+-- café isn't ready, the café has nothing servable, or the brainrot asset hasn't
+-- loaded. The VIP then enters, sits, orders its RARE dish and waits like anyone.
+function CustomerService.SpawnVip(_self: any, target: Player): boolean
+	if vipActive then
+		return false
+	end
+	if not DataService:IsLoaded(target) then
+		return false
+	end
+	local origin = CafeService:GetPlotOrigin(target)
+	local data = DataService:GetProfile(target)
+	if not origin or not data then
+		return false
+	end
+	local recipeId = pickVipRecipe(data)
+	if not recipeId then
+		return false -- the café has no on-menu dish yet
+	end
+	local model, humanoid, root, bubble = spawnVipModel(VIP_DEF.displayName)
+	if not model or not humanoid or not root or not bubble then
+		return false -- brainrot template still loading; skip this attempt
+	end
+
+	vipActive = true
+	local q = queues[target.UserId]
+	if q == nil then
+		q = {}
+		queues[target.UserId] = q
+	end
+	local cust: ActiveCustomer = {
+		userId = target.UserId,
+		model = model,
+		humanoid = humanoid,
+		root = root,
+		bubble = bubble,
+		def = VIP_DEF,
+		baseHip = humanoid.HipHeight,
+		name = VIP_DEF.displayName,
+		regular = false,
+		favourite = nil,
+		spawnClock = os.clock(),
+		orderId = nil,
+		served = false,
+		leaving = false,
+		isVip = true,
+		forcedRecipe = recipeId,
+	}
+	table.insert(q, cust)
+	allCustomers[cust] = true
+	cust.model.Destroying:Connect(function()
+		allCustomers[cust] = nil
+		vipActive = false -- free the single-VIP slot the moment this one despawns
+	end)
+	task.spawn(runActiveVisit, target, cust, origin)
+	-- Failsafe: no legitimate visit outlasts line + serve patience (~5.5 min); if
+	-- the coroutine ever dies mid-visit the model would strand vipActive forever,
+	-- so force the despawn (which frees the slot via Destroying) well past that.
+	task.delay(600, function()
+		if cust.model.Parent ~= nil then
+			cust.leaving = true
+			cust.model:Destroy()
+		end
+	end)
+	return true
 end
 
 function CustomerService.OnOrderResolved(
@@ -1150,6 +1456,7 @@ function CustomerService.Init(_self: any)
 	GoalService = ServiceRegistry.get("GoalService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
+	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 end
 
 function CustomerService.Start(_self: any)
