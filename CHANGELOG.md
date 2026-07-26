@@ -5,6 +5,19 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — VIP enters + orders the fanciest dish; lobby Buzz leaderboard
+Owner revisions to the brainrot VIP, plus a new leaderboard:
+- **VIP now enters the café**: scaled down to fit the 6-stud door, it walks INSIDE,
+  orders the **fanciest UNLOCKED dish** (highest menu price) served **INSTANTLY**
+  (owner paid `basePrice × 4` for it), eats, and leaves the earned gift box by the
+  table (inside). Appears rarely now (every 4–8 min).
+- **Lobby Buzz leaderboard** on the plaza board (new `LeaderboardService`): ranks
+  every open café by Buzz ("boost") with medals for the top 3, refreshed every 5s.
+  The VIP walks to **#1** (already the highest-Buzz café). Read-only, rails-clean.
+Verified in Studio: board shows `🥇 #1 by Buzz`; the VIP walks inside and its gift
+drops at the interior table (z=12); `vip_served` logs the dish + premium (espresso
+→ +48 = 12×4); 20 services, clean boot, no errors.
+
 ### Feature — 2026-07-26 — shelves: bigger + pick food from the shelf (not the counter)
 Owner feedback on the wall food shelves:
 - **Bigger + clearer**: each shelf's dish prop is scaled 1.8× and the quantity is
