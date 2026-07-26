@@ -22,6 +22,8 @@ local Vip = require(Shared.Config.Vip)
 local World = require(Shared.Config.World)
 local RewardMath = require(Shared.Utilities.RewardMath)
 local StreetMath = require(Shared.Utilities.StreetMath)
+local Recipes = require(Shared.Config.Recipes)
+local Types = require(Shared.Types)
 local Log = require(Shared.Utilities.Log)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -32,6 +34,7 @@ local VipService = {}
 VipService.Name = "VipService"
 
 local CafeService: any
+local DataService: any
 local AssetLibraryService: any
 local KitchenService: any
 local EconomyService: any
@@ -68,6 +71,27 @@ end
 -- PedestrianService.doorApproach.
 local function frontPoint(origin: CFrame, outStuds: number): Vector3
 	return (origin * CFrame.new(StreetMath.plotWidth() * World.doorCenterFrac, 2, -outStuds)).Position
+end
+
+-- A point INSIDE the café, straight in from the door — where the VIP sits to eat.
+local function interiorPoint(origin: CFrame, depthStuds: number): Vector3
+	return (origin * CFrame.new(StreetMath.plotWidth() * World.doorCenterFrac, 2, depthStuds)).Position
+end
+
+-- The fanciest dish the café can make (highest menu price among UNLOCKED recipes)
+-- — the "very difficult" thing the VIP orders. nil if the profile isn't loaded.
+local function hardestDish(owner: Player): Types.RecipeDefinition?
+	local data = DataService:GetProfile(owner)
+	if not data then
+		return nil
+	end
+	local best: Types.RecipeDefinition? = nil
+	for id, r in Recipes do
+		if data.unlockedRecipes[id] == true and (not best or r.basePrice > best.basePrice) then
+			best = r
+		end
+	end
+	return best
 end
 
 -- ————— the brainrot walker —————
@@ -148,7 +172,7 @@ end
 local function dropGift(target: Target)
 	local ffolder = CafeService:GetFurnitureFolder(target.owner)
 	local plotModel: Instance = (ffolder and ffolder.Parent) or folder
-	local boxCf = CFrame.new(frontPoint(target.origin, 4) + Vector3.new(0, 1.5, 0))
+	local boxCf = CFrame.new(interiorPoint(target.origin, Vip.insideDepth) + Vector3.new(0, 1.5, 0))
 
 	local box = Instance.new("Part")
 	box.Name = "VipGift"
@@ -259,29 +283,45 @@ local function runVipEvent()
 	end
 
 	local opts = { baseHip = Vip.hipHeight, straightTimeout = 18, legTimeout = 6 }
+	-- Approach the door, then walk INSIDE (the brainrot is scaled to fit the doorway).
 	NpcNav.walkTo(model, humanoid, root, frontPoint(target.origin, 6), opts)
 	if root.Parent == nil then
 		return
 	end
-	banner.Text = Vip.bannerArrivedText
+	NpcNav.walkTo(model, humanoid, root, interiorPoint(target.origin, Vip.insideDepth), opts)
+	if root.Parent == nil then
+		return
+	end
 
-	-- The premium order: pay the owner, then leave the gift at the entrance.
-	task.wait(Vip.lingerSeconds)
+	-- Order the fanciest dish on the menu — served INSTANTLY. The owner is paid a
+	-- big premium scaled to how fancy that dish is.
+	local dish = hardestDish(target.owner)
+	local dishName = if dish then dish.displayName else "the special"
+	banner.Text = "😋 VIP is eating " .. dishName .. "!"
 	if target.owner.Parent ~= nil then
-		EconomyService:AddCoins(target.owner, Vip.premiumCoins)
+		local premium = if dish
+			then math.floor(dish.basePrice * Vip.premiumMultiplier)
+			else Vip.premiumCoins
+		EconomyService:AddCoins(target.owner, premium)
 		EconomyService:AddReputation(target.owner, Vip.premiumReputation)
 		Fx.floatText(
-			frontPoint(target.origin, 6) + Vector3.new(0, 5, 0),
-			"⭐ VIP order +" .. tostring(Vip.premiumCoins) .. " 🪙"
+			interiorPoint(target.origin, Vip.insideDepth) + Vector3.new(0, 5, 0),
+			"⭐ VIP ordered " .. dishName .. "! +" .. tostring(premium) .. " 🪙"
 		)
 		if AnalyticsService then
-			AnalyticsService:Track(target.owner, "vip_served", { coins = Vip.premiumCoins })
+			AnalyticsService:Track(target.owner, "vip_served", {
+				coins = premium,
+				dish = if dish then dish.id else "none",
+			})
 		end
 	end
+
+	-- Eat, then leave the earned gift box by the table.
+	task.wait(Vip.lingerSeconds)
 	dropGift(target)
 
-	-- Stroll off, then despawn.
-	NpcNav.walkTo(model, humanoid, root, frontPoint(target.origin, 26), opts)
+	-- Stroll out through the door and despawn.
+	NpcNav.walkTo(model, humanoid, root, frontPoint(target.origin, 10), opts)
 	task.wait(Vip.leaveAfterSeconds)
 	if model.Parent ~= nil then
 		model:Destroy()
@@ -290,6 +330,7 @@ end
 
 function VipService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
+	DataService = ServiceRegistry.get("DataService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	EconomyService = ServiceRegistry.get("EconomyService")

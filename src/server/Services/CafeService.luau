@@ -1187,13 +1187,14 @@ local function buildPlaza(parent: Instance)
 	gui.CanvasSize = Vector2.new(800, 400)
 	gui.Parent = board
 	local text = Instance.new("TextLabel")
+	text.Name = "LeaderboardText" -- LeaderboardService rewrites this with the live ranking
 	text.Size = UDim2.fromScale(1, 1)
 	text.BackgroundTransparency = 1
 	text.Font = Enum.Font.GothamBold
 	text.TextScaled = true
 	text.TextColor3 = Color3.fromRGB(255, 246, 232)
-	text.Text =
-		"🏘️ Neighbourhood Board\nVisit your neighbours — leave a compliment!\nCommunity goals coming soon"
+	text.TextYAlignment = Enum.TextYAlignment.Top
+	text.Text = "🏆 CAFÉ LEADERBOARD\nRanking the street by Buzz…"
 	text.TextWrapped = true
 	text.Parent = gui
 
