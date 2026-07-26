@@ -15,6 +15,7 @@ local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local EconomyConfig = require(Shared.Config.Economy)
 local Grid = require(Shared.Utilities.Grid)
+local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
 
@@ -22,7 +23,9 @@ local SocialService = {}
 SocialService.Name = "SocialService"
 
 local CafeService: any
+local DataService: any
 local EconomyService: any
+local KitchenService: any
 local AnalyticsService: any
 local GoalService: any
 
@@ -33,6 +36,59 @@ local COMPLIMENTS: { [string]: string } = {
 	great_coffee = "says the coffee is great! ☕",
 	cozy_vibes = "loves the cosy vibes ✨",
 }
+
+-- Co-op neighbour help (Phase C §4a). Each action is once per neighbour per day
+-- (anti-farm, persisted so it survives a rejoin). Data-driven: a new helpful
+-- action is a new row. The helper earns coins/xp/rep + friendship points; the
+-- (online) owner gets reputation and/or a small Buzz bump.
+type HelpAction = {
+	label: string,
+	helperCoins: number,
+	helperXp: number,
+	helperRep: number,
+	friendship: number,
+	ownerRep: number,
+	ownerBuzz: number,
+}
+local HELP_ACTIONS: { [string]: HelpAction } = {
+	water_plants = {
+		label = "watered the plants 🌱",
+		helperCoins = 15,
+		helperXp = 8,
+		helperRep = 0,
+		friendship = 2,
+		ownerRep = 1,
+		ownerBuzz = 0,
+	},
+	bus_table = {
+		label = "bussed a table 🧽",
+		helperCoins = 0,
+		helperXp = 6,
+		helperRep = 3,
+		friendship = 2,
+		ownerRep = 0,
+		ownerBuzz = 1,
+	},
+	stir_pot = {
+		label = "stirred a pot 🥄",
+		helperCoins = 12,
+		helperXp = 6,
+		helperRep = 1,
+		friendship = 2,
+		ownerRep = 0,
+		ownerBuzz = 1,
+	},
+	hand_flyers = {
+		label = "handed out flyers 📣",
+		helperCoins = 0,
+		helperXp = 6,
+		helperRep = 4,
+		friendship = 3,
+		ownerRep = 0,
+		ownerBuzz = 2,
+	},
+}
+local GOOD_NEIGHBOUR_BONUS = 25 -- first help of the day (any neighbour), once daily
 
 local visitLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)

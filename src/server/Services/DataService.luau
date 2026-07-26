@@ -174,6 +174,9 @@ local function defaultProfile(): Types.PlayerData
 		grantedReceipts = {},
 		boosts = {},
 		ownedPasses = {},
+		-- Neighbour friendships + per-day help anti-farm (Phase C §4a). Top-level
+		-- maps → reconcile heals old saves; SocialService.socialOf heals sub-tables.
+		social = { friendship = {}, helpLog = {}, lastGoodNeighbourDay = 0 },
 		-- Seed kitchen sits a few cells into the room, clear of the front door
 		-- lane (the facade door is centred on the plot's front wall).
 		placedFurniture = {
