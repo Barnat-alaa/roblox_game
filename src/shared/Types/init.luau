@@ -160,6 +160,7 @@ export type PlayerData = {
 	reputation: number,
 	cafeStars: number,
 	buzz: number, -- 0..105 café hype: fed customers raise it, walkouts drop it
+	cafeName: string?, -- player-chosen café name (filtered); nil → "<DisplayName>'s Café"
 	expansionTier: number, -- 0-based index into World.interiorDepthTiers (buy land → deeper café)
 	regulars: { [string]: RegularEntry }, -- name-keyed returning customers (max 8)
 	inventory: { [string]: number },

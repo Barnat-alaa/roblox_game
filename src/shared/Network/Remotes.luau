@@ -31,6 +31,7 @@ local EVENTS = {
 	"VisitCafe", -- c->s: request to visit another plot
 	"NeighbourHelp", -- c->s: help a neighbour's café {plotIndex, actionId} (Phase C §4a)
 	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit (Phase C §4b)
+	"SetCafeName", -- c->s: name your own café {name} — filtered server-side (TextService)
 	"ProfileUpdated", -- s->c: full PlayerData snapshot
 	"Notify", -- s->c: toast / error feedback
 	"OrderCreated", -- s->c: a customer placed an order
