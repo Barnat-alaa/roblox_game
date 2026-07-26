@@ -185,6 +185,26 @@ function KitchenService.servingPayout(_self: any, recipe: Types.RecipeDefinition
 	return math.max(1, math.floor(recipe.basePrice * Kitchen.servingPayoutFraction))
 end
 
+-- The wall-shelf part (its Ledge) for a recipe, so the serve/pickup flow can send
+-- the owner + waiter to the shelf instead of the counter. nil if no shelf exists
+-- yet (recipe not unlocked, or the plot hasn't built its shelves).
+function KitchenService.GetShelfPart(_self: any, player: Player, recipeId: string): BasePart?
+	local folder = CafeService:GetFurnitureFolder(player)
+	if not folder then
+		return nil
+	end
+	local rack = folder:FindFirstChild("FoodShelfRack")
+	if not rack then
+		return nil
+	end
+	local shelf = rack:FindFirstChild("Shelf_" .. recipeId)
+	local ledge = shelf and shelf:FindFirstChild("Ledge")
+	if ledge and ledge:IsA("BasePart") then
+		return ledge
+	end
+	return nil
+end
+
 function KitchenService.IsOnMenu(_self: any, data: Types.PlayerData, recipeId: string): boolean
 	return kitchenOf(data).menu[recipeId] == true and data.unlockedRecipes[recipeId] == true
 end
@@ -411,7 +431,12 @@ local FOOD_COLORS: { [string]: Color3 } = {
 
 -- Place every food model by its real bounds rather than its imported pivot.
 -- This works for cups, teapots, pastries, plates, and fallback cylinders.
-local function placeFoodMarker(display: Instance, slotCf: CFrame, recipe: Types.RecipeDefinition)
+local function placeFoodMarker(
+	display: Instance,
+	slotCf: CFrame,
+	recipe: Types.RecipeDefinition,
+	scale: number?
+)
 	local prop: Model? = if AssetLibraryService
 		then AssetLibraryService:GetProp(recipe.category, recipe.id)
 		else nil
@@ -425,6 +450,11 @@ local function placeFoodMarker(display: Instance, slotCf: CFrame, recipe: Types.
 				descendant.CanTouch = false
 			end
 		end
+		if scale and scale ~= 1 then
+			pcall(function()
+				prop:ScaleTo(prop:GetScale() * scale)
+			end)
+		end
 		prop:PivotTo(slotCf)
 		local boundsCf, boundsSize = prop:GetBoundingBox()
 		local bottomY = boundsCf.Position.Y - boundsSize.Y / 2
@@ -436,7 +466,7 @@ local function placeFoodMarker(display: Instance, slotCf: CFrame, recipe: Types.
 	local food = Instance.new("Part")
 	food.Name = "Food_" .. recipe.id
 	food.Shape = Enum.PartType.Cylinder
-	food.Size = Vector3.new(0.55, 1.1, 1.1)
+	food.Size = Vector3.new(0.55, 1.1, 1.1) * (scale or 1)
 	food.Color = FOOD_COLORS[recipe.category] or Color3.fromRGB(200, 160, 110)
 	food.Material = Enum.Material.SmoothPlastic
 	food.Anchored = true
@@ -532,9 +562,10 @@ end
 local SHELF_WALL_X = Grid.PLOT_WIDTH * Grid.CELL_SIZE -- far interior wall (local X)
 local SHELF_COLS = 7 -- shelves per row before a second row stacks above
 local SHELF_START_Z = 22 -- first column sits just behind the front kitchen
-local SHELF_STEP_Z = 8 -- stud gap between columns along the wall
-local SHELF_ROW_Y = { 3.4, 7.0 } -- lower + upper row heights (ceiling is 12)
-local SHELF_DEPTH = 2.4 -- how far the ledge reaches out from the wall
+local SHELF_STEP_Z = 10 -- stud gap between columns along the wall (bigger shelves)
+local SHELF_ROW_Y = { 3.4, 7.6 } -- lower + upper row heights (ceiling is 12)
+local SHELF_DEPTH = 3.0 -- how far the ledge reaches out from the wall
+local SHELF_PROP_SCALE = 1.8 -- enlarge the dish prop so the food reads clearly
 
 local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: number): Model
 	local col = slot % SHELF_COLS
@@ -549,19 +580,19 @@ local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: 
 
 	local back = Instance.new("Part")
 	back.Name = "Back"
-	back.Size = Vector3.new(0.4, 3.0, 3.6)
+	back.Size = Vector3.new(0.5, 4.2, 4.8)
 	back.Anchored = true
 	back.CanCollide = false
 	back.CanQuery = false
 	back.CanTouch = false
 	back.Color = Color3.fromRGB(224, 206, 176)
 	back.Material = Enum.Material.SmoothPlastic
-	back.CFrame = origin * CFrame.new(SHELF_WALL_X - 0.2, y + 1.0, z)
+	back.CFrame = origin * CFrame.new(SHELF_WALL_X - 0.25, y + 1.4, z)
 	back.Parent = shelf
 
 	local ledge = Instance.new("Part")
 	ledge.Name = "Ledge"
-	ledge.Size = Vector3.new(SHELF_DEPTH, 0.3, 3.4)
+	ledge.Size = Vector3.new(SHELF_DEPTH, 0.4, 4.4)
 	ledge.Anchored = true
 	ledge.CanCollide = false
 	ledge.CanQuery = false
@@ -571,39 +602,47 @@ local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: 
 	ledge.CFrame = origin * CFrame.new(ledgeX, y, z)
 	ledge.Parent = shelf
 
-	-- Permanent food "photo": the dish prop, bottom-aligned on the ledge top.
-	placeFoodMarker(shelf, origin * CFrame.new(ledgeX, y + 0.15, z), recipe)
+	-- Permanent food "photo": the dish prop (enlarged), bottom-aligned on the ledge.
+	placeFoodMarker(shelf, origin * CFrame.new(ledgeX, y + 0.2, z), recipe, SHELF_PROP_SCALE)
 
+	-- Big, always-on-top label so the dish + quantity read clearly across the room.
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "Label"
-	billboard.Size = UDim2.fromScale(4, 1.4)
-	billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.0, 0)
-	billboard.MaxDistance = 90
+	billboard.Size = UDim2.fromScale(6, 3)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 140
 	billboard.Adornee = ledge
 	billboard.Parent = ledge
 
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "Name"
-	nameLabel.Size = UDim2.fromScale(1, 0.55)
+	nameLabel.Size = UDim2.fromScale(1, 0.4)
 	nameLabel.BackgroundTransparency = 1
-	nameLabel.Font = Enum.Font.GothamMedium
+	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextScaled = true
 	nameLabel.TextColor3 = Color3.fromRGB(255, 244, 216)
-	nameLabel.TextStrokeTransparency = 0.35
+	nameLabel.TextStrokeTransparency = 0.3
 	nameLabel.Text = recipe.displayName
 	nameLabel.Parent = billboard
 
+	-- Quantity in a bold pill under the name — the "much more visible" count.
 	local countLabel = Instance.new("TextLabel")
 	countLabel.Name = "Count"
-	countLabel.Position = UDim2.fromScale(0, 0.55)
-	countLabel.Size = UDim2.fromScale(1, 0.45)
-	countLabel.BackgroundTransparency = 1
-	countLabel.Font = Enum.Font.GothamBold
+	countLabel.AnchorPoint = Vector2.new(0.5, 0)
+	countLabel.Position = UDim2.fromScale(0.5, 0.46)
+	countLabel.Size = UDim2.fromScale(0.7, 0.5)
+	countLabel.BackgroundColor3 = Color3.fromRGB(40, 32, 30)
+	countLabel.BackgroundTransparency = 0.15
+	countLabel.Font = Enum.Font.GothamBlack
 	countLabel.TextScaled = true
-	countLabel.TextColor3 = Color3.fromRGB(235, 245, 235)
-	countLabel.TextStrokeTransparency = 0.35
+	countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	countLabel.TextStrokeTransparency = 0.4
 	countLabel.Text = "x0"
 	countLabel.Parent = billboard
+	local countCorner = Instance.new("UICorner")
+	countCorner.CornerRadius = UDim.new(0.35, 0)
+	countCorner.Parent = countLabel
 
 	return shelf
 end
