@@ -37,11 +37,24 @@ Shipped this session (PRs #30–#35, all merged):
 | #34 | **VIP rework + lobby Buzz leaderboard** — VIP enters, orders the fanciest dish, instant serve; `LeaderboardService` ranks cafés by Buzz on the plaza board |
 | #35 | **Phase C 4a — neighbour help + friendships** — `NeighbourHelp` remote, `HELP_ACTIONS`, `PlayerData.social` |
 
-**Phase status:** A ✅ · B ✅ · C-4a ✅ · C-4b ✅ · D ✅ (monetisation — core was
-already built; this session finished the boost-timer HUD pill, wired the VIP perks,
-and removed the redundant Auto-Collect pass). **Next: PUBLISH** (owner runs
-`scripts/publish.ps1`), then a live purchase test + the C-4b 2-player lure playtest.
-Deferred D polish: VIP name colour; ProfileStore swap (Phase 6 hardening).
+**Phase status:** A ✅ · B ✅ · C-4a ✅ · C-4b ✅ · D ✅.
+
+Also shipped this session (all merged to `main`, CI-green — see `CHANGELOG.md`):
+
+| PR | What |
+| --- | --- |
+| #37 | **3 owner bugs** — seating leak (derive occupancy from live diners), VIP-as-customer (via `CustomerService:SpawnVip`), session + 15-min playtime gift with a HUD countdown pill |
+| #38 | **Phase C-4b mischief** — smell bomb + recruit lure, all guardrails (`MischiefService`, `CustomerService:LureOne`) |
+| #39 | **Phase D monetisation** — boost-timer HUD pill, VIP perks wired (+50% gift, faster walk, 👑 sign badge), Auto-Collect pass removed |
+| #40 | **World aesthetics** — natural sky+sun, sea+grass island, more trees, upside-down-sign fix, **spawn-on-wall fix**, cozier 72×72 café |
+| #41 | **Player-named cafés** — typed name, `TextService`-filtered, on the sign (`SetCafeName`, `CafeNameController`) |
+
+**Next: PUBLISH** (owner runs `scripts/publish.ps1`), then: a live Robux purchase
+test (IDs are real), the C-4b 2-player lure playtest + 4a two-player path, and the
+owner's visual eyeball of the new sky/sea (easy config tweaks in
+`CafeService.applyLighting`/`buildGroundAndSea`). Deferred polish: VIP name colour;
+café-name presented more artistically if wanted; café **width** reduction (kept at
+72 studs — a bigger change touching street spacing); ProfileStore swap (Phase 6).
 
 ⚠️ **NOT PUBLISHED.** All 7 merged features are in `main` but **NOT live** in the
 DEV place. Publish with `./scripts/publish.ps1` — it needs `$env:ROBLOX_API_KEY`
