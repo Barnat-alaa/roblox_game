@@ -33,6 +33,7 @@ local EVENTS = {
 	"ProfileUpdated", -- s->c: full PlayerData snapshot
 	"Notify", -- s->c: toast / error feedback
 	"OrderCreated", -- s->c: a customer placed an order
+	"SessionReward", -- s->c: connect/playtime gift + HUD countdown target (Bug 1)
 }
 
 local FUNCTIONS = {

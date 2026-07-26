@@ -47,7 +47,14 @@ must NOT enter/handle the key in plaintext. See `HANDOFF.md` §2a.
 
 ---
 
-## 3. 🐞 BUGS THE OWNER FOUND (2026-07-26) — TOP PRIORITY, fix these next
+## 3. 🐞 BUGS THE OWNER FOUND (2026-07-26) — ✅ ALL THREE FIXED (branch `fix/owner-bugs-seating-vip-session`, verified live in Studio)
+
+> **Status 2026-07-26:** all three fixed end-to-end and Studio-verified (clean
+> boot, no errors; connect + playtime gifts fired with the HUD countdown pill; a
+> customer AND the VIP both sat in placed chairs; the VIP ordered → waited →
+> was served → dropped its gift box; a third customer was rejected only when both
+> chairs were genuinely held). See `CHANGELOG.md [Unreleased]` top entry. Details
+> below kept for reference.
 
 ### Bug 1 — Session gift + 15-minute playtime gift with a visible counter
 A gift should appear **once when the player connects**, and **another after they

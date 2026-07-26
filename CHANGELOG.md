@@ -5,6 +5,44 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-07-26 — three owner-reported bugs (seating, VIP customer, session gifts)
+The three bugs the owner found (docs/SESSION_HANDOFF.md §3), fixed end-to-end:
+
+- **Seating: customers no longer wait while chairs sit empty.**
+  `CustomerService.claimSeat` tracked occupancy in a mutable `occupiedSeats`
+  side-table that permanently LEAKED a chair whenever a customer coroutine ended
+  without reaching `releaseSeat` (an error mid-visit, a furniture re-place that
+  changes instanceIds, a player leaving) — the seat stayed "taken" forever, so
+  arrivals found the café full while the chairs were empty. Occupancy is now
+  DERIVED from the live diners on every scan (`occupiedSeatIds` over
+  `allCustomers`), so it cannot drift and a genuinely-free chair is always taken.
+- **Brainrot VIP now behaves like a normal customer** (was served INSTANTLY on a
+  standalone path). It spawns THROUGH `CustomerService` as a special customer
+  (`CustomerService:SpawnVip`): enters → sits in an empty chair → orders a RARE
+  dish (the priciest UNLOCKED, on-menu, non-Coffee/Tea recipe; falls back to the
+  priciest drink if the café has only drinks) → WAITS to be served (owner or
+  waiter) → leaves the earned gift box at its table. `VipService` is now only the
+  scheduler (scores every open café by Buzz, hands the #1 to `SpawnVip`); its
+  instant-serve walker + gift code is gone. One VIP server-wide at a time (guard +
+  failsafe despawn so a dead coroutine can't strand the slot).
+- **NEW: session + 15-minute playtime gift with a HUD countdown.** A gift lands the
+  moment you connect and again for every 15 min of connected play, with a live
+  countdown pill top-right ("🎁 Next gift · 12:04") and a toast as each one lands.
+  New `SessionRewardService` (server owns the clock + grant),
+  `SessionRewardController` (the pill, fed the next-gift server time),
+  `Config/SessionRewards` (interval + weighted reward table), and a `SessionReward`
+  remote. `RewardMath.rollReward` is the generic weighted roller now (the VIP box +
+  session gifts share it; `rollGift` delegates to it). Rails-clean: EARNED by play,
+  never paid, no fake urgency, odds never touch money (HANDOFF §1).
+
+Verified live in Studio (in-memory, temporarily fast intervals): clean boot (21
+services, no errors); the connect gift + repeating playtime gifts fired (coins AND
+reputation) with the countdown pill visible top-right; a normal customer AND the VIP
+both sat in placed chairs; the VIP ordered → waited → was served by the waiter →
+dropped its gift box at the table; a third customer was turned away only when both
+chairs were held by live diners. Rare-dish selection checked against real recipe data
+(full menu → quiche $48; drinks-only café → tea fallback).
+
 ### Feature — 2026-07-26 — Phase C 4a: neighbour help + friendships
 Co-op social layer (docs/GAMEPLAY_DIRECTION.md §4a). Visit an **online** neighbour
 and lend a hand from the visit card:
