@@ -469,6 +469,32 @@ local function buildRigTemplate(assetId: number): Model?
 	return rig
 end
 
+-- The VIP display model (the brainrot): a non-humanoid prop VipService welds
+-- onto an invisible Humanoid to walk. Unlike a rig it has no Humanoid/joints;
+-- unlike a placed prop it must stay UNANCHORED + massless so it can ride along.
+local function buildVipTemplate(assetId: number, height: number): Model?
+	local container = loadAndSanitise(assetId)
+	if not container then
+		return nil
+	end
+	local model = unwrap(container)
+	if not ensurePrimary(model) then
+		model:Destroy()
+		return nil
+	end
+	scaleToHeight(model, height)
+	model.WorldPivot = CFrame.new(model:GetBoundingBox().Position)
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = false
+			d.CanCollide = false
+			d.CanQuery = false
+			d.Massless = true
+		end
+	end
+	return model
+end
+
 -- ————— public API: always returns a fresh clone or nil —————
 
 local function cloneOf(key: string): Model?
@@ -492,6 +518,12 @@ end
 
 function AssetLibraryService.GetStaff(_self: any, role: string): Model?
 	return cloneOf("staff:" .. role)
+end
+
+-- The VIP display model (brainrot), scaled + script-free. Non-humanoid —
+-- VipService welds it onto a Humanoid to walk it.
+function AssetLibraryService.GetVip(_self: any): Model?
+	return cloneOf("vip:brainrot")
 end
 
 -- Single-instance feature decor (e.g. the dirt spill mesh).
@@ -599,6 +631,11 @@ function AssetLibraryService.Start(_self: any)
 				cache(key, t)
 				table.insert(customerRigKeys, key)
 			end
+			tally(t ~= nil)
+		end
+		if AssetManifest.vip then
+			local t = buildVipTemplate(AssetManifest.vip.assetId, AssetManifest.vip.height)
+			cache("vip:brainrot", t)
 			tally(t ~= nil)
 		end
 

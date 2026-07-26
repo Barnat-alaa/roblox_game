@@ -304,6 +304,12 @@ local AssetManifest = {
 		-- base + green apron.
 		Cleaner = { assetId = 8243272714, name = "Mom's NPC base (RAMAS_RMZ)" },
 	},
+
+	-- VIP: the brainrot celebrity guest (owner-chosen 2026-07-26). NOT a rig — it
+	-- has an AnimationController and no Humanoid — so it loads as a scaled prop and
+	-- VipService welds it onto an invisible Humanoid to walk it. Scripts stripped
+	-- on load like every asset.
+	vip = { assetId = 112586636995159, height = 6, name = "67 Brainrot (working)" },
 }
 
 return AssetManifest

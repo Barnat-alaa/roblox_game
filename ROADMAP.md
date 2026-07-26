@@ -63,7 +63,13 @@ social game, each giving the player short-, medium- and long-term goals:
 (2026-07-25 — every recipe nets 42–58%, guarded by `tests/Recipes.spec`). Pending
 polish (not blocking): the remaining **VIP** perks (walk-speed, daily bonus, name
 colour, storage) + **Auto-Collect** effect on manual cooks; **real-purchase
-testing** of A8 in the published place. Next: **Phase B (VIP customers + gift box)**.
+testing** of A8 in the published place.
+
+**Phase B (VIP customers + gift box) is DONE (2026-07-26).** A brainrot VIP
+(owner-chosen asset) walks the boulevard to the busiest café by Buzz, pays the
+owner a premium order, and drops an EARNED gift box opened for a weighted reward
+(`VipService`, `Config/Vip`, `Config/Gifts`, `RewardMath.rollGift`; not a loot
+box). Next: **Phase C** (neighbour help + friendships + mischief).
 
 Non-negotiables carried from below: server-authoritative, data-driven, no loot
 boxes, no pay-to-win, no fake-urgency, and **tested in Roblox Studio before every
