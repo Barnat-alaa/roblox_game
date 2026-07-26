@@ -5,6 +5,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — world aesthetics pass + spawn/sign fixes
+Owner-requested visual polish for the neighbourhood (docs/SESSION_HANDOFF.md):
+- **Natural sky + sun** — a real `Sky` (default cloud cubemap + a bigger sun disc,
+  `SunAngularSize` 19), a brighter midday `ClockTime`, and a much lighter Atmosphere
+  so the sky reads clear blue instead of a heavy golden wash.
+- **Sea + grass island** — a grass base fills the bare ground between plots and
+  around the boulevard, with a Water sea stretching to the horizon beyond it (new
+  `buildGroundAndSea`); no more grey void at the map edges.
+- **More trees** — boulevard trees on BOTH sidewalks and denser, plus two extra
+  trees in each back garden.
+- **Café sign fixed** — the front decor sign rendered upside down (+90° about X);
+  now -90°, upright and facing the street.
+- **Spawn fixed** — players spawned on the café's corner WALL (the default (0,0,0)
+  spawn) because the profile loads instantly in Studio and a single teleport was
+  overridden by Roblox's own spawn-repositioning. Now connect-first + re-assert the
+  target CFrame across a few frames → the player reliably lands on the sidewalk in
+  front of their door, facing in.
+- **Cozier café** — interior depth reduced ({24,28,32} → {18,24,30} cells): the base
+  café is a roughly square 72×72 instead of a deep empty hall, with a bigger garden.
+
+Verified in Studio: clean boot, no errors; the player spawns in front of the café
+(50.5, 3, -13.9) not the wall; the café is 72×72 and seating still works (a customer
+sat + ordered); the Sky/Sea/grass/trees are all built (the fixed café-sim camera
+can't frame the sky, so the final look is the owner's eyeball). Player café-naming
+follows as a separate PR.
+
 ### Feature — 2026-07-26 — Phase D: monetisation completion (boost pill · VIP perks · Auto-Collect removed)
 Finished the rails-clean Robux monetisation (docs/MONETISATION.md). The core was
 already built (idempotent `ProcessReceipt`, working 2× boosts, the full Store UI,
