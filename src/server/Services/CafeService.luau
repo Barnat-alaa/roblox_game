@@ -603,6 +603,10 @@ local function rebuildShell(plot: Plot, tier: number)
 		canopy.CanCollide = false
 	end
 	placeWorld("tree", width - 10, depth + g * 0.8)
+	-- A leafier back garden (owner request 2026-07-26) — two more trees toward the
+	-- back corners. Asset-only like the tree above; skipped cleanly if not loaded.
+	placeWorld("tree", width - 18, depth + g * 0.4)
+	placeWorld("tree", 20, depth + g * 0.88)
 
 	for bi, bx in { width - 12, 16 } do
 		local bedZ = depth + g * (if bi == 1 then 0.35 else 0.75)
@@ -788,43 +792,56 @@ local function buildPlot(index: number, parent: Instance): Plot
 	return plot
 end
 
--- Warm golden-hour pass: the street should feel like a Mediterranean evening.
+-- Bright, natural afternoon sky with a real sun (owner request 2026-07-26). Warm
+-- but no longer a heavy golden wash — the sky reads as clear blue with clouds and
+-- a visible sun disc, and the horizon stays crisp so the sea at the edges shows.
 local function applyLighting()
-	Lighting.ClockTime = 16.4
-	Lighting.Brightness = 2.4
-	Lighting.Ambient = Color3.fromRGB(140, 120, 105)
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 130, 110)
-	Lighting.ColorShift_Top = Color3.fromRGB(255, 200, 150)
-	Lighting.ColorShift_Bottom = Color3.fromRGB(200, 160, 130)
-	Lighting.EnvironmentDiffuseScale = 0.6
-	Lighting.EnvironmentSpecularScale = 0.6
+	Lighting.ClockTime = 14.2 -- sun high and warm, not late-evening low
+	Lighting.GeographicLatitude = 18
+	Lighting.Brightness = 2.6
+	Lighting.Ambient = Color3.fromRGB(150, 140, 128)
+	Lighting.OutdoorAmbient = Color3.fromRGB(165, 158, 145)
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 226, 190)
+	Lighting.ColorShift_Bottom = Color3.fromRGB(215, 205, 190)
+	Lighting.EnvironmentDiffuseScale = 0.75
+	Lighting.EnvironmentSpecularScale = 0.75
 
-	-- The approved Store sky is one square decal, not a six-face cubemap. A
-	-- single decal cannot be assigned to Skybox* without producing gray faces;
-	-- buildSkyBackdrop uses it on distant tiled scenery instead.
+	-- A real natural sky with a prominent sun. Instance.new("Sky") carries Roblox's
+	-- default cloud cubemap (no external asset id needed); we just keep the
+	-- celestial bodies on and enlarge the sun disc so it reads clearly.
+	local sky = Lighting:FindFirstChildOfClass("Sky")
+	if not sky then
+		sky = Instance.new("Sky")
+	end
+	sky.CelestialBodiesShown = true
+	sky.SunAngularSize = 19
+	sky.MoonAngularSize = 11
+	sky.Parent = Lighting
+
 	local brokenSky = Lighting:FindFirstChild("ApprovedCafeSky")
 	if brokenSky then
 		brokenSky:Destroy()
 	end
 
+	-- Light, cool-ish haze — depth without flattening the sky into a golden fog.
 	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-	atmo.Density = 0.35
-	atmo.Offset = 0.4
-	atmo.Color = Color3.fromRGB(214, 180, 150)
-	atmo.Decay = Color3.fromRGB(120, 90, 70)
-	atmo.Glare = 0.25
-	atmo.Haze = 1.6
+	atmo.Density = 0.22
+	atmo.Offset = 0.1
+	atmo.Color = Color3.fromRGB(200, 210, 225)
+	atmo.Decay = Color3.fromRGB(150, 145, 140)
+	atmo.Glare = 0.12
+	atmo.Haze = 0.45
 	atmo.Parent = Lighting
 
 	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
-	bloom.Intensity = 0.6
-	bloom.Size = 32
-	bloom.Threshold = 1.1
+	bloom.Intensity = 0.5
+	bloom.Size = 30
+	bloom.Threshold = 1.3
 	bloom.Parent = Lighting
 
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
-	rays.Intensity = 0.08
-	rays.Spread = 0.6
+	rays.Intensity = 0.12
+	rays.Spread = 0.7
 	rays.Parent = Lighting
 end
 
@@ -898,6 +915,48 @@ local function buildSkyBackdrop(parent: Instance)
 		CFrame.new(westX, height / 2 - 60, centreZ),
 		Enum.NormalId.Right
 	)
+end
+
+-- A grass island under the whole neighbourhood — fills the bare ground between
+-- plots and around the boulevard — with the sea stretching to the horizon beyond
+-- it (owner request 2026-07-26). Land sits at ~ground level; the sea a touch lower
+-- so the street reads as a sunny coastal island under the open sky.
+local function buildGroundAndSea(parent: Instance)
+	local old = parent:FindFirstChild("Landscape")
+	if old then
+		old:Destroy()
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "Landscape"
+	folder.Parent = parent
+
+	local plotWidth = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local streetLength = (PLOTS_PER_ROW - 1) * PLOT_SPACING + plotWidth
+	local centreX = streetLength / 2
+	local centreZ = -World.boulevardWidth / 2
+
+	local land = makePart(
+		"NeighbourhoodGround",
+		Vector3.new(streetLength + 340, 1, World.boulevardWidth + 2 * TOTAL_DEPTH + 340),
+		CFrame.new(centreX, -0.7, centreZ),
+		Color3.fromRGB(122, 168, 96),
+		folder,
+		Enum.Material.Grass
+	)
+	land.CanCollide = true
+	land.CanQuery = false
+
+	local sea = makePart(
+		"Sea",
+		Vector3.new(8000, 1, 8000),
+		CFrame.new(centreX, -2.6, centreZ),
+		Color3.fromRGB(64, 132, 172),
+		folder,
+		Enum.Material.Water
+	)
+	sea.CanCollide = false
+	sea.CanQuery = false
+	sea.Transparency = 0.08
 end
 
 -- A real two-lane boulevard with tiled sidewalks. The Store road images are
@@ -1022,32 +1081,36 @@ local function buildStreetDecor(parent: Instance)
 		end
 	end
 
-	-- Boulevard trees, spaced by DISTANCE rather than a fixed count of 4 — on the
-	-- shortened street a hardcoded 4 put a tree every ~105 studs (roughly one per
-	-- café, ~3x the intended density) instead of every ~315.
+	-- Boulevard trees along BOTH sidewalks and denser than before (owner asked for
+	-- more greenery). Spaced by distance — roughly one every ~150 studs per side.
 	local streetRun = PLOTS_PER_ROW * PLOT_SPACING
-	local treeCount = math.max(2, math.floor(streetRun / 315 + 0.5))
-	for i = 1, treeCount do
-		local x = (i - 0.5) * streetRun / treeCount - 12
-		local z = -44
-		if not placeWorld("tree", x, -0.5, z) then
-			makePart(
-				"Trunk",
-				Vector3.new(1.4, 5, 1.4),
-				CFrame.new(x, 2, z),
-				Color3.fromRGB(110, 82, 60),
-				folder,
-				Enum.Material.Wood
-			)
-			local canopy = makePart(
-				"Canopy",
-				Vector3.new(7, 7, 7),
-				CFrame.new(x, 6.4, z),
-				Color3.fromRGB(105, 150, 88),
-				folder,
-				Enum.Material.Grass
-			)
-			canopy.Shape = Enum.PartType.Ball
+	local treeCount = math.max(3, math.floor(streetRun / 150 + 0.5))
+	for _, z in { -44, -16 } do
+		for i = 1, treeCount do
+			-- Offset the far row half a step so the two rows interleave, not line up.
+			local halfStep = if z == -16 then streetRun / treeCount / 2 else 0
+			local x = (i - 0.5) * streetRun / treeCount - 12 + halfStep
+			if not placeWorld("tree", x, -0.5, z) then
+				local trunk = makePart(
+					"Trunk",
+					Vector3.new(1.4, 5, 1.4),
+					CFrame.new(x, 2, z),
+					Color3.fromRGB(110, 82, 60),
+					folder,
+					Enum.Material.Wood
+				)
+				trunk.CanCollide = false
+				local canopy = makePart(
+					"Canopy",
+					Vector3.new(7, 7, 7),
+					CFrame.new(x, 6.4, z),
+					Color3.fromRGB(105, 150, 88),
+					folder,
+					Enum.Material.Grass
+				)
+				canopy.Shape = Enum.PartType.Ball
+				canopy.CanCollide = false
+			end
 		end
 	end
 end
@@ -1387,12 +1450,24 @@ local function teleportOnto(plot: Plot, character: Model)
 	-- Players never collide with NPCs (walk through your own queue freely).
 	NpcNav.assignPlayerGroup(character)
 	if hrp and hrp:IsA("BasePart") then
-		-- Arrive on the street IN FRONT of your own café, facing the door —
-		-- the "this is my restaurant" moment (owner request).
+		-- Arrive on the SIDEWALK clearly IN FRONT of your own café's door, facing
+		-- straight in — the "this is my restaurant" moment (owner request). -14 puts
+		-- the player out on the pavement (an earlier -8 sat in the facade/awning
+		-- line) and matching the look-at X faces them square through the door.
 		local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-		local standAt = (plot.origin * CFrame.new(width * World.doorCenterFrac, 4, -8)).Position
-		local lookAt = (plot.origin * CFrame.new(width / 2, 4, 10)).Position
-		hrp.CFrame = CFrame.lookAt(standAt, lookAt)
+		local doorX = width * World.doorCenterFrac
+		local target = CFrame.lookAt(
+			(plot.origin * CFrame.new(doorX, 5, -14)).Position,
+			(plot.origin * CFrame.new(doorX, 5, 10)).Position
+		)
+		-- Re-assert the position for a few frames: Roblox's own spawn logic
+		-- repositions a JUST-spawned character a beat AFTER our first move, which
+		-- undid a single set and left the player at the default (0,0,0) spawn — the
+		-- café's corner wall (owner "spawn on the wall" bug, 2026-07-26).
+		for _ = 1, 6 do
+			hrp.CFrame = target
+			task.wait()
+		end
 	end
 end
 
@@ -1436,14 +1511,20 @@ local function activatePlot(player: Player, plot: Plot)
 	CafeService:RefreshTier(player)
 	BuildService:RenderProfile(player)
 
-	if player.Character then
-		task.spawn(teleportOnto, plot, player.Character)
-		applyVipMovement(player, player.Character)
-	end
-	player.CharacterAdded:Connect(function(character)
+	-- Place the player on their café front for the current character AND every
+	-- respawn. Connect FIRST, then handle the already-present character: with the
+	-- profile loading instantly (Studio in-memory), the character could spawn in
+	-- the gap between an "if player.Character" check and a later Connect, slip past
+	-- both, and be left at the default (0,0,0) spawn — which is the café's corner
+	-- wall (owner "spawn on the wall" bug, 2026-07-26). A double-place is harmless.
+	local function placeOnCafe(character: Model)
 		teleportOnto(plot, character)
 		applyVipMovement(player, character)
-	end)
+	end
+	player.CharacterAdded:Connect(placeOnCafe)
+	if player.Character then
+		task.spawn(placeOnCafe, player.Character)
+	end
 end
 
 local function onPlayerAdded(player: Player)
@@ -1536,11 +1617,13 @@ local function placeCafeSign(plot: Plot)
 			d.CanQuery = false
 		end
 	end
-	-- Native sign is flat (thin Y); stand it upright on the wall facing -Z.
+	-- Native sign is flat (thin Y); stand it upright on the wall facing the street
+	-- (-Z). It was rendering upside down at +90° about X (owner report 2026-07-26);
+	-- -90° stands it up the right way round with its face toward the street.
 	sign:PivotTo(
 		plot.origin
 			* CFrame.new(width * World.doorCenterFrac, DOOR_H + 3, -0.7)
-			* CFrame.Angles(math.rad(90), 0, 0)
+			* CFrame.Angles(math.rad(-90), 0, 0)
 	)
 	sign.Parent = plot.model
 end
@@ -1657,6 +1740,7 @@ function CafeService.Start(_self: any)
 
 	applyLighting()
 	buildSkyBackdrop(workspace)
+	buildGroundAndSea(workspace)
 	buildRoadNetwork(workspace)
 	buildStreetDecor(workspace)
 	buildPlaza(workspace)

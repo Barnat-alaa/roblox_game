@@ -34,9 +34,11 @@ local World = {
 	roadWidth = 24,
 
 	-- Interior depth per expansion tier, in grid cells (width is fixed at
-	-- Grid.PLOT_WIDTH). Tier 0 = 18x24 cells = exactly 3x the original
-	-- 12x12 floor area. Buying land (S4) moves the back wall into the garden.
-	interiorDepthTiers = { 24, 28, 32 },
+	-- Grid.PLOT_WIDTH = 18). Reduced 2026-07-26 (owner: "café too big") from
+	-- {24,28,32} → a cozier, roughly square 18×18 base café (72×72 studs) that
+	-- still leaves room for the kitchen (0–3 deep) + a dining area, and gives a
+	-- bigger back garden. Buying land (S4) moves the back wall into the garden.
+	interiorDepthTiers = { 18, 24, 30 },
 
 	-- The front-right corner (from the player's view while entering) is a
 	-- staff-only open kitchen. A low L-shaped service counter keeps dining NPCs
