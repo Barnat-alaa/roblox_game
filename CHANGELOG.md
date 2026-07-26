@@ -5,6 +5,21 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — shelves: bigger + pick food from the shelf (not the counter)
+Owner feedback on the wall food shelves:
+- **Bigger + clearer**: each shelf's dish prop is scaled 1.8× and the quantity is
+  a bold `GothamBlack` pill on an **always-on-top** billboard, so the food + count
+  read across the room. Ledge/back enlarged, columns spaced further apart.
+- **Pick from the shelf, not the counter**: an order's pickup now spawns in front
+  of that recipe's wall shelf (`KitchenService.GetShelfPart` → OrderService
+  `pickupAnchorCf`/`isNearPickup`); the old kitchen-pass pickup is removed (kept
+  only as a fallback if a shelf isn't built yet). Table delivery and the waiter's
+  auto-serve (which already consumes shelf stock) are unchanged.
+Verified in Studio: shelves build bigger (espresso prop 2.3×3.6 vs 1.3×2.0), new
+shelves appear on unlock (cappuccino/sandwich), the pickup anchor computes to the
+shelf front, clean ~5-min run with no errors. Live owner-pickup pending a real
+playtest (idle test Buzz was ~0, so almost no customers spawned).
+
 ### Feature — 2026-07-26 — Phase B: brainrot VIP customer + earned gift box
 The first Phase B feature (docs/GAMEPLAY_DIRECTION.md §3). A rare "brainrot"
 celebrity (owner-chosen Creator Store asset 112586636995159) walks the boulevard

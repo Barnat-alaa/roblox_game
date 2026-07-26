@@ -80,14 +80,26 @@ local function pickupOffset(userId: number): number
 	return ((count - 1) % 3 - 1) * 2.2
 end
 
-local function isAtKitchenPass(player: Player): boolean
+-- Where an order's pickup lives: just in front of that recipe's WALL SHELF, so
+-- the owner (and waiter) take food from the shelf now, not the counter. Local -X
+-- is out into the room (shelves are on the far +X wall). Falls back to the kitchen
+-- pass only if the shelf hasn't been built yet.
+local function pickupAnchorCf(player: Player, recipeId: string): CFrame?
+	local ledge = KitchenService:GetShelfPart(player, recipeId)
+	if ledge then
+		return ledge.CFrame * CFrame.new(-2.2, 0.1, 0)
+	end
+	return CafeService:GetKitchenPass(player)
+end
+
+local function isNearPickup(player: Player, recipeId: string): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local passCf = CafeService:GetKitchenPass(player)
-	return root ~= nil
-		and root:IsA("BasePart")
-		and passCf ~= nil
-		and (root.Position - (passCf :: CFrame).Position).Magnitude <= 15
+	if not (root and root:IsA("BasePart")) then
+		return false
+	end
+	local anchor = pickupAnchorCf(player, recipeId)
+	return anchor ~= nil and (root.Position - (anchor :: CFrame).Position).Magnitude <= 16
 end
 
 local function stopCarrying(player: Player): CarriedOrder?
@@ -145,8 +157,8 @@ local function pickupOrder(player: Player, orderId: string)
 		notify(player, "already_carrying")
 		return
 	end
-	if not isAtKitchenPass(player) then
-		notify(player, "go_to_pass")
+	if not isNearPickup(player, order.recipeId) then
+		notify(player, "go_to_shelf")
 		return
 	end
 	if servingLocks[orderId] then
@@ -250,16 +262,16 @@ local function deliverOrder(player: Player, orderId: string)
 end
 
 local function createPickupPoint(player: Player, order: Types.Order)
-	local passCf = CafeService:GetKitchenPass(player)
+	local anchorCf = pickupAnchorCf(player, order.recipeId)
 	local folder = CafeService:GetFurnitureFolder(player)
 	local recipe = Recipes[order.recipeId]
-	if not passCf or not folder or not recipe then
+	if not anchorCf or not folder or not recipe then
 		return
 	end
 	local point = Instance.new("Part")
 	point.Name = "OrderPickup_" .. order.orderId
 	point.Size = Vector3.new(1.5, 0.25, 1.5)
-	point.CFrame = (passCf :: CFrame) * CFrame.new(pickupOffset(player.UserId), 0.55, 0)
+	point.CFrame = (anchorCf :: CFrame) * CFrame.new(pickupOffset(player.UserId), 0.55, 0)
 	point.Color = Color3.fromRGB(255, 190, 78)
 	point.Material = Enum.Material.Neon
 	point.Transparency = 0.18

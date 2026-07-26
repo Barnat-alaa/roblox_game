@@ -43,6 +43,7 @@ local FRIENDLY_ERROR = {
 	not_in_stock = "No fresh servings are ready.",
 	already_carrying = "Deliver the item in your hand before taking another.",
 	go_to_pass = "Walk to the glowing kitchen pass to pick this order up.",
+	go_to_shelf = "Walk to the dish's wall shelf to pick this order up.",
 	pick_up_first = "Pick the order up from the kitchen pass first.",
 	wrong_table = "Wrong table - follow the table number on the order ticket.",
 }
