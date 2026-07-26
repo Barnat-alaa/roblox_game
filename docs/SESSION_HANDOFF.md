@@ -37,8 +37,8 @@ Shipped this session (PRs #30–#35, all merged):
 | #34 | **VIP rework + lobby Buzz leaderboard** — VIP enters, orders the fanciest dish, instant serve; `LeaderboardService` ranks cafés by Buzz on the plaza board |
 | #35 | **Phase C 4a — neighbour help + friendships** — `NeighbourHelp` remote, `HELP_ACTIONS`, `PlayerData.social` |
 
-**Phase status:** A ✅ · B ✅ · C-4a ✅. **Next: C-4b (mischief, owner-approved),
-then D (monetisation).**
+**Phase status:** A ✅ · B ✅ · C-4a ✅ · C-4b ✅ (mischief — merged, needs a
+2-player lure playtest). **Next: publish, then D (monetisation).**
 
 ⚠️ **NOT PUBLISHED.** All 7 merged features are in `main` but **NOT live** in the
 DEV place. Publish with `./scripts/publish.ps1` — it needs `$env:ROBLOX_API_KEY`
@@ -96,14 +96,17 @@ customer takes any genuinely-free chair; verify seated dining end-to-end.
 
 ## 4. Also open (from earlier this session)
 
-- **Phase C 4b — mischief (owner APPROVED, build with FULL guardrails).** Smell
-  Bomb (green vapour VFX via a new `Fx.smellVapour` modelled on `Fx.scrub`; lures
-  customers) + manual recruitment (walk to a wandering customer, press E; success
-  scales with reputation; VIPs resist). MANDATORY guardrails: earned/bought
-  consumable on a **cooldown**, a **visible telegraph** (the vapour),
-  **one-at-a-time** pull of **not-yet-served** customers only, **immunity periods**
-  + a **max-stolen cap**, **VIP resistance**, and **no permanent loss**.
-  Server-authoritative. Hooks: `docs/IMPLEMENTATION_MAP.md` "Feature 4 / 4b".
+- **Phase C 4b — mischief ✅ SHIPPED** (branch `feat/mischief-4b`, Studio-verified
+  solo). Smell Bomb (coin-bought consumable → guaranteed pull, big green
+  `Fx.smellVapour` telegraph) + Recruit (free, reputation-scaled), both on the
+  neighbour visit card, both routed through the new `MischiefService` (one
+  `Mischief` remote). ALL guardrails enforced: cooldown, proximity, not-yet-served
+  / un-seated / non-VIP only (VIPs resist), per-customer immunity + per-victim
+  max-stolen cap, visible vapour, no permanent loss (victim's customer leaves
+  calmly, re-appears at the caster via `CustomerService:LureOne`). New
+  `PlayerData.smellBombs`; ships behind `Config/Mischief.enabled`. **Still owed: a
+  2-player playtest of the actual cross-café lure** (solo can't — same as 4a; the
+  buy path + guard ladder + vapour ARE verified live).
 - **2-player playtest of 4a** — the helper→online-neighbour reward/friendship path
   + the once-per-neighbour-per-day cap. A single client can't test it (the remote/
   guard path IS verified live: firing `NeighbourHelp` at your own plot returns the

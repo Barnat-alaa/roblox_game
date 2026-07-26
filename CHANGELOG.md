@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — Phase C-4b: mischief (smell bomb + recruit)
+The competitive social mechanic (docs/GAMEPLAY_DIRECTION.md §4b, IMPLEMENTATION_MAP
+"Feature 4 / 4b") — the ONE rails-BRUSHING feature, owner-approved and built with
+the FULL guardrails. Two ways to pull a WAITING customer from a neighbour to your
+café, both on the neighbour visit card:
+- **Smell Bomb** — a coin-bought consumable (`Config/Mischief.bombCost`);
+  GUARANTEED if an eligible customer exists; big green vapour telegraph.
+- **Recruit** — free; success scales with your REPUTATION.
+
+Both route through the new **`MischiefService`** (one method-tagged `Mischief`
+remote) which enforces EVERY guardrail server-side: bought consumable + per-caster
+**cooldown**, **proximity** to the target, only **not-yet-served / un-seated /
+non-VIP** customers (**VIPs resist**), per-customer **immunity** + a per-victim
+**max-stolen cap** per window, and a **visible** green **`Fx.smellVapour`**
+telegraph. The pull is `CustomerService:LureOne` — the victim's customer leaves
+CALMLY (no Buzz / coin / satisfaction penalty → **no permanent loss**, and capped)
+and a fresh, temporarily lure-immune walk-in appears at the caster's café (the
+normal spawn, extracted to a shared `spawnWalkIn`). New top-level
+`PlayerData.smellBombs` (reconcile heals old saves; `startingBombs` starter).
+Ships behind `Config/Mischief.enabled`.
+
+Verified in Studio (in-memory, solo): clean boot (22 services, no errors); buying
+a bomb spent 150 coins + added one (persisted); the guard ladder blocked
+self-poach (bomb NOT consumed) and an empty plot; the green vapour telegraph
+rendered + self-cleaned; normal customers still spawn via the refactored
+`spawnWalkIn`. The full cross-player lure needs a 2-player playtest (same
+limitation as §4a).
+
 ### Fix — 2026-07-26 — three owner-reported bugs (seating, VIP customer, session gifts)
 The three bugs the owner found (docs/SESSION_HANDOFF.md §3), fixed end-to-end:
 

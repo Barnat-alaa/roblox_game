@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
+local Mischief = require(Shared.Config.Mischief)
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -34,6 +35,18 @@ local HELP_BUTTONS = {
 
 local ui: { [string]: any } = {}
 local currentVisitPlot: number? = nil
+
+-- Keep the smell-bomb button showing the player's current count (server is the
+-- source of truth; the profile carries `smellBombs`). Phase C-4b.
+local function refreshSmellCount()
+	local button = ui.smellButton
+	if not button then
+		return
+	end
+	local profile = UIController.getProfile()
+	local n = if profile then tonumber(profile.smellBombs) or 0 else 0
+	button.Text = "💨 Smell bomb (×" .. tostring(n) .. ")"
+end
 
 local function goHome()
 	Remotes.event("VisitCafe"):FireServer({ home = true })
@@ -137,6 +150,61 @@ local function buildPanel()
 		table.insert(ui.helpButtons, button)
 	end
 
+	-- Mischief (Phase C-4b) — the one rails-brushing section, shown only when
+	-- Config.Mischief.enabled. Server (MischiefService) owns every guardrail.
+	if Mischief.enabled then
+		sectionLabel("Cause mischief 😈", 20)
+		local recruit = Components.Button(
+			list,
+			"😈 Poach a customer (free)",
+			Theme.Colors.Berry,
+			UDim2.new(1, 0, 0, 38)
+		)
+		recruit.LayoutOrder = 21
+		recruit.ZIndex = 22
+		recruit.Activated:Connect(function()
+			if currentVisitPlot then
+				Remotes.event("Mischief"):FireServer({
+					method = "recruit",
+					plotIndex = currentVisitPlot,
+				})
+			end
+		end)
+
+		local bomb = Components.Button(
+			list,
+			"💨 Smell bomb (×0)",
+			Theme.Colors.Berry,
+			UDim2.new(1, 0, 0, 38)
+		)
+		bomb.LayoutOrder = 22
+		bomb.ZIndex = 22
+		bomb.Activated:Connect(function()
+			if currentVisitPlot then
+				Remotes.event("Mischief"):FireServer({
+					method = "smell_bomb",
+					plotIndex = currentVisitPlot,
+				})
+			end
+		end)
+		ui.smellButton = bomb
+
+		local buy = Components.Button(
+			list,
+			"🛒 Buy smell bomb (" .. Mischief.bombCost .. " 🪙)",
+			Theme.Colors.Roast,
+			UDim2.new(1, 0, 0, 38)
+		)
+		buy.LayoutOrder = 23
+		buy.ZIndex = 22
+		buy.Activated:Connect(function()
+			Remotes.event("Mischief"):FireServer({ method = "buy_bomb" })
+		end)
+
+		refreshSmellCount()
+		UIController.subscribeProfile(refreshSmellCount)
+	end
+
 	local home = Components.Button(
 		panel,
 		"RETURN HOME",
@@ -235,6 +303,18 @@ function InteractionController.Start(_self: any)
 		then
 			if typeof(msg.text) == "string" then
 				UIController.toast(msg.text)
+			end
+		elseif
+			msg.kind == "mischief_done"
+			or msg.kind == "mischief_hit"
+			or msg.kind == "mischief_blocked"
+			or msg.kind == "mischief_bought"
+		then
+			if typeof(msg.text) == "string" then
+				UIController.toast(msg.text)
+			end
+			if msg.kind == "mischief_bought" then
+				refreshSmellCount()
 			end
 		end
 	end)
