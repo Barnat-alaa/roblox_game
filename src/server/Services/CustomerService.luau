@@ -168,6 +168,7 @@ type ActiveCustomer = {
 	resolvedManual: boolean?,
 	isVip: boolean?, -- the brainrot VIP: uses the welded rig + gift box on serve
 	forcedRecipe: string?, -- VIP orders this exact (RARE) dish, not a random pick
+	lureImmuneUntil: number?, -- os.clock() until which this customer can't be lured (Phase C-4b)
 }
 
 local queues: { [number]: { ActiveCustomer } } = {}
@@ -1360,6 +1361,66 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	depart(cust, streetExit)
 end
 
+-- Construct one normal walk-in for `player` and start its visit. Shared by the
+-- Buzz-driven spawner (Start) and the mischief recruit path — a lured customer
+-- re-appears here at the caster's café. `immuneUntil` (os.clock) marks a freshly
+-- lured customer as un-lurable for a grace period (Phase C-4b).
+local function spawnWalkIn(player: Player, origin: CFrame, immuneUntil: number?)
+	local q = queues[player.UserId]
+	if q == nil then
+		q = {}
+		queues[player.UserId] = q
+	end
+	local def = pickCustomer()
+	local data = DataService:GetProfile(player)
+	local regularName, favourite = pickRegular(data)
+	local name = regularName or NAMES[rng:NextInteger(1, #NAMES)]
+	local model, humanoid, root, bubble = spawnCustomerModel(def, name)
+	local cust: ActiveCustomer = {
+		userId = player.UserId,
+		model = model,
+		humanoid = humanoid,
+		root = root,
+		bubble = bubble,
+		def = def,
+		baseHip = humanoid.HipHeight,
+		name = name,
+		regular = regularName ~= nil,
+		favourite = favourite,
+		spawnClock = os.clock(),
+		orderId = nil,
+		served = false,
+		leaving = false,
+		lureImmuneUntil = immuneUntil,
+	}
+	table.insert(q, cust)
+	allCustomers[cust] = true
+	cust.model.Destroying:Connect(function()
+		allCustomers[cust] = nil
+	end)
+	task.spawn(runActiveVisit, player, cust, origin)
+end
+
+-- A customer at `fromUserId`'s café eligible to be lured away (Phase C-4b): still
+-- WAITING (not served, not seated, no order yet), NOT the VIP (VIPs resist), not
+-- already leaving, and past any immunity grace. nil = nobody to take.
+local function eligibleLureTarget(fromUserId: number): ActiveCustomer?
+	for cust in allCustomers do
+		if
+			cust.userId == fromUserId
+			and not cust.leaving
+			and not cust.served
+			and not cust.isVip
+			and cust.seatId == nil
+			and cust.orderId == nil
+			and (cust.lureImmuneUntil == nil or os.clock() >= cust.lureImmuneUntil)
+		then
+			return cust
+		end
+	end
+	return nil
+end
+
 -- Spawn the brainrot VIP as a real customer at `target`'s café (called by
 -- VipService, the scheduler that picks the #1-Buzz café). Returns false — so
 -- VipService just retries next interval — if a VIP is already out, the profile/
@@ -1429,6 +1490,41 @@ function CustomerService.SpawnVip(_self: any, target: Player): boolean
 	return true
 end
 
+-- Is there a customer at `fromUserId`'s café eligible to be lured? MischiefService
+-- peeks with this before committing a smell bomb / recruit roll (Phase C-4b).
+function CustomerService.HasLureTarget(_self: any, fromUserId: number): boolean
+	return eligibleLureTarget(fromUserId) ~= nil
+end
+
+-- Pull ONE eligible waiting customer from `fromPlayer` to `toPlayer` (Phase C-4b
+-- mischief; the guardrails live in MischiefService). The victim's customer leaves
+-- CALMLY — no Buzz/coin/satisfaction penalty, so there is no permanent loss — and
+-- a fresh, temporarily lure-immune walk-in appears at the caster's café. Returns
+-- false if the caster has no café or nobody was eligible.
+function CustomerService.LureOne(
+	_self: any,
+	fromPlayer: Player,
+	toPlayer: Player,
+	immunitySeconds: number
+): boolean
+	local toOrigin = CafeService:GetPlotOrigin(toPlayer)
+	if not toOrigin then
+		return false
+	end
+	local victim = eligibleLureTarget(fromPlayer.UserId)
+	if not victim then
+		return false
+	end
+	-- Leave the neighbour calmly: the queue loop turns cust.leaving into a plain
+	-- depart() (walk out) with NO penalty — unlike an angry walkout.
+	victim.bubble.Text = "🚶 Off to another café…"
+	victim.leaving = true
+	-- The "recruited" customer re-appears at the caster's café, immune for a grace
+	-- period so it can't be instantly ping-ponged back.
+	spawnWalkIn(toPlayer, toOrigin, os.clock() + immunitySeconds)
+	return true
+end
+
 function CustomerService.OnOrderResolved(
 	_self: any,
 	orderId: string,
@@ -1482,33 +1578,7 @@ function CustomerService.Start(_self: any)
 						local demandPerMinute = KitchenService:GetDemandRate(player)
 						local interval = 60 / math.max(0.2, demandPerMinute)
 						nextSpawnAt[player.UserId] = os.clock() + interval
-						local def = pickCustomer()
-						local data = DataService:GetProfile(player)
-						local regularName, favourite = pickRegular(data)
-						local name = regularName or NAMES[rng:NextInteger(1, #NAMES)]
-						local model, humanoid, root, bubble = spawnCustomerModel(def, name)
-						local cust: ActiveCustomer = {
-							userId = player.UserId,
-							model = model,
-							humanoid = humanoid,
-							root = root,
-							bubble = bubble,
-							def = def,
-							baseHip = humanoid.HipHeight,
-							name = name,
-							regular = regularName ~= nil,
-							favourite = favourite,
-							spawnClock = os.clock(),
-							orderId = nil,
-							served = false,
-							leaving = false,
-						}
-						table.insert(q, cust)
-						allCustomers[cust] = true
-						cust.model.Destroying:Connect(function()
-							allCustomers[cust] = nil
-						end)
-						task.spawn(runActiveVisit, player, cust, origin)
+						spawnWalkIn(player, origin)
 					end
 				end
 			end

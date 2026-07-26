@@ -21,6 +21,7 @@ local Economy = require(Shared.Config.Economy)
 local Recipes = require(Shared.Config.Recipes)
 local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
+local Mischief = require(Shared.Config.Mischief)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
 local Log = require(Shared.Utilities.Log)
 local Remotes = require(Shared.Network.Remotes)
@@ -173,6 +174,7 @@ local function defaultProfile(): Types.PlayerData
 		-- Monetisation state (top-level maps → reconcile heals old saves).
 		grantedReceipts = {},
 		boosts = {},
+		smellBombs = Mischief.startingBombs, -- Phase C-4b consumable (top-level → reconcile heals)
 		ownedPasses = {},
 		-- Neighbour friendships + per-day help anti-farm (Phase C §4a). Top-level
 		-- maps → reconcile heals old saves; SocialService.socialOf heals sub-tables.
@@ -316,6 +318,11 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 			pantry[item] = math.floor(n)
 		end
 	end
+
+	-- Smell-bomb count is a top-level number (reconcile fills it for old saves);
+	-- this guard just floors/clamps a corrupt value. Phase C-4b.
+	local mutableBombs: any = data
+	mutableBombs.smellBombs = math.max(0, math.floor(tonumber(mutableBombs.smellBombs) or 0))
 
 	-- Heal staff: legacy members predate the `hired` flag, so default them to
 	-- hired (their NPCs were already active). reconcile can't reach array elements.

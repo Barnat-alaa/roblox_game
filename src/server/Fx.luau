@@ -108,6 +108,45 @@ function Fx.scrub(position: Vector3, seconds: number?)
 	end)
 end
 
+-- A drifting cloud of green stink — the Phase C-4b smell-bomb telegraph, so the
+-- mischief is VISIBLE to everyone (a mandatory guardrail, not decoration).
+-- Modelled on Fx.scrub: anchored invisible part + ParticleEmitter + timed disable
+-- + Debris. Rate/Lifetime kept modest since it replicates to every client.
+function Fx.smellVapour(position: Vector3, seconds: number?)
+	local duration = seconds or 5
+
+	local anchor = Instance.new("Part")
+	anchor.Name = "SmellVapour"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.new(0.4, 0.4, 0.4)
+	anchor.Position = position + Vector3.new(0, 1.5, 0)
+
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	emitter.Color = ColorSequence.new(Color3.fromRGB(150, 210, 90), Color3.fromRGB(90, 165, 70))
+	emitter.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	emitter.Size = NumberSequence.new(3, 6)
+	emitter.Lifetime = NumberRange.new(1.2, 2.2)
+	emitter.Rate = 14
+	emitter.Speed = NumberRange.new(1, 2.5)
+	emitter.SpreadAngle = Vector2.new(40, 40)
+	emitter.Acceleration = Vector3.new(0, 2, 0)
+	emitter.Parent = anchor
+
+	anchor.Parent = workspace
+	task.spawn(function()
+		task.wait(duration)
+		emitter.Enabled = false
+		Debris:AddItem(anchor, 2.5) -- let the last puffs fade before removing the anchor
+	end)
+end
+
 -- A quick shower of little gold coins.
 function Fx.coinBurst(position: Vector3, count: number?)
 	for _ = 1, math.clamp(count or 6, 1, 10) do
