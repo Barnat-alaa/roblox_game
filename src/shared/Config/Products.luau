@@ -18,7 +18,7 @@ export type ProductInfo = {
 	ingredients: { [string]: number }?, -- kind == "bundle"
 	boost: string?, -- kind == "boost": "coins" | "reputation"
 	seconds: number?, -- kind == "boost": duration
-	pass: string?, -- kind == "pass": the perk key ("vip" | "auto_collect")
+	pass: string?, -- kind == "pass": the perk key ("vip")
 }
 
 -- Levels the pantry products top up to.
@@ -28,6 +28,15 @@ local REFILL_LEVEL = 150
 local Products = {
 	restockLevel = RESTOCK_LEVEL,
 	refillLevel = REFILL_LEVEL,
+}
+
+-- VIP Membership perks (docs/MONETISATION.md §C). Convenience + cosmetic ONLY,
+-- never exclusive power (rails). Applied server-side, gated on ownedPasses.vip:
+-- the offline cap (CafeOperationsService), the session-gift bonus
+-- (SessionRewardService), faster walk + the 👑 café-sign badge (CafeService).
+Products.vipPerks = {
+	walkSpeed = 20, -- a touch above the default 16 — convenience, not power
+	giftMultiplier = 1.5, -- +50% on the session/playtime gift (the "daily bonus")
 }
 
 -- Developer products (consumable, repeatable) keyed by Product ID.
@@ -114,7 +123,9 @@ Products.developerProducts = {
 	},
 }
 
--- Game passes (permanent) keyed by Pass ID.
+-- Game passes (permanent) keyed by Pass ID. (The old Auto-Collect pass was
+-- removed 2026-07-26 — auto-collect is now free for everyone via
+-- Kitchen.autoCollectCooks, so the pass was a redundant SKU. VIP is the flagship.)
 Products.passes = {
 	[1928898980] = {
 		id = 1928898980,
@@ -125,16 +136,6 @@ Products.passes = {
 		icon = "👑",
 		kind = "pass",
 		pass = "vip",
-	},
-	[1928521004] = {
-		id = 1928521004,
-		key = "auto_collect",
-		name = "Auto-Collect",
-		price = 149,
-		blurb = "Finished batches drop straight to the counter",
-		icon = "🅰️",
-		kind = "pass",
-		pass = "auto_collect",
 	},
 }
 
@@ -148,7 +149,6 @@ Products.order = {
 	{ id = 3611623096, pass = false },
 	{ id = 3611623160, pass = false },
 	{ id = 1928898980, pass = true },
-	{ id = 1928521004, pass = true },
 }
 
 return Products

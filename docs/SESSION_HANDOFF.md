@@ -37,8 +37,11 @@ Shipped this session (PRs #30–#35, all merged):
 | #34 | **VIP rework + lobby Buzz leaderboard** — VIP enters, orders the fanciest dish, instant serve; `LeaderboardService` ranks cafés by Buzz on the plaza board |
 | #35 | **Phase C 4a — neighbour help + friendships** — `NeighbourHelp` remote, `HELP_ACTIONS`, `PlayerData.social` |
 
-**Phase status:** A ✅ · B ✅ · C-4a ✅ · C-4b ✅ (mischief — merged, needs a
-2-player lure playtest). **Next: publish, then D (monetisation).**
+**Phase status:** A ✅ · B ✅ · C-4a ✅ · C-4b ✅ · D ✅ (monetisation — core was
+already built; this session finished the boost-timer HUD pill, wired the VIP perks,
+and removed the redundant Auto-Collect pass). **Next: PUBLISH** (owner runs
+`scripts/publish.ps1`), then a live purchase test + the C-4b 2-player lure playtest.
+Deferred D polish: VIP name colour; ProfileStore swap (Phase 6 hardening).
 
 ⚠️ **NOT PUBLISHED.** All 7 merged features are in `main` but **NOT live** in the
 DEV place. Publish with `./scripts/publish.ps1` — it needs `$env:ROBLOX_API_KEY`

@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config.SessionRewards)
+local Products = require(Shared.Config.Products)
 local Remotes = require(Shared.Network.Remotes)
 local RewardMath = require(Shared.Utilities.RewardMath)
 local Log = require(Shared.Utilities.Log)
@@ -46,6 +47,16 @@ end
 -- Roll + grant one gift, server-side, and tell the client to celebrate.
 local function grant(player: Player, reason: string)
 	local reward = RewardMath.rollReward(Config.rewards, rng:NextNumber(), rng:NextNumber())
+	-- VIP Membership perk (docs/MONETISATION.md §C): +50% on the session/playtime
+	-- gift — this is the pass's "daily bonus". Reads the cached ownedPasses flag.
+	local data = DataService:GetProfile(player)
+	if
+		data ~= nil
+		and typeof((data :: any).ownedPasses) == "table"
+		and (data :: any).ownedPasses.vip == true
+	then
+		reward.amount = math.floor(reward.amount * Products.vipPerks.giftMultiplier + 0.5)
+	end
 	if reward.kind == "reputation" then
 		EconomyService:AddReputation(player, reward.amount)
 	else

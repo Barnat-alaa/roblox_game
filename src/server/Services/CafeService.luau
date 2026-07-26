@@ -24,6 +24,7 @@ local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local Graphics = require(Shared.Config.Graphics)
 local World = require(Shared.Config.World)
+local Products = require(Shared.Config.Products)
 local Log = require(Shared.Utilities.Log)
 local Remotes = require(Shared.Network.Remotes)
 
@@ -1252,6 +1253,33 @@ local function buildShutter(plot: Plot): Model
 	return shutter
 end
 
+-- The owner's name on their café sign, with a 👑 badge if they own VIP (a
+-- cosmetic Robux perk, docs/MONETISATION.md §C). Reads the cached ownedPasses
+-- flag off the profile (like the offline-cap perk), so no extra async query.
+local function ownerDisplay(player: Player): string
+	local data = DataService:GetProfile(player)
+	local vip = data ~= nil
+		and typeof((data :: any).ownedPasses) == "table"
+		and (data :: any).ownedPasses.vip == true
+	return if vip then "👑 " .. player.DisplayName else player.DisplayName
+end
+
+-- VIP owners walk a touch faster (a convenience perk, not power). Applied on each
+-- spawn; MonetizationService re-applies it the moment the pass flag first lands.
+local function applyVipMovement(player: Player, character: Instance)
+	local data = DataService:GetProfile(player)
+	local vip = data ~= nil
+		and typeof((data :: any).ownedPasses) == "table"
+		and (data :: any).ownedPasses.vip == true
+	if not vip then
+		return
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = Products.vipPerks.walkSpeed
+	end
+end
+
 local function setPlotClosed(plot: Plot)
 	plot.ownerLabel.Text = "Opening soon…"
 	if plot.shutter == nil then
@@ -1260,7 +1288,7 @@ local function setPlotClosed(plot: Plot)
 end
 
 local function setPlotOpen(plot: Plot, player: Player)
-	plot.ownerLabel.Text = player.DisplayName .. "'s Café"
+	plot.ownerLabel.Text = ownerDisplay(player) .. "'s Café"
 	if plot.shutter then
 		plot.shutter:Destroy()
 		plot.shutter = nil
@@ -1295,7 +1323,7 @@ end
 function CafeService.SetSignBuzz(_self: any, player: Player, buzz: number)
 	local plot = plotByUser[player.UserId]
 	if plot then
-		plot.ownerLabel.Text = player.DisplayName .. "'s Café\n🔥 Buzz " .. tostring(buzz)
+		plot.ownerLabel.Text = ownerDisplay(player) .. "'s Café\n🔥 Buzz " .. tostring(buzz)
 	end
 end
 
@@ -1410,9 +1438,11 @@ local function activatePlot(player: Player, plot: Plot)
 
 	if player.Character then
 		task.spawn(teleportOnto, plot, player.Character)
+		applyVipMovement(player, player.Character)
 	end
 	player.CharacterAdded:Connect(function(character)
 		teleportOnto(plot, character)
+		applyVipMovement(player, character)
 	end)
 end
 

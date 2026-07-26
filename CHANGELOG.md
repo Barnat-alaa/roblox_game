@@ -5,6 +5,30 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — Phase D: monetisation completion (boost pill · VIP perks · Auto-Collect removed)
+Finished the rails-clean Robux monetisation (docs/MONETISATION.md). The core was
+already built (idempotent `ProcessReceipt`, working 2× boosts, the full Store UI,
+the VIP offline-cap); this completes it:
+- **Boost-timer HUD pill** — the visible boost the design asks for ("2× Coins ·
+  43:12"). New `BoostController` reads the `PlayerData.boosts` expiries and stacks
+  one small pill per active boost top-right, under the session-gift pill. Display
+  only — `EconomyService` already applies the 2×.
+- **VIP Membership perks wired** (server-authoritative, gated on `ownedPasses.vip`):
+  **+50% session/playtime gift** (the pass's "daily bonus", in `SessionRewardService`),
+  **faster walk** (WalkSpeed 20 on spawn, re-applied the instant the pass flag
+  lands), and a **👑 badge on the café sign**. (Offline cap 8h→12h was already done.
+  Deferred: unique name colour; "larger ingredient storage" is N/A — the pantry has
+  no cap.) New `Config/Products.vipPerks` tuning. Rails: convenience + cosmetic only.
+- **Auto-Collect pass removed** (owner decision): auto-collect is free for everyone
+  via `Kitchen.autoCollectCooks`, so the R$149 pass was a redundant SKU — nothing
+  gated on it. VIP is now the sole flagship pass.
+
+Verified in Studio (in-memory, VIP seeded): clean boot (22 services, 17 controllers,
+no errors); the Store shows no Auto-Collect (only VIP; order count 8); a VIP owner
+got WalkSpeed 20, the "👑 …'s Café" sign, and a 135-coin connect gift (= 90 × 1.5);
+both boost pills rendered, counted down, and stacked under the gift pill. The owner
+confirmed the product/pass IDs are real, so a live purchase test follows publish.
+
 ### Feature — 2026-07-26 — Phase C-4b: mischief (smell bomb + recruit)
 The competitive social mechanic (docs/GAMEPLAY_DIRECTION.md §4b, IMPLEMENTATION_MAP
 "Feature 4 / 4b") — the ONE rails-BRUSHING feature, owner-approved and built with
