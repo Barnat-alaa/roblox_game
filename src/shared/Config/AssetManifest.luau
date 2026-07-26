@@ -309,7 +309,7 @@ local AssetManifest = {
 	-- has an AnimationController and no Humanoid — so it loads as a scaled prop and
 	-- VipService welds it onto an invisible Humanoid to walk it. Scripts stripped
 	-- on load like every asset.
-	vip = { assetId = 112586636995159, height = 6, name = "67 Brainrot (working)" },
+	vip = { assetId = 112586636995159, height = 3, name = "67 Brainrot (working)" },
 }
 
 return AssetManifest
