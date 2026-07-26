@@ -5,6 +5,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — Phase C 4a: neighbour help + friendships
+Co-op social layer (docs/GAMEPLAY_DIRECTION.md §4a). Visit an **online** neighbour
+and lend a hand from the visit card:
+- New **`NeighbourHelp`** remote + `SocialService.handleHelp` (mirrors the
+  compliment guard ladder). Data-driven `HELP_ACTIONS`: Water Plants, Bus a Table,
+  Stir a Pot, Hand Flyers — each **once per neighbour per day** (persisted
+  anti-farm on `PlayerData.social`, survives rejoin).
+- The helper earns coins/XP/reputation + **friendship points** (persisted
+  per-pair); the online owner gets reputation and/or a Buzz bump. A
+  first-help-of-the-day **"Good Neighbour"** bonus. Rails-clean (whitelisted
+  actions, no free text).
+- New `PlayerData.social` `{friendship, helpLog, lastGoodNeighbourDay}` (top-level
+  → `reconcile` heals old saves; `socialOf` heals sub-tables).
+- Client: a **"Lend a hand"** section of help buttons in the neighbour visit card.
+Verified in Studio: remote + handler wired (self-block guard fired live), `social`
+field present + defaulted, clean boot, no errors. The full 2-player
+help→reward→friendship path needs a real 2-player playtest.
+
 ### Feature — 2026-07-26 — VIP enters + orders the fanciest dish; lobby Buzz leaderboard
 Owner revisions to the brainrot VIP, plus a new leaderboard:
 - **VIP now enters the café**: scaled down to fit the 6-stud door, it walks INSIDE,

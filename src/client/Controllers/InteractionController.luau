@@ -23,6 +23,15 @@ local COMPLIMENT_BUTTONS = {
 	{ id = "cozy_vibes", label = "Cosy vibes" },
 }
 
+-- Co-op help actions (Phase C §4a). Server (SocialService.HELP_ACTIONS) is the
+-- source of truth for rewards + the once-per-neighbour-per-day cap.
+local HELP_BUTTONS = {
+	{ id = "water_plants", label = "💧 Water plants" },
+	{ id = "bus_table", label = "🧽 Bus a table" },
+	{ id = "stir_pot", label = "🥄 Stir a pot" },
+	{ id = "hand_flyers", label = "📣 Hand flyers" },
+}
+
 local ui: { [string]: any } = {}
 local currentVisitPlot: number? = nil
 
@@ -36,7 +45,7 @@ local function buildPanel()
 	local panel = Components.Panel(UIController.modalRoot(), "VisitPanel")
 	panel.AnchorPoint = Vector2.new(1, 0.5)
 	panel.Position = UDim2.new(1, -12, 0.5, 0)
-	panel.Size = UDim2.fromOffset(286, 310)
+	panel.Size = UDim2.fromOffset(286, 420)
 	panel.Visible = false
 	local _, close = Components.PanelHeader(
 		panel,
@@ -54,26 +63,41 @@ local function buildPanel()
 	title.ZIndex = 21
 	ui.title = title
 
-	local list = Instance.new("Frame")
-	list.Size = UDim2.new(1, -24, 0, 132)
+	local list = Instance.new("ScrollingFrame")
+	list.Size = UDim2.new(1, -24, 0, 258)
 	list.Position = UDim2.fromOffset(12, 112)
 	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 4
+	list.CanvasSize = UDim2.new()
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.ZIndex = 21
 	list.Parent = panel
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 6)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
+
+	local function sectionLabel(labelText: string, order: number)
+		local lbl = Components.Label(list, labelText, 12, true)
+		lbl.Size = UDim2.new(1, 0, 0, 20)
+		lbl.TextXAlignment = Enum.TextXAlignment.Left
+		lbl.TextColor3 = Color3.fromRGB(190, 180, 170)
+		lbl.LayoutOrder = order
+		lbl.ZIndex = 22
+	end
+
+	sectionLabel("Say something nice", 1)
 	ui.complimentButtons = {}
 	for order, definition in COMPLIMENT_BUTTONS do
 		local button = Components.Button(
 			list,
 			definition.label,
 			Theme.Colors.Roast,
-			UDim2.new(1, 0, 0, 40),
+			UDim2.new(1, 0, 0, 38),
 			"+"
 		)
-		button.LayoutOrder = order
+		button.LayoutOrder = 1 + order
 		button.ZIndex = 22
 		button.Activated:Connect(function()
 			if currentVisitPlot then
@@ -88,6 +112,29 @@ local function buildPanel()
 			end
 		end)
 		table.insert(ui.complimentButtons, button)
+	end
+
+	sectionLabel("Lend a hand", 10)
+	ui.helpButtons = {}
+	for order, definition in HELP_BUTTONS do
+		local button = Components.Button(
+			list,
+			definition.label,
+			Theme.Colors.Blue,
+			UDim2.new(1, 0, 0, 38),
+			"♥"
+		)
+		button.LayoutOrder = 10 + order
+		button.ZIndex = 22
+		button.Activated:Connect(function()
+			if currentVisitPlot then
+				Remotes.event("NeighbourHelp"):FireServer({
+					plotIndex = currentVisitPlot,
+					actionId = definition.id,
+				})
+			end
+		end)
+		table.insert(ui.helpButtons, button)
 	end
 
 	local home = Components.Button(
@@ -105,11 +152,11 @@ local function buildPanel()
 		if mode == "Phone" then
 			panel.AnchorPoint = Vector2.new(0.5, 1)
 			panel.Position = UDim2.new(0.5, 0, 1, -8)
-			panel.Size = UDim2.new(1, -16, 0, 310)
+			panel.Size = UDim2.new(1, -16, 0, 420)
 		else
 			panel.AnchorPoint = Vector2.new(1, 0.5)
 			panel.Position = UDim2.new(1, -12, 0.5, 0)
-			panel.Size = UDim2.fromOffset(286, 310)
+			panel.Size = UDim2.fromOffset(286, 420)
 		end
 	end)
 end
@@ -173,10 +220,22 @@ function InteractionController.Start(_self: any)
 				button.Active = true
 				button.BackgroundTransparency = 0
 			end
+			for _, button in ui.helpButtons do
+				button.Active = true
+				button.BackgroundTransparency = 0
+			end
 			UIController.togglePanel(ui.panel)
 			UIController.toast("Welcome to " .. tostring(msg.owner) .. "'s cafe")
 		elseif msg.kind == "complimented" then
 			UIController.toast("Compliment sent")
+		elseif
+			msg.kind == "helped"
+			or msg.kind == "neighbour_helped"
+			or msg.kind == "help_blocked"
+		then
+			if typeof(msg.text) == "string" then
+				UIController.toast(msg.text)
+			end
 		end
 	end)
 end

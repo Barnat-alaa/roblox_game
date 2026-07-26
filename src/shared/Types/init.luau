@@ -146,6 +146,12 @@ export type DailyState = {
 
 -- The full persisted player document. Bump `schemaVersion` and add a migration
 -- (see DataService.migrate) whenever this shape changes.
+export type SocialState = {
+	friendship: { [string]: number }, -- other userId (string) → accumulated friendship points
+	helpLog: { [string]: { [string]: number } }, -- other userId → { [actionId] = day last helped }
+	lastGoodNeighbourDay: number, -- floor(os.time()/86400) of the last "Good Neighbour" bonus
+}
+
 export type PlayerData = {
 	schemaVersion: number,
 	coins: number,
@@ -161,6 +167,7 @@ export type PlayerData = {
 	grantedReceipts: { [string]: boolean }, -- Robux PurchaseId → granted (ProcessReceipt idempotency)
 	boosts: { [string]: number }, -- boost key → os.time() expiry (2× coins/reputation)
 	ownedPasses: { [string]: boolean }, -- pass key → owned (VIP, Auto-Collect), cached on join
+	social: SocialState, -- neighbour friendships + per-day help anti-farm (Phase C §4a)
 	placedFurniture: { PlacedFurniture },
 	unlockedRecipes: { [string]: boolean },
 	recipeMastery: { [string]: RecipeMasteryEntry },
