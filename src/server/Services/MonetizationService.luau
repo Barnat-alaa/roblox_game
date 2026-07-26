@@ -21,6 +21,8 @@ local MonetizationService = {}
 MonetizationService.Name = "MonetizationService"
 
 local DataService: any
+local CafeService: any
+local KitchenService: any
 
 -- Apply one product's reward to a loaded profile. Returns true on success (so
 -- ProcessReceipt only records the grant + returns PurchaseGranted when it worked).
@@ -129,6 +131,19 @@ local function refreshPasses(player: Player)
 	if changed then
 		DataService:Push(player)
 	end
+	-- Apply VIP perks as soon as ownership is confirmed (they otherwise wait for the
+	-- next spawn / Buzz tick): faster walk + the 👑 café-sign badge. Idempotent, so
+	-- it's safe to run on every join/purchase refresh.
+	if data.ownedPasses.vip == true then
+		local char = player.Character
+		local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.WalkSpeed = Products.vipPerks.walkSpeed
+		end
+		if CafeService and KitchenService then
+			CafeService:SetSignBuzz(player, KitchenService:GetBuzz(player) or 0)
+		end
+	end
 end
 
 function MonetizationService.OwnsPass(_self: any, player: Player, passKey: string): boolean
@@ -148,6 +163,8 @@ end
 
 function MonetizationService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
+	CafeService = ServiceRegistry.get("CafeService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 end
 
 function MonetizationService.Start(_self: any)
