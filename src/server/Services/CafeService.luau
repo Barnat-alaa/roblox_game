@@ -19,12 +19,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local Graphics = require(Shared.Config.Graphics)
 local World = require(Shared.Config.World)
 local Products = require(Shared.Config.Products)
+local EconomyConfig = require(Shared.Config.Economy)
+local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Log = require(Shared.Utilities.Log)
 local Remotes = require(Shared.Network.Remotes)
 
@@ -37,6 +41,8 @@ CafeService.Name = "CafeService"
 local DataService: any
 local BuildService: any
 local AssetLibraryService: any
+local KitchenService: any
+local AnalyticsService: any
 
 local NUM_PLOTS = World.plotCount
 local PLOTS_PER_ROW = World.plotsPerRow
@@ -1316,15 +1322,21 @@ local function buildShutter(plot: Plot): Model
 	return shutter
 end
 
--- The owner's name on their café sign, with a 👑 badge if they own VIP (a
--- cosmetic Robux perk, docs/MONETISATION.md §C). Reads the cached ownedPasses
--- flag off the profile (like the offline-cap perk), so no extra async query.
-local function ownerDisplay(player: Player): string
+-- The café's name line on its sign: the player's chosen name if they set one
+-- (SetCafeName, filtered), else "<DisplayName>'s Café". A 👑 prefixes it for VIP
+-- owners (a cosmetic Robux perk, docs/MONETISATION.md §C). Reads the cached flags
+-- off the profile, so no extra async query.
+local function cafeSignName(player: Player): string
 	local data = DataService:GetProfile(player)
 	local vip = data ~= nil
 		and typeof((data :: any).ownedPasses) == "table"
 		and (data :: any).ownedPasses.vip == true
-	return if vip then "👑 " .. player.DisplayName else player.DisplayName
+	local crown = if vip then "👑 " else ""
+	local custom = if data ~= nil then (data :: any).cafeName else nil
+	if typeof(custom) == "string" and custom ~= "" then
+		return crown .. custom
+	end
+	return crown .. player.DisplayName .. "'s Café"
 end
 
 -- VIP owners walk a touch faster (a convenience perk, not power). Applied on each
@@ -1351,7 +1363,7 @@ local function setPlotClosed(plot: Plot)
 end
 
 local function setPlotOpen(plot: Plot, player: Player)
-	plot.ownerLabel.Text = ownerDisplay(player) .. "'s Café"
+	plot.ownerLabel.Text = cafeSignName(player)
 	if plot.shutter then
 		plot.shutter:Destroy()
 		plot.shutter = nil
@@ -1386,7 +1398,7 @@ end
 function CafeService.SetSignBuzz(_self: any, player: Player, buzz: number)
 	local plot = plotByUser[player.UserId]
 	if plot then
-		plot.ownerLabel.Text = ownerDisplay(player) .. "'s Café\n🔥 Buzz " .. tostring(buzz)
+		plot.ownerLabel.Text = cafeSignName(player) .. "\n🔥 Buzz " .. tostring(buzz)
 	end
 end
 
@@ -1628,10 +1640,83 @@ local function placeCafeSign(plot: Plot)
 	sign.Parent = plot.model
 end
 
+local cafeNameLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
+local MAX_CAFE_NAME = 22
+
+-- Name your OWN café (owner request 2026-07-26). Server-authoritative + safe: the
+-- typed name is run through Roblox's TextService filter — mandatory for any player
+-- text shown to others — before it is stored or displayed. In Studio the filter
+-- often can't reach the moderation service; there (and ONLY there) an unfiltered
+-- name is allowed so the flow is testable. Live, a name that can't be filtered is
+-- rejected rather than shown raw.
+local function handleSetCafeName(player: Player, payload: unknown)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	if not cafeNameLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	local raw = (payload :: any).name
+	if typeof(raw) ~= "string" then
+		return
+	end
+	local trimmed = (string.gsub(raw, "^%s*(.-)%s*$", "%1"))
+	if #trimmed == 0 or utf8.len(trimmed) == nil then
+		Remotes.event("Notify")
+			:FireClient(player, { kind = "cafe_name_rejected", text = "Please type a name." })
+		return
+	end
+	if utf8.len(trimmed) :: number > MAX_CAFE_NAME then
+		trimmed = string.sub(trimmed, 1, utf8.offset(trimmed, MAX_CAFE_NAME + 1) :: number - 1)
+	end
+
+	local filtered: string? = nil
+	local ok, result = pcall(function()
+		local r =
+			TextService:FilterStringAsync(trimmed, player.UserId, Enum.TextFilterContext.PublicChat)
+		return r:GetNonChatStringForBroadcastAsync()
+	end)
+	if ok and typeof(result) == "string" and result ~= "" then
+		filtered = result
+	elseif not ok and RunService:IsStudio() then
+		Log.warn(
+			"SetCafeName: TextService filter unavailable in Studio — using raw name for test"
+		)
+		filtered = trimmed
+	end
+	if not filtered then
+		Remotes.event("Notify"):FireClient(
+			player,
+			{ kind = "cafe_name_rejected", text = "That name wasn't allowed — try another." }
+		)
+		return
+	end
+
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+	(data :: any).cafeName = filtered
+	DataService:Push(player)
+	-- Repaint the sign with the new name (SetSignBuzz reads cafeSignName).
+	local buzz = if KitchenService then KitchenService:GetBuzz(player) or 0 else 0
+	CafeService:SetSignBuzz(player, buzz)
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "cafe_named",
+		text = "Café renamed to " .. filtered,
+	})
+	if AnalyticsService then
+		AnalyticsService:Track(player, "cafe_named", {})
+	end
+end
+
 function CafeService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	BuildService = ServiceRegistry.get("BuildService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	KitchenService = ServiceRegistry.get("KitchenService")
+	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 end
 
 function CafeService.Start(_self: any)
@@ -1790,6 +1875,10 @@ function CafeService.Start(_self: any)
 	end
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
+	Players.PlayerRemoving:Connect(function(player)
+		cafeNameLimiter:clear(player.UserId)
+	end)
+	Remotes.event("SetCafeName").OnServerEvent:Connect(handleSetCafeName)
 
 	Log.info("CafeService built", NUM_PLOTS, "plots (facade + garden architecture)")
 end

@@ -5,6 +5,20 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-26 — player-named cafés (typed, filtered)
+Players can now name their own café (owner request). A **"Name your café"** prompt on
+your own doormat opens a small text-box panel; the typed name is sent to the server
+(`SetCafeName`), which **trims, length-caps (22), and runs it through Roblox's
+`TextService` filter** — mandatory for any player text shown to others — before it is
+stored (`PlayerData.cafeName`, top-level) and painted on the street sign
+(`cafeSignName`: custom name if set, else "<DisplayName>'s Café", with the VIP 👑
+still prefixed). Rate-limited; a name that can't be filtered is rejected (in Studio,
+where the moderation service is unreachable, an unfiltered name is allowed **only**
+for local testing). New `CafeNameController` (prompt + panel), `SetCafeName` remote.
+Verified in Studio: firing `SetCafeName("  The Cosy Bean  ")` trimmed + stored the
+name, repainted the sign to "👑 The Cosy Bean · 🔥 Buzz 8", and the rename prompt is
+attached to the owner's plot.
+
 ### Feature — 2026-07-26 — world aesthetics pass + spawn/sign fixes
 Owner-requested visual polish for the neighbourhood (docs/SESSION_HANDOFF.md):
 - **Natural sky + sun** — a real `Sky` (default cloud cubemap + a bigger sun disc,
