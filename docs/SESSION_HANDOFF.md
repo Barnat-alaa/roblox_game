@@ -1,245 +1,174 @@
-# Session handoff — 2026-07-22
+# Session handoff — Social Café City — 2026-07-26
 
-Paste the "Prompt for the next session" block at the bottom into a fresh
-session. Full project context is in [HANDOFF.md](../HANDOFF.md); what the game
-*is* and where to take it is in
-[docs/GAMEPLAY_DIRECTION.md](GAMEPLAY_DIRECTION.md).
-
-`main` is green. **No open PRs.**
+_Authoritative pick-up doc (supersedes prior handoffs). Written for a fresh AI
+session or a new developer taking over. This is the "start here" prompt — read it
+top to bottom, then the docs it points to._
 
 ---
 
-## 1. What shipped this session (2026-07-22)
+## 0. You are
 
-Six PRs, all merged with CI green, all verified live in Studio by measurement.
+A senior Roblox dev continuing **Social Café City**, a social café-management sim
+at `C:\Users\barna\Desktop\roblox` (git repo, `main`, CI-green). Strict-Luau /
+Rojo / Rokit / Wally, **server-authoritative**, **data-driven** (all tuning in
+`src/shared/Config`). Published privately (DEV place `85898641225605`,
+universeId `10501568035`). You drive Roblox Studio via the **Studio MCP**.
+
+## 1. Read first (in order)
+
+- **`HANDOFF.md` §1 (ethics rails — ABSOLUTE)** + §2 (where everything lives +
+  publishing).
+- `docs/GAMEPLAY_DIRECTION.md` (what/why), `docs/IMPLEMENTATION_MAP.md` (exact
+  code hooks per feature), `docs/CORE_LOOP_SPEC.md` (recipe/production balance),
+  `docs/MONETISATION.md`.
+- `ROADMAP.md` → "ACTIVE BUILD — Direction phases A–D".
+- `CHANGELOG.md` `[Unreleased]` — every change this session, with rationale.
+
+## 2. State (2026-07-26) — everything below is MERGED to `main`, CI-green
+
+Shipped this session (PRs #30–#35, all merged):
 
 | PR | What |
 | --- | --- |
-| [#10](https://github.com/Barnat-alaa/roblox_game/pull/10) | The chunky icon HUD — stat pills, centre dock, right rail — and 17 CC0 icons sourced and self-uploaded |
-| [#11](https://github.com/Barnat-alaa/roblox_game/pull/11) | Catalogue rows show the real item, blurred while locked |
-| [#12](https://github.com/Barnat-alaa/roblox_game/pull/12) | All 14 dishes get their own icon |
-| [#13](https://github.com/Barnat-alaa/roblox_game/pull/13) | Furniture renders 1.5× bigger; round table is one cell; `deepen` added |
-| [#14](https://github.com/Barnat-alaa/roblox_game/pull/14) | HUD rearranged (camera pad, health bars, tutorial card) + **the tutorial dead-end fixed** |
-| [#15](https://github.com/Barnat-alaa/roblox_game/pull/15) | The last three button icons — the whole HUD is one style |
+| #30 | **Production balance** — per-serving margins fixed to 42–58% (were 0% on the cheapest); `tests/Recipes.spec` invariant guards it |
+| #31 | **Auto-collect + wall food shelves** — finished manual cooks auto-collect (`Kitchen.autoCollectCooks`); per-recipe wall shelves (`Kitchen.useFoodShelves`) |
+| #32 | **Phase B — brainrot VIP + earned gift box** — Creator Store asset `112586636995159`; `VipService`, `Config/Vip`, `Config/Gifts`, `RewardMath.rollGift` |
+| #33 | **Shelf rework** — bigger shelves + props/labels; order pickup moved from the counter to each recipe's wall shelf |
+| #34 | **VIP rework + lobby Buzz leaderboard** — VIP enters, orders the fanciest dish, instant serve; `LeaderboardService` ranks cafés by Buzz on the plaza board |
+| #35 | **Phase C 4a — neighbour help + friendships** — `NeighbourHelp` remote, `HELP_ACTIONS`, `PlayerData.social` |
 
-### The HUD
+**Phase status:** A ✅ · B ✅ · C-4a ✅. **Next: C-4b (mischief, owner-approved),
+then D (monetisation).**
 
-Bottom-left: **Money · Reputation · Buzz** as stacked pills whose values tween
-(measured: 16 intermediate frames on a −15 purchase) with a 1.08 scale pop.
-Bottom-centre: five chunky plates — **Build 1, Cookbook 2, Staff 3, Upgrades 4,
-Shop 5** — that lift to 1.10 and fade their name in on hover, dip to 0.94 and
-settle on press, and stay raised with a bright stroke while their panel is open.
-Right edge: **Goals G, Trophies T, Map M, Music B, Settings V** as smaller round
-plates with the key in a pill beside them. Music is a toggle and shows its state
-through tint, not the raised treatment.
-
-Both zones are one component, `Components.IconButton`. Every size, scale, tint
-and motion value is in `Theme.Hud`; controllers hold no layout literals. One
-`HUD_BUTTONS` table in `UIController` declares id, zone, order, key, badge,
-label and accent together — controllers only attach behaviour via
-`registerAction(id, callback)`. Buttons with no panel yet (Staff, Upgrades, Map,
-Settings) raise a toast saying so rather than doing nothing.
-
-Full spec and the measured acceptance table: [HUD_REDESIGN.md](HUD_REDESIGN.md).
-
-### Item and dish art
-
-Shop rows, build-placement rows, cookbook cards and pantry rows show **the real
-item**. Furniture is rendered on demand by Roblox from the Creator Store model
-we already ship (`Graphics.ItemThumbnail`); dishes have their own uploaded icon
-(`Graphics.Dishes`, keyed by recipe id). Locked entries show that same picture
-**heavily blurred** with the level requirement over it.
-
-Coverage is complete: 20/20 furniture, 14/14 dishes, 13/13 HUD buttons, 3/3 stat
-pills. Every id is recorded in [ASSET_LICENSES.md](ASSET_LICENSES.md).
-
-### World scale
-
-`AssetManifest.displayScale = 1.5` scales every placed piece from one number.
-`table_round` is **1×1**, so the four adjacent cells are exactly the four chair
-seats — measured at 4.00 studs centre-to-centre with a +0.07…+0.14 stud gap.
+⚠️ **NOT PUBLISHED.** All 7 merged features are in `main` but **NOT live** in the
+DEV place. Publish with `./scripts/publish.ps1` — it needs `$env:ROBLOX_API_KEY`
+(the owner's Open Cloud key). The **owner runs it or provides the key**; an agent
+must NOT enter/handle the key in plaintext. See `HANDOFF.md` §2a.
 
 ---
 
-## 2. Hard-won facts — read before re-deriving them
+## 3. 🐞 BUGS THE OWNER FOUND (2026-07-26) — TOP PRIORITY, fix these next
 
-These each cost real time to establish. They are not guesses.
+### Bug 1 — Session gift + 15-minute playtime gift with a visible counter
+A gift should appear **once when the player connects**, and **another after they
+stay connected 15 minutes**, with a **clearly-shown countdown timer** ("compteur")
+on the HUD. This is a NEW retention feature (there is no login/session-gift system
+today; the VIP gift box is unrelated — it drops when a VIP visits).
+- Build: a new server service tracking each player's session connect-time + a HUD
+  countdown; grant the gift on connect and again at the 15-min mark; show the
+  ticking timer.
+- Look at `GoalService` / the `daily` state + `RewardMath.rollGift` / `Config/Gifts`
+  for reward patterns; the HUD countdown mirrors the boost-timer pill idea in
+  `docs/MONETISATION.md` ("2× Coins — 43:12 left"). Rails: earned by play, not
+  paid, no fake urgency.
 
-**`rbxthumb` for `type=Asset` serves only 150×150 and 420×420.** Every other
-size (48/60/75/100/110/128/140/160/180/250/256/352/512/720) is accepted as a
-string and silently returns a **blank image**.
+### Bug 2 — Brainrot VIP must behave like a normal customer
+Right now the VIP walks in and is **served instantly** (`VipService`, a standalone
+path). The owner wants it to act like a real customer: **enter → find & SIT in an
+empty chair (if one is free) → order a RARE item (a fancy dish, NOT coffee/tea) →
+WAIT to be served** (owner or waiter serves it), then leave the earned gift box.
+- Hooks: `CustomerService` owns the customer lifecycle (spawn → walk to a seat →
+  order → wait → served → leave) and seating. `VipService` currently does the
+  standalone instant path (tuning in `Config/Vip`).
+- Cleanest approach: spawn the VIP THROUGH `CustomerService` as a special customer
+  (VIP flag + forced RARE recipe + the brainrot rig from `AssetLibraryService:GetVip`),
+  reusing its seating/order/serve flow, instead of the standalone instant-serve
+  path. Keep the leaderboard targeting (#1 by Buzz), the entrance walk, and the
+  earned gift box on leave.
+- "Rare item, not coffee/tea": pick a high-tier non-Coffee/Tea recipe the café has
+  unlocked (`Config/Recipes` has `category` + `basePrice`).
 
-**Roblox has no GUI blur.** `BlurEffect` is a Lighting post-process on the 3D
-world and does nothing to a `ScreenGui`. With no small thumbnail available to
-upscale either, the locked-item blur is composited — the same picture drawn 14×
-at small offsets. Measured cost: 20 blurred rows = 260 ImageLabels = 61 fps.
-
-**Roblox does not fetch images it is not rendering.** A row scrolled out of view
-reports `IsLoaded == false` forever. That is normal, not a fault — scroll it in
-before concluding an asset is broken. First-ever requests also generate
-server-side and took seconds, which is why `UIController` warms every catalogue
-image with `PreloadAsync` on a background thread at join.
-
-**Automatic production monopolises appliances.** `ProductionService` holds a job
-on the appliance, so a player's manual `StartCook` answers `stove_busy`. This is
-why the tutorial could not be completed, and it is worth knowing before
-designing anything that asks the player to cook on demand.
-
-**MCP's Luau context has its own module cache.** `require`ing `ServiceRegistry`
-from `execute_luau` gets a fresh, empty registry — you cannot reach the running
-singletons. Drive tests through remotes, exactly as a client would.
-
-**Generated icon sheets are not transparent.** The checkerboard is painted in as
-opaque pixels in two tones, with each icon's glow blended into it. A colour key
-leaves a dirty halo; `scripts/slice_icon_sheet.py` un-mixes the background
-instead and takes `--rows/--cols/--names`.
-
----
-
-## 3. ⚠️ Owner actions still outstanding
-
-1. **Dashboard Max Players → 10.** Not settable from code. The recorded setting
-   is 30; leave it and 20 players per server join with no café.
-2. **Create an Open Cloud API key** for `scripts/publish.ps1` — see HANDOFF §2a.
-3. **Publish.** The cloud place still lags the repo — everything above is local.
-4. ~~Decide the next feature.~~ **Decided 2026-07-23** — the owner chose the
-   feature set now written in [GAMEPLAY_DIRECTION.md](GAMEPLAY_DIRECTION.md):
-   ingredients + staff hire/upgrade first, then VIP + gift box, then neighbour
-   help + smell bomb, then a monetisation pass. Two things still need the owner:
-   the **VIP NPC model**, and a **sign-off on the monetisation stance** (Robux
-   buys accelerators, not power) and on the **smell-bomb guard rails**.
+### Bug 3 — Customers wait even when chairs are empty
+Some customers enter and keep waiting/standing even though there ARE free chairs.
+Seating bug in `CustomerService` — the seat-assignment / chair-availability scan
+isn't picking up empty chairs (candidates: stale seat state, a seat reservation
+never released, or the scan missing newly-placed chairs). Fix so a waiting
+customer takes any genuinely-free chair; verify seated dining end-to-end.
 
 ---
 
-## 4. Verification state
+## 4. Also open (from earlier this session)
 
-- **The 10-café street and the ambient crowd: playtested and confirmed by the
-  owner (2026-07-21).** Do not ask him to re-run it.
-- **The HUD, item art and furniture scale: verified by measurement, not by eye**
-  — zero overlapping elements in all three responsive modes, world visibility
-  80.3% / 64.4% / 56.3% against 62 / 62 / 55% floors, every image `IsLoaded`,
-  hover/press/active states read back off the instances.
-- **The tutorial: run end to end, 1 → 2 → 3 → 6, no dead end.**
-- **Still not runtime-tested: the `saveBlocked` path.** Reproducing it needs a
-  store that exists but whose `GetAsync` fails, which cannot be forced from
-  Studio. Correct by inspection only.
-- **Never tested: two clients at once.** MCP cannot attach to the child
-  processes a `Serveur et clients` test spawns, so visits, compliments and two
-  cafés running simultaneously remain unverified.
-
----
-
-## 5. Known gaps worth picking up
-
-- **No ingredients exist.** The word is a coin cost with no representation. See
-  GAMEPLAY_DIRECTION §1 — this is the owner's own top complaint.
-- **The game automates away its own gameplay.** Staff remove the physical loop
-  as you progress. GAMEPLAY_DIRECTION §3.
-- **No session locking.** `saveAsync` does a blind last-writer-wins
-  `UpdateAsync`; a server hop can roll a profile back. ProfileStore is the
-  documented fix and matters more now that many small servers exist.
-- **`BindToClose` waits a flat 3s** instead of waiting for saves to finish.
-- **CustomerService walks customers down z = −14 / −46** — exactly the mailbox
-  and hydrant lines. It is the only street-facing service not using
-  `StreetMath`, and it hand-rolls `streetLength` a fourth time.
-- **Offline earnings ignore producer capacity** — `capacityScale` uses Waiter
-  only, so Barista/Cook can be at 0 and the claim still pays in full.
-- **Offline window can be forfeited** — `onPlayerRemoving` stamps `lastSeenAt`
-  unconditionally, even if settlement never ran that session.
-- **SocialService compliment anti-farm is per-server, in-memory** — defeated by
-  rejoining.
-- **AnalyticsService is a log-only stub**, so none of the above is visible at
-  scale.
-- **The espresso machine is wider than the counter it stands on** (6.3 vs 3.9
-  studs). That is the machine being a big model, not the counter being thin —
-  shrink `coffee_machine.maxSpan` or raise the counter's `deepen`.
-- **Three furniture pieces overhang by >2 studs** on their long side:
-  `cake_display` +2.7, `coffee_machine` +2.9, `rug_round` +3.4. A rug is fine;
-  the other two are the first to trim if the owner wants things tighter.
-- **Two spare icons are unused** from the owner's sheet: a coin stack and a
-  trophy-with-bar-chart (`Graphics.UI.Coins` / `.Rankings`). The second suits a
-  street leaderboard.
+- **Phase C 4b — mischief (owner APPROVED, build with FULL guardrails).** Smell
+  Bomb (green vapour VFX via a new `Fx.smellVapour` modelled on `Fx.scrub`; lures
+  customers) + manual recruitment (walk to a wandering customer, press E; success
+  scales with reputation; VIPs resist). MANDATORY guardrails: earned/bought
+  consumable on a **cooldown**, a **visible telegraph** (the vapour),
+  **one-at-a-time** pull of **not-yet-served** customers only, **immunity periods**
+  + a **max-stolen cap**, **VIP resistance**, and **no permanent loss**.
+  Server-authoritative. Hooks: `docs/IMPLEMENTATION_MAP.md` "Feature 4 / 4b".
+- **2-player playtest of 4a** — the helper→online-neighbour reward/friendship path
+  + the once-per-neighbour-per-day cap. A single client can't test it (the remote/
+  guard path IS verified live: firing `NeighbourHelp` at your own plot returns the
+  self-block). Needs Studio 2-client or two real players.
+- **Live shelf-pickup playtest** — confirm the owner picking a dish off its wall
+  shelf → carrying → delivering → paid feels right. Only verified structurally
+  (idle-test Buzz was ~0, so no live customers ordered).
+- **Brainrot scale/offset** — tune `Config/Vip.modelHeight` / `hipHeight` /
+  `rigYOffset` by eye in a playtest.
+- **`tests/Graphics.spec` failure (pre-existing).** "defines a non-empty image for
+  every persistent HUD icon" fails: `Config/Graphics.luau` `UI` has `Coins` but the
+  test expects `Coin` (and a `Level` icon looks missing). CI only builds (it does
+  NOT run TestEZ), so it never caught it. Fix the key mismatch + add the missing
+  icon(s). This is the "1 failed / 87 passed" in every Studio TestEZ run —
+  unrelated to any feature.
+- **Friendship reward ladder (4a follow-up)** — friendship points accumulate +
+  persist (`PlayerData.social.friendship`), but there's no reward ladder yet
+  (daily rewards / exclusive decor from friendship levels).
+- **Auto-Collect gamepass overlap** — auto-collect is now free for everyone, so the
+  Auto-Collect gamepass (`Config/Products`, R$149) is redundant; repurpose it in
+  the Phase D monetisation pass.
+- **MaxPlayers = 10** on the Creator Dashboard (owner action; boot warns
+  MaxPlayers 12 > 10 plots).
 
 ---
 
-## 6. Workflow reminders
+## 5. Working rules (the owner expects these)
 
-Gates: `stylua --check src tests` + **unpiped** `selene src tests` + `rojo build`
-of **both** `default.project.json` and `test.project.json`, with
-`set -o pipefail`. CI is the honest gate.
+- **Senior dev team loop:** understand → build cleanly → **TEST IN ROBLOX STUDIO**
+  → commit → open PR → wait CI green → merge. **Never merge unverified core-loop
+  code.** Run an adversarial review for risky changes.
+- **Every gate (this IS the CI):** `stylua .` + `selene .` (unpiped) +
+  `rojo build default.project.json` + `rojo build test.project.json`. House style:
+  tabs, `--!strict`, plain-table services with `Init`/`Start`, data-driven config,
+  no hardcoded values in logic. Add new remotes to the `EVENTS` list in
+  `Remotes.luau`; validate every payload server-side; new persisted state should be
+  a **top-level** `PlayerData` field (so `reconcile` heals old saves) + a heal
+  helper for nested shapes (see `SocialService.socialOf`, `KitchenService.kitchenOf`).
+- **Ship risky/core changes behind a config flag first**, test with it on, then
+  flip live (`Kitchen.enforceIngredients` / `useProductionPlan` / `autoCollectCooks`
+  / `useFoodShelves`; `Vip.enabled`).
+- **Ethics rails (ABSOLUTE — `HANDOFF.md` §1):** server-authoritative; no loot
+  boxes; no pay-to-win (every Robux SKU also coin/level-earnable); no fake urgency;
+  no free-text chat (whitelisted compliments/help actions only). §4b mischief is
+  the ONE rails-brushing mechanic — the owner has signed off, but ONLY with the
+  guardrails in §4 above.
 
-Publish with `./scripts/publish.ps1` — **never** Studio's *Publier sur Roblox*,
-which uploads whatever is open in Studio rather than what is on disk.
+## 6. Studio workflow (the owner authorised driving Studio directly)
 
-**Layout belongs in one place.** `ResponsiveLayout.hudLayout(mode, viewport)`
-returns every HUD rectangle and six controllers read it (UI, Inventory,
-Operations, Camera, Cooking, Tutorial). They each used to guess, which is
-exactly how the tutorial card ended up on top of the stat pills. If you move
-something, move it there, then re-run the overlap measurement.
+- **Close:** a SINGLE `Stop-Process` of `RobloxStudio*`, then `Start-Sleep 3`.
+  Repeated force-kill relaunches trigger Studio's home/recovery page — minimise
+  them.
+- **Rebuild:** `rojo build default.project.json --output SocialCafe.rbxlx` (or
+  `test.project.json` for the TestEZ place) — NEVER while Studio has that file open.
+- **Relaunch:** launch `RobloxStudioBeta.exe` with the absolute place path, wait
+  ~24s, then `list_roblox_studios` + `set_active_studio`.
+- **Driving:** `execute_luau` runs in an ISOLATED VM (fresh require cache) — read
+  the running server's state via **remotes** (e.g.
+  `RS.Remotes.RequestProfile:InvokeServer()`) or by inspecting the DataModel, not
+  by requiring services. **The Play-mode camera CANNOT be repositioned from the
+  MCP** (the game's camera controller overrides any set) — verify visual features
+  via **server data** (`execute_luau` + `inspect_instance`) + console/analytics,
+  and expose visual tuning as config knobs for the owner to eyeball. Upload an
+  image by serving it over `python -m http.server` and passing the URL to
+  `upload_image` (it rejects local paths).
+- **TestEZ:** build `test.project.json`, open it, `RunTests` prints the report on
+  Play. Expect **1 known failure** (the Graphics HUD-icon spec, §4) — CI does NOT
+  run TestEZ, only builds.
 
-**Phone sizing is tuned against a measured floor, not taste.** 560×365 lands at
-56.3% world visible against a 55% floor. Growing the phone plates or pills in
-`Theme.Hud` will break it.
+## 7. Exact command to continue
 
-Studio MCP notes: `screen_capture` only grabs the 3D viewport and cannot be
-posed during Play (the camera controller overwrites a scripted camera every
-frame); it never shows the Studio ribbon — ask the owner for those. Prefer
-`execute_luau` measurement over screenshots for anything geometric. Relaunching
-Studio repeatedly can trigger its recovery/start page — relaunch once per change
-set. Owner runs a **French Studio UI**; give French click paths. Never run two
-agents on this repo at once.
-
----
-
-## Prompt for the next session
-
-> Continue the Social Café game (repo at C:\Users\barna\Desktop\roblox). Read
-> HANDOFF.md, then docs/SESSION_HANDOFF.md, then docs/GAMEPLAY_DIRECTION.md.
->
-> **State:** `main` is green, no open PRs. The HUD, the item/dish art and the
-> world scale were all rebuilt and verified on 2026-07-22 — do not redo them.
-> Every buyable, placeable and cookable thing has real art; every HUD button is
-> on the owner's own icon set. The tutorial runs end to end.
->
-> **MAIN TASK — build the owner's chosen feature set, in
-> docs/GAMEPLAY_DIRECTION.md, in the order there.** It fixes the two diagnosed
-> problems: there are **no ingredients** (the word is a coin deduction with
-> nothing behind it) and the game **automates away its own gameplay** (staff
-> progressively remove every physical action). Read the doc in full first — each
-> feature names the exact service it hooks into. In order:
->   - **Phase A — Ingredients + Staff hire/upgrade panel.** Recipes consume real
->     stock from a pantry, bought in bulk at the market (art: HAVE, all 14 — 11
->     direct Kenney Food Kit renders + 3 recolours). The café starts with only a
->     Barista and Waiter; the Staff button hires the locked Cook/Cleaner (blurred
->     photo when locked) and upgrades each in 10% steps that raise their
->     capacity, with a level-up effect on the NPC. `StaffMember` already carries
->     `level`; `staffCapacity` is already per-role; the plumbing fits.
->   - **Phase B — VIP customers + gift box.** A VIP spawns in the lobby and walks
->     to the busiest café on the server; eats, tips big, leaves a gift box the
->     player opens for a reward (coins now). Owner supplies the VIP NPC model.
->     The gift box is EARNED, never a paid random box.
->   - **Phase C — Neighbour help (co-op) + smell bomb (competitive).** See the
->     doc; the smell bomb brushes the ethics rails and needs the guard rails
->     spelled out there — confirm with the owner before building it.
->   - **Phase D — Monetisation**, only after A–C prove the loop is fun. Robux
->     buys ACCELERATORS (everything also earnable with coins), never power;
->     idempotent `ProcessReceipt`.
->
-> **Ethics rails are absolute** (HANDOFF §1): spoilage transparent and paused
-> offline, no missed-day punishment, no loot boxes, no pay-to-win, no fake
-> urgency, whitelisted communication only. Any design that breaks one is invalid.
->
-> **Before you build anything that asks the player to cook on demand:** the
-> automatic production loop holds a job on the appliance, so a manual `StartCook`
-> answers `stove_busy`. That is what made the old tutorial impossible — and it is
-> why ingredient checks must gate the AUTOMATIC production tick, not just manual
-> cooking.
->
-> Work in strict Luau on disk. Keep StyLua + Selene + both Rojo builds green with
-> `set -o pipefail` and unpiped selene, commit with conventional messages +
-> CHANGELOG entries, open a PR and merge once CI is green. Verify live via
-> Roblox Studio MCP by **measuring** — screenshots cannot be posed during Play,
-> MCP cannot reach the running singletons (drive tests through remotes), and it
-> cannot see the Studio ribbon. Relaunch Studio once per change set, not per
-> edit. Never import copyrighted assets; record every asset in
-> docs/ASSET_LICENSES.md before it ships.
+Open Claude Code in `C:\Users\barna\Desktop\roblox` and paste this file, or say
+"continue" (a fresh session reads `docs/SESSION_HANDOFF.md`). Recommended order:
+**fix the three §3 bugs** (what the owner is blocked on) → build **Phase C 4b** →
+**publish** → **Phase D**.
