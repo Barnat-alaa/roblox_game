@@ -32,6 +32,7 @@ local EVENTS = {
 	"NeighbourHelp", -- c->s: help a neighbour's café {plotIndex, actionId} (Phase C §4a)
 	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit (Phase C §4b)
 	"SetCafeName", -- c->s: name your own café {name} — filtered server-side (TextService)
+	"WorldReady", -- s->c: café rendered + assets loaded {cafeName} — ends the intro overlay
 	"ProfileUpdated", -- s->c: full PlayerData snapshot
 	"Notify", -- s->c: toast / error feedback
 	"OrderCreated", -- s->c: a customer placed an order

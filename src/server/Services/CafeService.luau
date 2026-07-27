@@ -829,6 +829,17 @@ local function applyLighting()
 		brokenSky:Destroy()
 	end
 
+	-- Volumetric moving clouds (owner request 2026-07-27): the modern engine
+	-- technique that replaces the old flat cloud-TEXTURE backdrop walls
+	-- (buildSkyBackdrop, removed). Parented to Terrain, which always exists; drifts
+	-- and lights realistically with the sun.
+	local terrain = workspace.Terrain
+	local clouds = terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
+	clouds.Cover = 0.55 -- fraction of sky covered
+	clouds.Density = 0.6
+	clouds.Color = Color3.fromRGB(255, 251, 244)
+	clouds.Parent = terrain
+
 	-- Light, cool-ish haze — depth without flattening the sky into a golden fog.
 	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmo.Density = 0.22
@@ -849,78 +860,6 @@ local function applyLighting()
 	rays.Intensity = 0.12
 	rays.Spread = 0.7
 	rays.Parent = Lighting
-end
-
-local function buildSkyBackdrop(parent: Instance)
-	local old = parent:FindFirstChild("SkyBackdrop")
-	if old then
-		old:Destroy()
-	end
-	local folder = Instance.new("Folder")
-	folder.Name = "SkyBackdrop"
-	folder.Parent = parent
-
-	local plotWidth = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local streetLength = (PLOTS_PER_ROW - 1) * PLOT_SPACING + plotWidth
-	local centreX = streetLength / 2
-	local centreZ = -World.boulevardWidth / 2
-	-- Keep the approved cloud image close enough to read from the isometric
-	-- gameplay camera. It remains beyond every playable plot and is non-solid.
-	local spanX = streetLength + 500
-	local spanZ = World.boulevardWidth + 2 * TOTAL_DEPTH + 500
-	local height = 500
-	local image = Graphics.Surfaces.Sky
-
-	local function backdrop(name: string, size: Vector3, cf: CFrame, face: Enum.NormalId)
-		local wall = makePart(
-			name,
-			size,
-			cf,
-			Color3.fromRGB(110, 190, 225),
-			folder,
-			Enum.Material.SmoothPlastic
-		)
-		wall.CanCollide = false
-		wall.CanQuery = false
-		wall.CanTouch = false
-		wall.CastShadow = false
-		local texture = Instance.new("Texture")
-		texture.Name = "ApprovedClouds"
-		texture.Face = face
-		texture.Texture = image
-		texture.StudsPerTileU = 420
-		texture.StudsPerTileV = 420
-		texture.Parent = wall
-	end
-
-	local northZ = centreZ + spanZ / 2
-	local southZ = centreZ - spanZ / 2
-	local eastX = centreX + spanX / 2
-	local westX = centreX - spanX / 2
-	backdrop(
-		"CloudsNorth",
-		Vector3.new(spanX, height, 2),
-		CFrame.new(centreX, height / 2 - 60, northZ),
-		Enum.NormalId.Front
-	)
-	backdrop(
-		"CloudsSouth",
-		Vector3.new(spanX, height, 2),
-		CFrame.new(centreX, height / 2 - 60, southZ),
-		Enum.NormalId.Back
-	)
-	backdrop(
-		"CloudsEast",
-		Vector3.new(2, height, spanZ),
-		CFrame.new(eastX, height / 2 - 60, centreZ),
-		Enum.NormalId.Left
-	)
-	backdrop(
-		"CloudsWest",
-		Vector3.new(2, height, spanZ),
-		CFrame.new(westX, height / 2 - 60, centreZ),
-		Enum.NormalId.Right
-	)
 end
 
 -- A grass island under the whole neighbourhood — fills the bare ground between
@@ -1537,6 +1476,15 @@ local function activatePlot(player: Player, plot: Plot)
 	if player.Character then
 		task.spawn(placeOnCafe, player.Character)
 	end
+
+	-- Tell the client the world is READY (café rendered here + Creator-Store assets
+	-- finished loading) so the intro overlay can reveal the player in front of their
+	-- café. Carries the current name so the intro pre-fills it.
+	local nameData = DataService:GetProfile(player)
+	local cafeName = if nameData then (nameData :: any).cafeName else nil
+	AssetLibraryService:OnReady(function()
+		Remotes.event("WorldReady"):FireClient(player, { cafeName = cafeName })
+	end)
 end
 
 local function onPlayerAdded(player: Player)
@@ -1824,7 +1772,6 @@ function CafeService.Start(_self: any)
 	end
 
 	applyLighting()
-	buildSkyBackdrop(workspace)
 	buildGroundAndSea(workspace)
 	buildRoadNetwork(workspace)
 	buildStreetDecor(workspace)

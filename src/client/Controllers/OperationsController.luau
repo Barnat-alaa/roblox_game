@@ -1,6 +1,8 @@
 --!strict
--- Tiny always-visible health card. It makes the four live pressures readable
--- without reopening a full-screen management panel.
+-- Café-health strip: four slim pills (satisfaction, cleanliness, barista, waiter)
+-- at the EXTREME top-centre (owner request 2026-07-27), so the live pressures read
+-- at a glance without ever covering the café or dishes below. Each pill is a
+-- rounded capsule whose coloured fill grows to the value, with an icon + %.
 
 local Players = game:GetService("Players")
 
@@ -17,10 +19,10 @@ local ui: { [string]: any } = {}
 local profile: any = nil
 
 local DEFINITIONS = {
-	{ id = "Satisfaction", short = "SAT", color = Theme.Colors.Coral },
-	{ id = "Cleanliness", short = "CLEAN", color = Theme.Colors.Mint },
-	{ id = "Barista", short = "BARISTA", color = Theme.Colors.Honey },
-	{ id = "Waiter", short = "WAITER", color = Theme.Colors.Blue },
+	{ id = "Satisfaction", icon = "😊", color = Theme.Colors.Coral },
+	{ id = "Cleanliness", icon = "✨", color = Theme.Colors.Mint },
+	{ id = "Barista", icon = "☕", color = Theme.Colors.Honey },
+	{ id = "Waiter", icon = "🍽️", color = Theme.Colors.Blue },
 }
 
 local function valueFor(id: string): number
@@ -42,56 +44,57 @@ local function update()
 	end
 	for _, definition in DEFINITIONS do
 		local row = ui.rows[definition.id]
-		local value = math.clamp(valueFor(definition.id), 0, 100)
-		row.fill.Size = UDim2.fromScale(value / 100, 1)
-		row.value.Text = tostring(math.floor(value)) .. "%"
-		row.fill.BackgroundColor3 = if value < 25
-			then Theme.Colors.Danger
-			elseif value < 55 then Theme.Colors.Honey
-			else definition.color
+		if row then
+			local value = math.clamp(valueFor(definition.id), 0, 100)
+			row.fill.Size = UDim2.fromScale(value / 100, 1)
+			row.label.Text = definition.icon .. " " .. tostring(math.floor(value)) .. "%"
+			row.fill.BackgroundColor3 = if value < 25
+				then Theme.Colors.Danger
+				elseif value < 55 then Theme.Colors.Honey
+				else definition.color
+		end
 	end
 end
 
-local function makeRow(parent: Instance, definition: any, order: number)
-	local row = Instance.new("Frame")
-	row.Name = definition.id
-	row.Size = UDim2.new(0.5, -8, 0, 18)
-	local column = (order - 1) % 2
-	local line = math.floor((order - 1) / 2)
-	row.Position = UDim2.new(column * 0.5, if column == 0 then 0 else 4, 0, line * 22)
-	row.BackgroundTransparency = 1
-	row.Parent = parent
-	local name = Components.Label(row, definition.short, 8, true)
-	name.Size = UDim2.fromOffset(46, 18)
-	name.TextColor3 = Theme.Colors.Cream
-	name.TextXAlignment = Enum.TextXAlignment.Left
-	local back = Instance.new("Frame")
-	back.Size = UDim2.new(1, -82, 0, 7)
-	back.Position = UDim2.fromOffset(48, 6)
-	back.BackgroundColor3 = Theme.Colors.Roast
-	back.BorderSizePixel = 0
-	Components.Corner(back, 4)
-	back.Parent = row
+local function makePill(parent: Instance, definition: any, index: number)
+	local pill = Instance.new("Frame")
+	pill.Name = definition.id
+	pill.Size = UDim2.new(0.25, -4, 1, 0)
+	pill.Position = UDim2.new((index - 1) * 0.25, 2, 0, 0)
+	pill.BackgroundColor3 = Theme.Colors.Espresso
+	pill.BackgroundTransparency = 0.28
+	pill.BorderSizePixel = 0
+	pill.ZIndex = 6
+	pill.ClipsDescendants = true
+	Components.Corner(pill, Theme.Radius.Pill)
+	pill.Parent = parent
+
 	local fill = Instance.new("Frame")
-	fill.Size = UDim2.fromScale(1, 1)
+	fill.Name = "Fill"
+	fill.AnchorPoint = Vector2.new(0, 0.5)
+	fill.Position = UDim2.fromScale(0, 0.5)
+	fill.Size = UDim2.fromScale(0, 1)
 	fill.BackgroundColor3 = definition.color
+	fill.BackgroundTransparency = 0.3
 	fill.BorderSizePixel = 0
-	Components.Corner(fill, 4)
-	fill.Parent = back
-	local value = Components.Label(row, "0%", 8, true)
-	value.Size = UDim2.fromOffset(32, 18)
-	value.Position = UDim2.new(1, -32, 0, 0)
-	value.TextColor3 = Theme.Colors.Cream
-	value.TextXAlignment = Enum.TextXAlignment.Right
-	ui.rows[definition.id] = { fill = fill, value = value }
+	fill.ZIndex = 7
+	Components.Corner(fill, Theme.Radius.Pill)
+	fill.Parent = pill
+
+	local label = Components.Label(pill, definition.icon .. " 0%", 12, true)
+	label.Size = UDim2.fromScale(1, 1)
+	label.TextColor3 = Theme.Colors.White
+	label.TextStrokeTransparency = 0.6
+	label.ZIndex = 8
+	label.Parent = pill
+
+	ui.rows[definition.id] = { fill = fill, label = label }
 end
 
 local function applyResponsive(mode: string, viewport: Vector2)
 	if not ui.card then
 		return
 	end
-	-- Shared geometry: on narrow screens this card drops into the left column
-	-- alongside the camera pad, which reads these same numbers to stay clear.
 	local layout = ResponsiveLayout.hudLayout(mode :: ResponsiveLayout.Mode, viewport)
 	ui.card.Size = UDim2.fromOffset(layout.healthWidth, layout.healthHeight)
 	ui.card.Position = UDim2.fromOffset(layout.healthLeft, layout.healthTopFromTop)
@@ -114,25 +117,18 @@ function OperationsController.Start(_self: any)
 	end)
 	gui.Parent = playerGui
 
+	-- A transparent positioning frame; the four pills carry their own backgrounds.
 	local card = Instance.new("Frame")
 	card.Name = "CafeHealth"
-	card.Size = UDim2.fromOffset(304, 50)
-	card.Position = UDim2.fromOffset(270, 62)
-	card.BackgroundColor3 = Theme.Colors.Espresso
-	card.BackgroundTransparency = 0.06
-	Components.Corner(card, Theme.Radius.Medium)
-	Components.Stroke(card, Theme.Colors.Cream, 1, 0.72)
+	card.Size = UDim2.fromOffset(360, 30)
+	card.Position = UDim2.fromOffset(0, 6)
+	card.BackgroundTransparency = 1
 	card.Parent = gui
 	ui.card = card
 	ui.rows = {}
 
-	local list = Instance.new("Frame")
-	list.Size = UDim2.new(1, -12, 1, -6)
-	list.Position = UDim2.fromOffset(6, 3)
-	list.BackgroundTransparency = 1
-	list.Parent = card
-	for order, definition in DEFINITIONS do
-		makeRow(list, definition, order)
+	for index, definition in DEFINITIONS do
+		makePill(card, definition, index)
 	end
 
 	UIController.subscribeProfile(function(newProfile)
