@@ -153,12 +153,11 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	local serveHeight = if compact then 46 else 50
 	local serveBottom = dockBottom + dockPlate + 12
 
-	-- The cafe-health bars sit centred along the top edge (owner request). Only
-	-- a viewport too narrow to centre them without colliding with the order
-	-- ticket drops them into the left column, where the camera pad also lives —
-	-- which is why the pad reads these numbers.
-	local healthWidth = if viewport.X < 700 then 292 else 304
-	local healthNarrow = viewport.X < 700
+	-- The café-health bars sit as one slim strip at the EXTREME top-centre (owner
+	-- request 2026-07-27) so they never cover the café/dishes below. Compact and
+	-- always centred; shrinks to fit a phone. The order ticket is top-RIGHT and the
+	-- camera pad bottom-left, so nothing collides here.
+	local healthWidth = math.min(360, viewport.X - 16)
 
 	return {
 		phoneSized = phoneSized,
@@ -182,10 +181,10 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 		serveHeight = serveHeight,
 		serveBottom = serveBottom,
 		serveTopFromBottom = serveBottom + serveHeight,
-		healthLeft = if healthNarrow then 10 else (viewport.X - healthWidth) / 2,
-		healthTopFromTop = if healthNarrow then 100 else 62,
+		healthLeft = (viewport.X - healthWidth) / 2,
+		healthTopFromTop = 6,
 		healthWidth = healthWidth,
-		healthHeight = 50,
+		healthHeight = 30,
 	}
 end
 

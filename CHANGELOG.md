@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-27 — intro/onboarding, advanced sky, cleaner health strip
+Three owner-requested polish items:
+- **First-run intro** (`IntroController`) — a full-screen welcome shown from the
+  first frame (built in `Init`, before any HUD) that MASKS the initial asset load +
+  café render while you **name your café**, then fades out to reveal you standing
+  in front of your own café door. The server fires a new `WorldReady` remote once
+  the café is built + Creator-Store assets are loaded; only then does "Enter my
+  café" light up. Player controls are frozen behind the overlay. (Café STYLE choices
+  will slot into the same panel later.)
+- **Advanced sky** — deleted the old flat cloud-TEXTURE backdrop walls
+  (`buildSkyBackdrop`) and switched to the modern engine technique: a `Sky` skybox +
+  `Atmosphere` + **volumetric Terrain `Clouds`** that drift and light with the sun.
+- **Café-health strip redesigned** — the ugly 2×2 dark card is now four slim,
+  rounded pills (😊 ✨ ☕ 🍽️ with a coloured fill + %) at the EXTREME top-centre, so
+  it never covers the café or dishes (`OperationsController` + `ResponsiveLayout`).
+
+Verified in Studio: clean boot, no errors; the intro overlay reliably appears on the
+first play after a fresh launch, "Enter my café" enables on `WorldReady`, typing a
+name + clicking it saves the name (sign → "👑 Sunset Brew"), fades the overlay, and
+reveals the player in front of the café (50, 3, -14); the new health pills render at
+the top-centre; the sky backdrop walls are gone. The Clouds look is the owner's
+eyeball (the fixed café-sim camera can't frame the sky).
+
 ### Feature — 2026-07-26 — player-named cafés (typed, filtered)
 Players can now name their own café (owner request). A **"Name your café"** prompt on
 your own doormat opens a small text-box panel; the typed name is sent to the server
