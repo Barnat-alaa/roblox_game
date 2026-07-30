@@ -52,10 +52,31 @@ Also shipped this session (all merged to `main`, CI-green — see `CHANGELOG.md`
 | #42 | **docs** — session handoff update |
 | #43 | **Intro/onboarding + advanced sky + health strip** — first-run naming overlay masking the load (`IntroController`, `WorldReady` remote, controls frozen, reveals in front of café); dropped the fake cloud-wall backdrop for `Sky` + `Atmosphere` + **volumetric Terrain `Clouds`**; café-health redesigned to 4 slim pills at the extreme top-centre (`OperationsController`, `ResponsiveLayout`) |
 
-**➡️ NEXT WORK: see `ROADMAP.md` → "⭐ NEXT — owner priorities (2026-07-28)".**
-That section is the ordered to-do (P1 grass-under-road bug → P2 the 3 real
-neighbour actions → P3 VIP timer event → P4 monetisation into Upgrades +
-sell-multiplier SKUs), each with code hooks. Build one deliverable per PR.
+### 2026-07-30 — the P1–P4 owner priorities are ALL SHIPPED (PRs #45–#50, merged, CI-green)
+
+| PR | What |
+| --- | --- |
+| #45 | **P1 grass-through-road fix** — the grass island's top face sat 0.02 studs ABOVE the road, so it won the depth test. Surface heights are now four named constants with the ordering documented; paving slabs deepened to 0.9 so the kerb never shows daylight |
+| #46 | **P2a steal from a shelf** — pick an item at the door, walk to ITS wall shelf, press E. Victim is told who took it. 90s cooldown, 3 items/5min per victim, must be at the shelf, visible vapour |
+| #47 | **P2b smell bomb = area denial** — clears the whole room, nobody transfers to you; vapour under the caster's feet. Measured Buzz 6→6 and satisfaction 70→70, so no penalty |
+| #48 | **P2c help by WORKING** — HELP_ACTIONS, `NeighbourHelp` and compliments all deleted. Scrub/clear/serve inside a neighbour's café via `SocialService:TryWork`, which pays the helper. `OrderService` now separates the café owner from the hands doing the work |
+| #49 | **P3 VIP scheduled event** — fixed 30-min server event, HUD countdown with the brainrot's rbxthumb, NPC 3 → 5.5 studs (now taller than a customer) |
+| #50 | **P4 store → UPGRADES** — Store rail button dropped; Robux catalogue folded into Upgrades beside a new coin-buyable ×5/×10/×20 **batch-output** ladder (yield, not sell value) |
+
+**⚠️ Owner actions now owed (both in ROADMAP):**
+1. **Create 3 Developer Products** (Batch Output ×5/×10/×20) and paste the IDs
+   into `Config/Products.yieldTiers[n].productId`. Coin path already works; the
+   Robux buttons stay hidden until then.
+2. **Economy rebalance pass** — a permanent ×20 yield is a 20× income ceiling.
+
+**Still owed on P2:** a **2-player playtest** of steal / smell-bomb / help-by-
+working where the victim or the café owner is a genuinely different player. A
+single client cannot test it; every guard ladder and the solo halves ARE verified.
+**Deferred:** cooking as a visitor (it spends the OWNER's coins/pantry — needs its
+own guardrails; hooks in ROADMAP).
+
+**➡️ NEXT WORK:** the carry-over list below, and `ROADMAP.md` → "⭐ NEXT". The
+biggest single unblock is still **PUBLISH** (`./scripts/publish.ps1`).
 
 Still owed (carry-over): **PUBLISH** (owner runs `scripts/publish.ps1`); a live
 Robux purchase test (IDs are real); the 2-player mischief-lure + neighbour-help
