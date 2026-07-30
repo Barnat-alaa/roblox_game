@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-07-30 — P2b: the smell bomb now CLEARS a neighbour's café
+The smell bomb was a second way to *pull* one customer to you. It is now **area
+denial**: every customer in the neighbour's café walks out, and **nobody
+transfers to the caster** — pulling is what `recruit` is for, and the two now do
+genuinely different things. The green vapour is thrown **under the caster's own
+feet** rather than at the café, so it is obvious who set it off.
+
+New `CustomerService.ScareAll`, which routes everyone through the existing
+`leaving` path — that cancels any order, frees the seat, and walks them to the
+street with **no Buzz, satisfaction or reputation penalty** (an angry walkout, by
+contrast, costs all three). VIPs resist, as they do every other mischief, and
+anyone already **served keeps the meal they paid for**. The bomb is only spent if
+it actually cleared someone, so it is never wasted on an empty room. The existing
+cooldown and per-victim cap are shared with the pull, so a café cannot be farmed
+by alternating the two. `handleLure` is now recruit-only and no longer carries
+dead smell-bomb branches.
+
+Verified in Studio (self-bomb temporarily allowed in Studio's in-memory DataModel
+only — disk untouched, reverted after): a roomful of 4 customers all fled and the
+toast read "4 customers fled their café"; the bomb decremented 2 → 1 → 0; the
+vapour landed **0.02 studs horizontally and 1.50 studs below** the caster's
+HumanoidRootPart, i.e. at their feet. The rails check needed a second run — the
+first showed Buzz −2 / satisfaction −8, which turned out to be the pre-existing
+"😡 NO EMPTY CHAIR!" storm-out (the default in-memory profile has no chairs), not
+the bomb. After placing a table and two chairs via the `PlaceFurniture` remote,
+the clean measurement was **Buzz 6 → 6 and satisfaction 70.00 → 70.00** across a
+bomb that emptied the room. **Still owed: the 2-player pass.**
+
 ### Feature — 2026-07-30 — P2a: steal an item off a neighbour's wall shelf
 The first of the three REAL neighbour actions replacing the old card of abstract
 buttons. Choosing "🫳 Steal an item" at a neighbour's café does **not** take
