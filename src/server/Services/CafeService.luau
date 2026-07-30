@@ -862,10 +862,34 @@ local function applyLighting()
 	rays.Parent = Lighting
 end
 
+-- ————— outdoor surface heights —————
+--
+-- The street is a stack of thin slabs and the ORDER of their TOP faces is what
+-- you actually see. The grass island spans the WHOLE neighbourhood, including
+-- the ground beneath the road, so its top face must sit clearly below the road's
+-- or the green wins the depth test and bleeds up through the tarmac. That is
+-- exactly the bug the owner reported (2026-07-28): grass topped out at −0.20
+-- against a road top of −0.22, i.e. 0.02 studs ABOVE it, so the near half of the
+-- boulevard rendered as a green field.
+--
+--     café / garden floor top    0.00
+--     sidewalk top              −0.13
+--     road top                  −0.22
+--     grass island top          −0.70   ← reads as a kerb, well under the road
+--
+-- The paving slabs are correspondingly DEEP so their undersides reach past the
+-- grass top (road −1.12, sidewalk −1.03 vs grass −0.70): the kerb is a solid
+-- step down, never a floating slab with daylight under its edge.
+local GRASS_TOP = -0.7
+local ROAD_TOP = -0.22
+local SIDEWALK_TOP = -0.13
+local PAVING_THICKNESS = 0.9
+
 -- A grass island under the whole neighbourhood — fills the bare ground between
 -- plots and around the boulevard — with the sea stretching to the horizon beyond
--- it (owner request 2026-07-26). Land sits at ~ground level; the sea a touch lower
--- so the street reads as a sunny coastal island under the open sky.
+-- it (owner request 2026-07-26). Land sits a kerb-height below the paving; the
+-- sea lower still, so the street reads as a sunny coastal island under the open
+-- sky.
 local function buildGroundAndSea(parent: Instance)
 	local old = parent:FindFirstChild("Landscape")
 	if old then
@@ -880,10 +904,11 @@ local function buildGroundAndSea(parent: Instance)
 	local centreX = streetLength / 2
 	local centreZ = -World.boulevardWidth / 2
 
+	local landThickness = 1
 	local land = makePart(
 		"NeighbourhoodGround",
-		Vector3.new(streetLength + 340, 1, World.boulevardWidth + 2 * TOTAL_DEPTH + 340),
-		CFrame.new(centreX, -0.7, centreZ),
+		Vector3.new(streetLength + 340, landThickness, World.boulevardWidth + 2 * TOTAL_DEPTH + 340),
+		CFrame.new(centreX, GRASS_TOP - landThickness / 2, centreZ),
 		Color3.fromRGB(122, 168, 96),
 		folder,
 		Enum.Material.Grass
@@ -934,9 +959,12 @@ local function buildRoadNetwork(parent: Instance)
 				then "RoadTurnLeft"
 				elseif index == tileCount - 1 then "RoadTurnRight"
 				else "RoadStraight",
-			Vector3.new(tileSize, 0.24, tileSize),
-			CFrame.new(firstX + index * tileSize, -0.34, -World.boulevardWidth / 2)
-				* CFrame.Angles(0, math.rad(90), 0),
+			Vector3.new(tileSize, PAVING_THICKNESS, tileSize),
+			CFrame.new(
+				firstX + index * tileSize,
+				ROAD_TOP - PAVING_THICKNESS / 2,
+				-World.boulevardWidth / 2
+			) * CFrame.Angles(0, math.rad(90), 0),
 			Color3.fromRGB(255, 255, 255),
 			folder,
 			Enum.Material.SmoothPlastic
@@ -955,8 +983,8 @@ local function buildRoadNetwork(parent: Instance)
 	do
 		local sidewalk = makePart(
 			"Sidewalk",
-			Vector3.new(totalLength, 0.3, sidewalkWidth),
-			CFrame.new(centreX, -0.28, z),
+			Vector3.new(totalLength, PAVING_THICKNESS, sidewalkWidth),
+			CFrame.new(centreX, SIDEWALK_TOP - PAVING_THICKNESS / 2, z),
 			Color3.fromRGB(205, 205, 200),
 			folder,
 			Enum.Material.Concrete

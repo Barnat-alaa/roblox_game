@@ -5,6 +5,31 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-07-30 — grass no longer bleeds up through the road
+The owner reported (with a screenshot) green grass showing through and under the
+road. Cause: the grass island spans the WHOLE neighbourhood, including the ground
+beneath the boulevard, and its top face sat at y −0.20 against a road top of
+−0.22 — **0.02 studs ABOVE the tarmac**. The grass therefore won the depth test
+wherever the two overlapped, so the near half of the street rendered as a green
+field (the far half flipped back to road as depth precision degraded, which is
+the hard horizontal seam across the road in the screenshot).
+
+`CafeService` now declares the outdoor surface stack as four named constants
+(`GRASS_TOP` −0.70, `ROAD_TOP` −0.22, `SIDEWALK_TOP` −0.13, `PAVING_THICKNESS`
+0.9) with the ordering written down, instead of four unexplained magic offsets
+spread across two builders. The grass drops to a **kerb height below the paving**,
+and the road/sidewalk slabs are correspondingly **deep (0.9 studs)** so their
+undersides (−1.12 / −1.03) reach well past the grass top: the kerb is a solid
+step down, never a floating slab with daylight under its edge.
+
+Verified in Studio by measurement, not by eye: grass top −0.700 vs road top
+−0.220 (0.48 clearance) and paving undersides 0.33–0.42 studs *below* the grass
+top; a sweep of every near-ground slab confirmed nothing floats over bare grass
+(plaza disc, garden paths, visit pads and street decor all rest on plot floors or
+paving, which themselves reach past the grass top); the sea (top −2.10) still
+clears the lowered grass underside (−1.70). Clean boot, no errors. Screenshots
+from two angles show the road reading solid with zero green bleed.
+
 ### Feature — 2026-07-27 — intro/onboarding, advanced sky, cleaner health strip
 Three owner-requested polish items:
 - **First-run intro** (`IntroController`) — a full-screen welcome shown from the
