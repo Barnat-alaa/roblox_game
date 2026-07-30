@@ -6,10 +6,19 @@
 local Vip = {
 	enabled = true,
 
-	-- Spawn cadence: one VIP attempt every [min,max] seconds. If no café is open
-	-- the attempt is skipped and the timer restarts. Only one VIP exists at a time.
-	spawnIntervalMinSeconds = 240,
-	spawnIntervalMaxSeconds = 480,
+	-- P3 (2026-07-30): the VIP is a SCHEDULED SERVER EVENT, not a random drop-in.
+	-- The old random 4–8 minute window meant nobody could plan for it and half the
+	-- visits went unnoticed. Now every player sees the same countdown on the HUD,
+	-- so "the VIP is due in 4 minutes" is something to get your café ready for.
+	-- The clock is the SERVER's (workspace:GetServerTimeNow), so every client
+	-- agrees; the client only renders what it is told.
+	eventIntervalSeconds = 1800, -- 30 minutes between VIP events
+	-- Grace after a server boots so the first event does not fire into an empty
+	-- street before anyone has built anything.
+	firstEventDelaySeconds = 300,
+	-- If an event can't run (no café open, a VIP already out, assets not ready),
+	-- retry this soon rather than losing the whole 30-minute slot.
+	retryDelaySeconds = 60,
 
 	walkSpeed = 10, -- struts a touch faster than the ambient crowd
 	lingerSeconds = 6, -- pause at the entrance ("placing the premium order")
@@ -33,8 +42,13 @@ local Vip = {
 	-- Humanoid). Tune by eye in a playtest — these only affect how it sits/scales.
 	-- modelHeight must match AssetManifest.vip.height; hipHeight ≈ half of it puts
 	-- the model's feet on the ground, and rigYOffset nudges it up/down from there.
-	modelHeight = 3, -- small enough to walk through the 6-stud door and eat inside
-	hipHeight = 1.6,
+	--
+	-- 2026-07-30 (P3): nearly doubled, 3 → 5.5 (owner: "make the NPC BIGGER"). It
+	-- must still clear the door to get inside and sit — World.doorHeight is 7, so
+	-- 5.5 leaves 1.5 studs of headroom. Do NOT raise this past ~6 without raising
+	-- the door with it, or the VIP will not be able to enter.
+	modelHeight = 5.5,
+	hipHeight = 2.9,
 	rigYOffset = 0,
 
 	bannerText = "✨ A VIP is choosing a café!",

@@ -5,6 +5,39 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-30 — P3: the VIP is a scheduled event with a HUD countdown
+The brainrot VIP used to drop in on a random 4–8 minute timer, so nobody could
+plan for it and half the visits went unnoticed. It is now a **fixed 30-minute
+server event** with a **countdown everyone can see**: a pill under the gift timer
+showing the **brainrot's own picture** (an `rbxthumb` of the real asset, so
+there's no second image to keep in sync) and the time remaining. When it lands,
+the whole street is told which café it chose — the countdown resolves into
+something visible rather than a private surprise.
+
+The clock is the SERVER's (`workspace:GetServerTimeNow`), so every client agrees
+and a mid-cycle joiner is sent the countdown on `PlayerAdded` rather than waiting
+for the next tick. A failed attempt (nobody open, a VIP already out, assets still
+loading) retries in 60s instead of burning the whole 30-minute slot. New
+`VipEvent` remote and `VipEventController`.
+
+**The NPC is much bigger** — `Vip.modelHeight` / `AssetManifest.vip.height` 3 →
+5.5, `hipHeight` 1.6 → 2.9. It was previously *shorter* than an ordinary customer;
+it now stands taller than one. It still clears the 7-stud door with 1.5 studs to
+spare — do not raise it past ~6 without raising the door too.
+
+Verified in Studio (interval temporarily fast-forwarded in Studio's in-memory
+DataModel only — disk untouched, reverted after): the pill renders at top-right
+below the gift timer with the real brainrot thumbnail and counts down correctly
+(0:19 → 0:13 over six seconds); the event fires, spawns the VIP through
+`CustomerService:SpawnVip`, broadcasts `arrived cafe=aloulouba1` to every client,
+and reschedules. Measured VIP height **5.57** studs against a normal customer's
+**4.97**, `HipHeight` 2.94.
+
+⚠️ **For the owner's eye:** the scaled model's bounding box is ~9.4 studs WIDE
+against a 6-stud doorway, so it will visually clip the frame on the way in. It is
+not physically blocked — only the invisible 2×2×1 root collides — but if it looks
+wrong, lower `Vip.modelHeight` (width scales with it) or widen `World.doorWidth`.
+
 ### Change — 2026-07-30 — P2c: help a neighbour by WORKING, not by tapping a card
 Helping was a card of four buttons — "water plants", "bus a table", "stir a pot",
 "hand flyers" — none of which were real things happening in the world, each

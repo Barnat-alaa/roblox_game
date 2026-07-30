@@ -38,6 +38,9 @@ local EVENTS = {
 	"Notify", -- s->c: toast / error feedback
 	"OrderCreated", -- s->c: a customer placed an order
 	"SessionReward", -- s->c: connect/playtime gift + HUD countdown target (Bug 1)
+	-- s->c: the scheduled VIP event (P3) — {kind="timer", nextAt, assetId} for the
+	-- HUD countdown, {kind="arrived", cafe} when the brainrot actually walks in.
+	"VipEvent",
 }
 
 local FUNCTIONS = {

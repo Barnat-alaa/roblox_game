@@ -19,6 +19,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Vip = require(Shared.Config.Vip)
 local World = require(Shared.Config.World)
+local AssetManifest = require(Shared.Config.AssetManifest)
+local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -31,8 +33,6 @@ local KitchenService: any
 local CustomerService: any
 local AssetLibraryService: any
 local AnalyticsService: any
-
-local rng = Random.new()
 
 -- ————— café scoring —————
 
@@ -58,15 +58,41 @@ end
 
 -- ————— the event —————
 
-local function runVipEvent()
+-- The next scheduled event, on the SERVER clock (workspace:GetServerTimeNow), so
+-- every client's countdown agrees and a late joiner sees the same number as
+-- everyone else. The client never computes this — it only renders it (P3).
+local nextEventAt = 0
+
+local function broadcastTimer()
+	Remotes.event("VipEvent"):FireAllClients({
+		kind = "timer",
+		nextAt = nextEventAt,
+		assetId = AssetManifest.vip and AssetManifest.vip.assetId or nil,
+	})
+end
+
+-- Returns true if a VIP actually walked in, so the caller can decide between the
+-- full interval and a short retry.
+local function runVipEvent(): boolean
 	local target = bestCafe()
 	if not target then
-		return -- nobody's open; try again next interval
+		return false -- nobody's open; retry soon rather than losing the slot
 	end
 	local spawned = CustomerService:SpawnVip(target.owner)
-	if spawned and AnalyticsService then
+	if not spawned then
+		return false
+	end
+	if AnalyticsService then
 		AnalyticsService:Track(target.owner, "vip_incoming", { score = target.score })
 	end
+	-- Tell the whole street, not just the winner: the countdown everyone watched
+	-- should resolve visibly into "it went THERE".
+	Remotes.event("VipEvent"):FireAllClients({
+		kind = "arrived",
+		cafe = target.owner.DisplayName,
+		plotIndex = target.index,
+	})
+	return true
 end
 
 function VipService.Init(_self: any)
@@ -84,16 +110,42 @@ function VipService.Start(_self: any)
 	end
 
 	local function loop()
+		nextEventAt = workspace:GetServerTimeNow() + Vip.firstEventDelaySeconds
+		broadcastTimer()
 		while true do
-			task.wait(rng:NextNumber(Vip.spawnIntervalMinSeconds, Vip.spawnIntervalMaxSeconds))
-			-- CustomerService owns the one-VIP-at-a-time guard; a busy or not-ready
-			-- attempt simply returns false and we retry next interval.
-			local ok, err = pcall(runVipEvent)
-			if not ok then
-				Log.warn("VIP event failed:", err)
+			local wait = nextEventAt - workspace:GetServerTimeNow()
+			if wait > 0 then
+				task.wait(math.min(wait, 5)) -- wake often so a late joiner is served promptly
+			end
+			if workspace:GetServerTimeNow() >= nextEventAt then
+				-- CustomerService owns the one-VIP-at-a-time guard; a busy or
+				-- not-ready attempt returns false and we retry shortly instead of
+				-- burning the whole 30-minute slot.
+				local ok, landed = pcall(runVipEvent)
+				if not ok then
+					Log.warn("VIP event failed:", landed)
+				end
+				nextEventAt = workspace:GetServerTimeNow()
+					+ (
+						if ok and landed == true
+							then Vip.eventIntervalSeconds
+							else Vip.retryDelaySeconds
+					)
+				broadcastTimer()
 			end
 		end
 	end
+
+	-- A joiner mid-cycle needs the countdown immediately, not at the next tick.
+	Players.PlayerAdded:Connect(function(player)
+		if nextEventAt > 0 then
+			Remotes.event("VipEvent"):FireClient(player, {
+				kind = "timer",
+				nextAt = nextEventAt,
+				assetId = AssetManifest.vip and AssetManifest.vip.assetId or nil,
+			})
+		end
+	end)
 
 	-- Wait for the brainrot template to finish loading before the first attempt,
 	-- so no early event is wasted on a not-yet-ready asset.
@@ -104,7 +156,7 @@ function VipService.Start(_self: any)
 	else
 		task.spawn(loop)
 	end
-	Log.info("VipService ready (brainrot VIP via CustomerService)")
+	Log.info("VipService ready (scheduled VIP event every " .. Vip.eventIntervalSeconds .. "s)")
 end
 
 return VipService
