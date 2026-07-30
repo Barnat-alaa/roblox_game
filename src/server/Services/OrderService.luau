@@ -25,6 +25,7 @@ local CafeService: any
 local CustomerService: any
 local AnalyticsService: any
 local RecipeService: any
+local SocialService: any
 local KitchenService: any
 local AssetLibraryService: any
 
@@ -92,13 +93,22 @@ local function pickupAnchorCf(player: Player, recipeId: string): CFrame?
 	return CafeService:GetKitchenPass(player)
 end
 
-local function isNearPickup(player: Player, recipeId: string): boolean
+-- May `who` work in `owner`'s café? Authorisation only — the paying call is
+-- SocialService:TryWork, made at the delivery step (P2c).
+local function canHelp(who: Player, owner: Player): boolean
+	return SocialService ~= nil and SocialService:CanWork(who, owner)
+end
+
+-- Is `player` standing at the pickup shelf? `shelfOwner` defaults to `player`, and
+-- differs only when a visiting neighbour is running the order (P2c): the shelf is
+-- the OWNER's, but the body that has to reach it is the helper's.
+local function isNearPickup(player: Player, recipeId: string, shelfOwner: Player?): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if not (root and root:IsA("BasePart")) then
 		return false
 	end
-	local anchor = pickupAnchorCf(player, recipeId)
+	local anchor = pickupAnchorCf(shelfOwner or player, recipeId)
 	return anchor ~= nil and (root.Position - (anchor :: CFrame).Position).Magnitude <= 16
 end
 
@@ -145,20 +155,26 @@ local function startCarryVisual(player: Player, orderId: string, plate: Model)
 	end)
 end
 
-local function pickupOrder(player: Player, orderId: string)
-	if not claimLimiter:check(player.UserId, os.clock()) then
+-- `player` is always the café OWNER (whose stock leaves, whose sale it is).
+-- `worker` is whoever physically pressed the prompt — the owner, or a visiting
+-- neighbour helping out (P2c). They carry the plate and must be at the shelf;
+-- the stock, the payout and the customer stay the owner's.
+local function pickupOrder(player: Player, orderId: string, worker: Player?)
+	local hands = worker or player
+	if not claimLimiter:check(hands.UserId, os.clock()) then
 		return
 	end
 	local order = activeOrders[orderId]
 	if not order or order.ownerUserId ~= player.UserId or order.status ~= "pending" then
 		return
 	end
-	if carriedByUser[player.UserId] then
-		notify(player, "already_carrying")
+	if carriedByUser[hands.UserId] then
+		notify(hands, "already_carrying")
 		return
 	end
-	if not isNearPickup(player, order.recipeId) then
-		notify(player, "go_to_shelf")
+	-- The shelf belongs to the owner, but the HANDS have to reach it.
+	if not isNearPickup(hands, order.recipeId, player) then
+		notify(hands, "go_to_shelf")
 		return
 	end
 	if servingLocks[orderId] then
@@ -173,7 +189,7 @@ local function pickupOrder(player: Player, orderId: string)
 	end
 	if not taken then
 		servingLocks[orderId] = nil
-		notify(player, "not_in_stock")
+		notify(hands, "not_in_stock")
 		return
 	end
 
@@ -183,12 +199,12 @@ local function pickupOrder(player: Player, orderId: string)
 	local bonus = if manualReady then math.max(1, math.floor(payout * 0.25)) else 0
 	order.claimed = true
 	order.status = "ready"
-	carriedByUser[player.UserId] = {
+	carriedByUser[hands.UserId] = {
 		orderId = orderId,
 		plate = plate,
 		manualBonus = bonus,
 	}
-	startCarryVisual(player, orderId, plate)
+	startCarryVisual(hands, orderId, plate)
 	local points = servicePoints[orderId]
 	if points and points.pickup and points.pickup.Parent ~= nil then
 		points.pickup:Destroy()
@@ -203,14 +219,19 @@ local function pickupOrder(player: Player, orderId: string)
 	})
 end
 
-local function deliverOrder(player: Player, orderId: string)
-	local carried = carriedByUser[player.UserId]
+-- As with pickupOrder: `player` owns the café and the sale, `worker` is whoever
+-- carried the plate to the table. The owner is paid the serving and the XP — it
+-- is their stock and their customer — while a helping neighbour is paid their
+-- fee by SocialService.TryWork at the prompt.
+local function deliverOrder(player: Player, orderId: string, worker: Player?)
+	local hands = worker or player
+	local carried = carriedByUser[hands.UserId]
 	if not carried then
-		notify(player, "pick_up_first")
+		notify(hands, "pick_up_first")
 		return
 	end
 	if carried.orderId ~= orderId then
-		notify(player, "wrong_table")
+		notify(hands, "wrong_table")
 		return
 	end
 	local order = activeOrders[orderId]
@@ -231,7 +252,7 @@ local function deliverOrder(player: Player, orderId: string)
 	end
 	EconomyService:AddExperience(player, EconomyConfig.xpPerServe)
 	local total = payout + carried.manualBonus
-	stopCarrying(player)
+	stopCarrying(hands)
 	order.status = "served"
 	activeOrders[orderId] = nil
 	servingLocks[orderId] = nil
@@ -245,9 +266,11 @@ local function deliverOrder(player: Player, orderId: string)
 			recipe = order.recipeId,
 			coins = total,
 			manualDelivery = true,
+			helped = hands ~= player,
 		})
 	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	-- The celebration pops over whoever actually walked it over.
+	local root = hands.Character and hands.Character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") then
 		Fx.coinBurst(root.Position + Vector3.new(0, 2, 0), 8)
 		Fx.floatText(root.Position + Vector3.new(0, 4, 0), "PERFECT DELIVERY! +" .. total)
@@ -310,8 +333,11 @@ local function createPickupPoint(player: Player, order: Types.Order)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = point
 	prompt.Triggered:Connect(function(who)
-		if who == player then
-			pickupOrder(player, order.orderId)
+		-- P2c: the owner, or a visitor helping in their café. Pickup is only half
+		-- the job, so it does NOT pay — the fee lands on delivery, which is the
+		-- step that actually feeds the customer.
+		if who == player or canHelp(who, player) then
+			pickupOrder(player, order.orderId, who)
 		end
 	end)
 	servicePoints[order.orderId] = { pickup = point, deliveryPrompt = nil }
@@ -354,8 +380,9 @@ function OrderService.CreateOrder(
 		prompt.RequiresLineOfSight = false
 		prompt.Parent = deliveryPart
 		prompt.Triggered:Connect(function(who)
-			if who == player then
-				deliverOrder(player, id)
+			-- The paying step: TryWork both authorises AND pays a helper here.
+			if SocialService and SocialService:TryWork(who, player, "serve") then
+				deliverOrder(player, id, who)
 			end
 		end)
 		local points = servicePoints[id] or { pickup = nil, deliveryPrompt = nil }
@@ -463,6 +490,7 @@ function OrderService.Init(_self: any)
 	RecipeService = ServiceRegistry.get("RecipeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	SocialService = ServiceRegistry.get("SocialService")
 end
 
 function OrderService.Start(_self: any)

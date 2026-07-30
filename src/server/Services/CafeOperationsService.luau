@@ -29,6 +29,7 @@ local EconomyService: any
 local CafeService: any
 local StaffService: any
 local AssetLibraryService: any
+local SocialService: any
 
 local resumed: { [number]: boolean } = {}
 local dirtByUser: { [number]: { Model } } = {}
@@ -279,7 +280,8 @@ local function makeDirt(player: Player, position: Vector3): Model
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = anchor
 	prompt.Triggered:Connect(function(who)
-		if who == player then
+		-- P2c: the owner, or a visitor working in their café (which pays them).
+		if SocialService and SocialService:TryWork(who, player, "clean_floor") then
 			CafeOperationsService:CleanMess(player, model, true)
 		end
 	end)
@@ -524,6 +526,7 @@ function CafeOperationsService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	StaffService = ServiceRegistry.get("StaffService")
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
+	SocialService = ServiceRegistry.get("SocialService")
 end
 
 function CafeOperationsService.Start(_self: any)

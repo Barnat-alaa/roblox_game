@@ -1037,10 +1037,6 @@ function UIController.Start(_self: any)
 			UIController.toast("The waiter served from fresh stock")
 		elseif msg.kind == "visitor" then
 			UIController.toast(tostring(msg.name) .. " is visiting your cafe")
-		elseif msg.kind == "compliment" then
-			UIController.toast(
-				tostring(msg.from) .. ": " .. tostring(msg.text) .. "  +2 reputation"
-			)
 		elseif msg.kind == "error" then
 			UIController.toast(FRIENDLY_ERROR[msg.reason] or tostring(msg.reason))
 		end

@@ -43,6 +43,7 @@ local GoalService: any
 local AssetLibraryService: any
 local CafeOperationsService: any
 local AnalyticsService: any
+local SocialService: any
 
 local MAX_QUEUE = 3
 local QUEUE_SPACING = 4 -- studs between line slots
@@ -1063,7 +1064,18 @@ local function eatMeal(
 						cleanPrompt.Parent = dishPart
 						local cleaned = false
 						cleanPrompt.Triggered:Connect(function(who)
-							if cleaned or who ~= player or plate.Parent == nil then
+							if cleaned or plate.Parent == nil then
+								return
+							end
+							-- P2c: the owner, or a visitor working in their café.
+							-- The Buzz still goes to the OWNER; the helper is paid
+							-- separately inside TryWork.
+							if
+								not (
+									SocialService
+									and SocialService:TryWork(who, player, "clean_plate")
+								)
+							then
 								return
 							end
 							cleaned = true
@@ -1577,6 +1589,7 @@ function CustomerService.Init(_self: any)
 	AssetLibraryService = ServiceRegistry.get("AssetLibraryService")
 	CafeOperationsService = ServiceRegistry.get("CafeOperationsService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
+	SocialService = ServiceRegistry.get("SocialService")
 end
 
 function CustomerService.Start(_self: any)

@@ -1,11 +1,16 @@
 --!strict
--- Café visits + safe predefined compliments (Day 5 — the social MVP).
+-- Café visits + helping a neighbour by WORKING (P2c).
 -- VisitCafe payloads (all validated here):
---   { plotIndex }                → teleport the visitor to that café's door
---   { plotIndex, compliment }   → leave ONE predefined compliment per owner
---                                  per session (+2 reputation for the owner)
---   { home = true }              → return the visitor to their own café
--- No free text anywhere — compliments come from a fixed whitelist (§19).
+--   { plotIndex }   → teleport the visitor to that café's door
+--   { home = true } → return the visitor to their own café
+--
+-- 2026-07-30 (P2c): the abstract help card is GONE. There is no longer a
+-- `NeighbourHelp` remote, a HELP_ACTIONS table ("water plants", "stir a pot" —
+-- none of which were real things happening in the world), or a compliment
+-- whitelist. Helping is now a REAL action: walk inside a neighbour's café and do
+-- the jobs the owner does — scrub the floor, clear a plate, run an order to a
+-- table. Those prompts ask `SocialService:TryWork` whether the presser is
+-- allowed, and it pays a visiting helper per action.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -14,6 +19,7 @@ local Shared = ReplicatedStorage.Shared
 local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local EconomyConfig = require(Shared.Config.Economy)
+local Neighbour = require(Shared.Config.Neighbour)
 local Grid = require(Shared.Utilities.Grid)
 local Types = require(Shared.Types)
 
@@ -25,75 +31,19 @@ SocialService.Name = "SocialService"
 local CafeService: any
 local DataService: any
 local EconomyService: any
-local KitchenService: any
 local AnalyticsService: any
 local GoalService: any
 
-local COMPLIMENT_REPUTATION = 2
-
-local COMPLIMENTS: { [string]: string } = {
-	nice_cafe = "loves your café! 💖",
-	great_coffee = "says the coffee is great! ☕",
-	cozy_vibes = "loves the cosy vibes ✨",
+-- Human-readable labels for the real jobs a visitor can do, used only in the
+-- toast both sides see. The pay and the cap live in Config/Neighbour.
+local WORK_LABELS: { [string]: string } = {
+	clean_floor = "scrubbed the floor 🧽",
+	clean_plate = "cleared a plate 🍽️",
+	serve = "served a customer ☕",
 }
-
--- Co-op neighbour help (Phase C §4a). Each action is once per neighbour per day
--- (anti-farm, persisted so it survives a rejoin). Data-driven: a new helpful
--- action is a new row. The helper earns coins/xp/rep + friendship points; the
--- (online) owner gets reputation and/or a small Buzz bump.
-type HelpAction = {
-	label: string,
-	helperCoins: number,
-	helperXp: number,
-	helperRep: number,
-	friendship: number,
-	ownerRep: number,
-	ownerBuzz: number,
-}
-local HELP_ACTIONS: { [string]: HelpAction } = {
-	water_plants = {
-		label = "watered the plants 🌱",
-		helperCoins = 15,
-		helperXp = 8,
-		helperRep = 0,
-		friendship = 2,
-		ownerRep = 1,
-		ownerBuzz = 0,
-	},
-	bus_table = {
-		label = "bussed a table 🧽",
-		helperCoins = 0,
-		helperXp = 6,
-		helperRep = 3,
-		friendship = 2,
-		ownerRep = 0,
-		ownerBuzz = 1,
-	},
-	stir_pot = {
-		label = "stirred a pot 🥄",
-		helperCoins = 12,
-		helperXp = 6,
-		helperRep = 1,
-		friendship = 2,
-		ownerRep = 0,
-		ownerBuzz = 1,
-	},
-	hand_flyers = {
-		label = "handed out flyers 📣",
-		helperCoins = 0,
-		helperXp = 6,
-		helperRep = 4,
-		friendship = 3,
-		ownerRep = 0,
-		ownerBuzz = 2,
-	},
-}
-local GOOD_NEIGHBOUR_BONUS = 25 -- first help of the day (any neighbour), once daily
 
 local visitLimiter =
 	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
--- One compliment per (visitor → owner) pair per session; no farming.
-local complimentGiven: { [number]: { [number]: boolean } } = {}
 
 local function teleportTo(player: Player, origin: CFrame)
 	local character = player.Character
@@ -154,56 +104,25 @@ local function handleVisit(player: Player, payload: unknown)
 		return
 	end
 
-	local compliment = p.compliment
-	if compliment == nil then
-		-- Plain visit: teleport to the door and tell both sides.
-		teleportTo(player, origin)
-		Remotes.event("Notify"):FireClient(player, {
-			kind = "visited",
-			plotIndex = plotIndex,
-			owner = owner.DisplayName,
-		})
-		Remotes.event("Notify"):FireClient(owner, {
-			kind = "visitor",
-			name = player.DisplayName,
-		})
-		if AnalyticsService then
-			AnalyticsService:TrackOnce(player, "first_cafe_visit", {})
-			AnalyticsService:Track(player, "cafe_visit", { plotIndex = plotIndex })
-		end
-		if GoalService then
-			GoalService:Bump(player, "visit_neighbour", 1)
-		end
-		return
-	end
-
-	-- Compliment: whitelist only, must be standing at that café, once per owner.
-	if typeof(compliment) ~= "string" or COMPLIMENTS[compliment] == nil then
-		return
-	end
-	if not isNearPlot(player, origin, 50) then
-		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = "too_far" })
-		return
-	end
-	local given = complimentGiven[player.UserId]
-	if not given then
-		given = {}
-		complimentGiven[player.UserId] = given
-	end
-	if given[ownerUserId] then
-		return
-	end
-	given[ownerUserId] = true
-
-	EconomyService:AddReputation(owner, COMPLIMENT_REPUTATION)
-	Remotes.event("Notify"):FireClient(owner, {
-		kind = "compliment",
-		from = player.DisplayName,
-		text = COMPLIMENTS[compliment],
+	-- Visit: teleport to the door and tell both sides. What you DO once you are
+	-- inside is the real interaction now (TryWork below) — there is nothing left
+	-- to send from a card.
+	teleportTo(player, origin)
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "visited",
+		plotIndex = plotIndex,
+		owner = owner.DisplayName,
 	})
-	Remotes.event("Notify"):FireClient(player, { kind = "complimented" })
+	Remotes.event("Notify"):FireClient(owner, {
+		kind = "visitor",
+		name = player.DisplayName,
+	})
 	if AnalyticsService then
-		AnalyticsService:Track(player, "compliment_sent", { compliment = compliment })
+		AnalyticsService:TrackOnce(player, "first_cafe_visit", {})
+		AnalyticsService:Track(player, "cafe_visit", { plotIndex = plotIndex })
+	end
+	if GoalService then
+		GoalService:Bump(player, "visit_neighbour", 1)
 	end
 end
 
@@ -230,144 +149,132 @@ local function blocked(player: Player, text: string)
 	Remotes.event("Notify"):FireClient(player, { kind = "help_blocked", text = text })
 end
 
--- Co-op help (§4a): walk into an online neighbour's café and do something useful.
--- Mirrors the handleVisit guard ladder. Each action is once per neighbour per day
--- (persisted anti-farm). The helper earns coins/xp/rep + friendship; the owner
--- gets reputation and/or a Buzz bump.
-local function handleHelp(player: Player, payload: unknown)
-	if typeof(payload) ~= "table" then
-		return
+-- ————— P2c: helping by WORKING —————
+--
+-- THE authorisation gate for every action that used to be owner-only. Each of
+-- those prompts now asks this instead of comparing `who == owner`:
+--
+--     if SocialService:TryWork(who, owner, "clean_plate") then ... end
+--
+-- • The owner working their own café: always yes, nothing is paid, no state moves.
+-- • A visitor: yes if they are INSIDE the café and the owner is online — and the
+--   action pays them a fee, up to a per-neighbour daily cap. Past the cap the
+--   action still succeeds (you can keep helping a friend); it just stops paying,
+--   so there is no reason to camp one café.
+-- • Anyone else (standing outside, café empty, owner offline): no.
+--
+-- The fee is minted for the helper, never taken from the owner: the café keeps
+-- its whole sale, its Buzz and its satisfaction, so being helped is pure upside
+-- and can't be farmed against you.
+-- Authorisation ONLY — no payment, no state change, no toast. Used for the half
+-- of a job that shouldn't pay on its own (picking an order off the shelf is only
+-- worth something once it reaches the table).
+function SocialService.CanWork(_self: any, worker: Player, owner: Player): boolean
+	if worker == owner then
+		return true
 	end
-	if not visitLimiter:check(player.UserId, os.clock()) then
-		return
+	if not Neighbour.enabled then
+		return false
 	end
-	local p = payload :: any
-	if typeof(p.plotIndex) ~= "number" or p.plotIndex ~= math.floor(p.plotIndex) then
-		return
-	end
-	if typeof(p.actionId) ~= "string" then
-		return
-	end
-	local action = HELP_ACTIONS[p.actionId]
-	if not action then
-		return
-	end
-	local origin, ownerUserId = CafeService:GetPlotInfo(p.plotIndex)
+	local origin = CafeService:GetPlotOrigin(owner)
 	if not origin then
-		return
+		return false
 	end
-	if not ownerUserId then
-		blocked(player, "That café is empty.")
-		return
+	-- Must actually be in the room. distanceToPlotRect is 0 anywhere inside the
+	-- plot, so this is a small tolerance around the footprint, not a radius.
+	return isNearPlot(worker, origin, Neighbour.insideTolerance)
+end
+
+function SocialService.TryWork(
+	_self: any,
+	worker: Player,
+	owner: Player,
+	actionKey: string
+): boolean
+	if worker == owner then
+		return true -- the owner, in their own café: unchanged behaviour
 	end
-	if ownerUserId == player.UserId then
-		blocked(player, "You can't help your own café.")
-		return
+	if not SocialService:CanWork(worker, owner) then
+		if Neighbour.enabled then
+			blocked(worker, "Stand inside their café to help.")
+		end
+		return false
 	end
-	local owner = Players:GetPlayerByUserId(ownerUserId)
-	if not owner then
-		blocked(player, "Your neighbour isn't around right now.")
-		return
-	end
-	if not isNearPlot(player, origin, 50) then
-		blocked(player, "Get closer to their café to help.")
-		return
+	local data = DataService:GetProfile(worker)
+	if not data then
+		return false
 	end
 
-	-- Anti-farm: each action once per neighbour per day (persisted, survives rejoin).
-	local data = DataService:GetProfile(player)
-	if not data then
-		return
-	end
+	-- Anti-farm: a per-neighbour daily count, persisted so it survives a rejoin.
 	local s = socialOf(data)
-	local ownerKey = tostring(ownerUserId)
+	local ownerKey = tostring(owner.UserId)
+	local d = today()
 	local log = s.helpLog[ownerKey]
-	if typeof(log) ~= "table" then
-		log = {}
+	if typeof(log) ~= "table" or (tonumber(log.day) or 0) ~= d then
+		log = { day = d, count = 0 }
 		s.helpLog[ownerKey] = log
 	end
-	local d = today()
-	if log[p.actionId] == d then
-		blocked(player, "You already did that for them today.")
-		return
-	end
-	log[p.actionId] = d
+	local paidCount = math.max(0, math.floor(tonumber(log.count) or 0))
 
-	-- Friendship (stored on the helper's side, per neighbour).
-	s.friendship[ownerKey] = (tonumber(s.friendship[ownerKey]) or 0) + action.friendship
+	local label = WORK_LABELS[actionKey] or "lent a hand 🤝"
+	if paidCount >= Neighbour.maxPaidActionsPerNeighbourPerDay then
+		-- Still allowed — just unpaid. Say so once the cap is hit, so the silence
+		-- reads as a rule rather than a bug.
+		Remotes.event("Notify"):FireClient(worker, {
+			kind = "helped",
+			text = "You " .. label .. " (daily pay cap reached — thanks anyway!)",
+		})
+		return true
+	end
+	log.count = paidCount + 1
 
-	-- Helper rewards.
-	if action.helperCoins > 0 then
-		EconomyService:AddCoins(player, action.helperCoins)
-	end
-	if action.helperRep > 0 then
-		EconomyService:AddReputation(player, action.helperRep)
-	end
-	if action.helperXp > 0 then
-		EconomyService:AddExperience(player, action.helperXp)
-	end
+	local pay = tonumber(Neighbour.payPerAction[actionKey]) or Neighbour.defaultPay
+	s.friendship[ownerKey] = (tonumber(s.friendship[ownerKey]) or 0) + Neighbour.friendshipPerAction
+	EconomyService:AddCoins(worker, pay)
 
-	-- "Good Neighbour" first-help-of-the-day bonus (any neighbour, once daily).
+	-- "Good Neighbour": first paid help of the day at ANY neighbour, once daily.
 	local bonus = 0
 	if s.lastGoodNeighbourDay ~= d then
 		s.lastGoodNeighbourDay = d
-		bonus = GOOD_NEIGHBOUR_BONUS
-		EconomyService:AddCoins(player, bonus)
+		bonus = Neighbour.goodNeighbourBonus
+		EconomyService:AddCoins(worker, bonus)
 	end
-	DataService:Push(player)
+	DataService:Push(worker)
 
-	-- Owner benefit (they're online — checked above).
-	if action.ownerRep > 0 then
-		EconomyService:AddReputation(owner, action.ownerRep)
-	end
-	if action.ownerBuzz > 0 then
-		KitchenService:AddBuzz(owner, action.ownerBuzz)
-	end
-
-	-- Feedback to both sides.
-	local bits = {}
-	if action.helperCoins > 0 then
-		table.insert(bits, "+" .. action.helperCoins .. " 🪙")
-	end
-	if action.helperRep > 0 then
-		table.insert(bits, "+" .. action.helperRep .. " ⭐")
-	end
-	table.insert(bits, "+" .. action.friendship .. " 💚")
+	local bits = { "+" .. pay .. " 🪙", "+" .. Neighbour.friendshipPerAction .. " 💚" }
 	if bonus > 0 then
 		table.insert(bits, "+" .. bonus .. " 🪙 Good Neighbour!")
 	end
-	Remotes.event("Notify"):FireClient(player, {
+	Remotes.event("Notify"):FireClient(worker, {
 		kind = "helped",
-		text = "You " .. action.label .. "  " .. table.concat(bits, "  "),
+		text = "You " .. label .. "  " .. table.concat(bits, "  "),
 	})
 	Remotes.event("Notify"):FireClient(owner, {
 		kind = "neighbour_helped",
-		text = player.DisplayName .. " " .. action.label,
+		text = worker.DisplayName .. " " .. label .. " in your café!",
 	})
 	if AnalyticsService then
 		AnalyticsService:Track(
-			player,
+			worker,
 			"neighbour_help",
-			{ action = p.actionId, owner = ownerUserId }
+			{ action = actionKey, owner = owner.UserId }
 		)
 	end
+	return true
 end
 
 function SocialService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	DataService = ServiceRegistry.get("DataService")
 	EconomyService = ServiceRegistry.get("EconomyService")
-	KitchenService = ServiceRegistry.get("KitchenService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 	GoalService = ServiceRegistry.get("GoalService")
 end
 
 function SocialService.Start(_self: any)
 	Remotes.event("VisitCafe").OnServerEvent:Connect(handleVisit)
-	Remotes.event("NeighbourHelp").OnServerEvent:Connect(handleHelp)
 	Players.PlayerRemoving:Connect(function(player)
 		visitLimiter:clear(player.UserId)
-		complimentGiven[player.UserId] = nil
 	end)
 end
 

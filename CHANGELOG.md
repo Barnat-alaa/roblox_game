@@ -5,6 +5,49 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-07-30 — P2c: help a neighbour by WORKING, not by tapping a card
+Helping was a card of four buttons — "water plants", "bus a table", "stir a pot",
+"hand flyers" — none of which were real things happening in the world, each
+once-per-neighbour-per-day, so the whole social loop was **four taps**. All of it
+is gone: `SocialService.HELP_ACTIONS`, the `NeighbourHelp` remote, and the
+compliment whitelist with it.
+
+Helping is now the actual job. Walk **inside** a neighbour's café and do what the
+owner does — **scrub the floor**, **clear a dirty plate**, **carry an order from
+the shelf to the right table**. Those prompts were gated to the owner with
+`who == player`; they now ask **`SocialService:TryWork(who, owner, action)`**,
+which authorises the presser and pays a visiting helper per job (10/12/22 coins,
+plus friendship and the Good Neighbour daily bonus). Past
+`maxPaidActionsPerNeighbourPerDay` (15) the actions still **work** — you can keep
+helping a friend — they just stop paying, so there is nothing to farm. Tuning
+lives in the new `Config/Neighbour`.
+
+The helper's fee is **minted for them, never taken from the owner**: the café
+keeps its whole sale, its Buzz and its satisfaction, so being helped is pure
+upside. `OrderService.pickupOrder`/`deliverOrder` now separate **whose café it
+is** (`player` — the stock, the payout, the customer) from **whose hands are
+doing it** (`worker` — carries the plate, must reach the shelf, gets the
+delivery burst). `CanWork` authorises without paying, used for pickup, since
+fetching a plate is only worth something once it reaches the table.
+`PlayerData.social.helpLog` changes shape from `{[actionId] = day}` to
+`{day, count}`; an old row simply has no `day`, which reads as a new day.
+
+Verified in Studio: clean boot with 22 services after the remote removal, no
+errors, no dangling client references. The **owner's own serve loop still works
+end-to-end through the refactored prompts** — E at the shelf took stock 4 → 3 and
+consumed the pickup prompt, E at the table paid out (coins 212 → 218, served
+2 → 3, Buzz 6 → 8) — which also proves `TryWork` short-circuits true for the
+owner. Analytics confirms the split is live: `customer_served {"helped":false}`.
+The visit card now shows the three real actions plus an explainer instead of the
+seven removed buttons. **Still owed: the 2-player pass** for a visitor actually
+being paid.
+
+**Left out of this PR: cooking as a visitor.** Starting a cook spends the
+*owner's* coins and pantry, so opening it to a visitor is a griefing vector that
+needs its own guardrails rather than the same `TryWork` gate — and with
+`Kitchen.autoCollectCooks` on there is no physical collect ritual to open anyway.
+Tracked in ROADMAP as a follow-up.
+
 ### Change — 2026-07-30 — P2b: the smell bomb now CLEARS a neighbour's café
 The smell bomb was a second way to *pull* one customer to you. It is now **area
 denial**: every customer in the neighbour's café walks out, and **nobody
