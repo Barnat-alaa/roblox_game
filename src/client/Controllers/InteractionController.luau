@@ -1,5 +1,7 @@
 --!strict
--- Neighbour visits and compliments in a small contextual card.
+-- Neighbour visits: a small contextual card offering the REAL actions (P2). It
+-- no longer carries compliments or abstract "help" buttons — helping is done by
+-- walking in and doing the jobs (P2c), and the card just says so.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,21 +19,6 @@ local player = Players.LocalPlayer
 
 local InteractionController = {}
 InteractionController.Name = "InteractionController"
-
-local COMPLIMENT_BUTTONS = {
-	{ id = "nice_cafe", label = "Lovely cafe" },
-	{ id = "great_coffee", label = "Great coffee" },
-	{ id = "cozy_vibes", label = "Cosy vibes" },
-}
-
--- Co-op help actions (Phase C §4a). Server (SocialService.HELP_ACTIONS) is the
--- source of truth for rewards + the once-per-neighbour-per-day cap.
-local HELP_BUTTONS = {
-	{ id = "water_plants", label = "💧 Water plants" },
-	{ id = "bus_table", label = "🧽 Bus a table" },
-	{ id = "stir_pot", label = "🥄 Stir a pot" },
-	{ id = "hand_flyers", label = "📣 Hand flyers" },
-}
 
 local ui: { [string]: any } = {}
 local currentVisitPlot: number? = nil
@@ -204,7 +191,7 @@ local function buildPanel()
 	local _, close = Components.PanelHeader(
 		panel,
 		"NEIGHBOUR VISIT",
-		"Leave a compliment before you go",
+		"Help out, or cause a little trouble",
 		Theme.Colors.Blue
 	)
 	close.Activated:Connect(goHome)
@@ -241,55 +228,23 @@ local function buildPanel()
 		lbl.ZIndex = 22
 	end
 
-	sectionLabel("Say something nice", 1)
-	ui.complimentButtons = {}
-	for order, definition in COMPLIMENT_BUTTONS do
-		local button = Components.Button(
-			list,
-			definition.label,
-			Theme.Colors.Roast,
-			UDim2.new(1, 0, 0, 38),
-			"+"
-		)
-		button.LayoutOrder = 1 + order
-		button.ZIndex = 22
-		button.Activated:Connect(function()
-			if currentVisitPlot then
-				Remotes.event("VisitCafe"):FireServer({
-					plotIndex = currentVisitPlot,
-					compliment = definition.id,
-				})
-				for _, other in ui.complimentButtons do
-					other.Active = false
-					other.BackgroundTransparency = 0.5
-				end
-			end
-		end)
-		table.insert(ui.complimentButtons, button)
-	end
-
-	sectionLabel("Lend a hand", 10)
-	ui.helpButtons = {}
-	for order, definition in HELP_BUTTONS do
-		local button = Components.Button(
-			list,
-			definition.label,
-			Theme.Colors.Blue,
-			UDim2.new(1, 0, 0, 38),
-			"♥"
-		)
-		button.LayoutOrder = 10 + order
-		button.ZIndex = 22
-		button.Activated:Connect(function()
-			if currentVisitPlot then
-				Remotes.event("NeighbourHelp"):FireServer({
-					plotIndex = currentVisitPlot,
-					actionId = definition.id,
-				})
-			end
-		end)
-		table.insert(ui.helpButtons, button)
-	end
+	-- P2c: helping is no longer a button. The card now just TELLS you that the
+	-- way to help is to walk in and do the jobs — clear a plate, scrub the floor,
+	-- run an order to a table — and that each one pays you.
+	sectionLabel("Lend a hand", 1)
+	local howTo = Components.Label(
+		list,
+		"Walk inside and just DO the work — clear a dirty plate, scrub the floor,"
+			.. " or carry an order from the shelf to the table. Each job pays you"
+			.. " coins and earns friendship. No buttons needed.",
+		12
+	)
+	howTo.Size = UDim2.new(1, 0, 0, 84)
+	howTo.LayoutOrder = 2
+	howTo.TextWrapped = true
+	howTo.TextXAlignment = Enum.TextXAlignment.Left
+	howTo.TextYAlignment = Enum.TextYAlignment.Top
+	howTo.ZIndex = 22
 
 	-- Mischief (Phase C-4b) — the one rails-brushing section, shown only when
 	-- Config.Mischief.enabled. Server (MischiefService) owns every guardrail.
@@ -441,18 +396,8 @@ function InteractionController.Start(_self: any)
 		if msg.kind == "visited" then
 			currentVisitPlot = if typeof(msg.plotIndex) == "number" then msg.plotIndex else nil
 			ui.title.Text = "Visiting " .. tostring(msg.owner) .. "'s cafe"
-			for _, button in ui.complimentButtons do
-				button.Active = true
-				button.BackgroundTransparency = 0
-			end
-			for _, button in ui.helpButtons do
-				button.Active = true
-				button.BackgroundTransparency = 0
-			end
 			UIController.togglePanel(ui.panel)
 			UIController.toast("Welcome to " .. tostring(msg.owner) .. "'s cafe")
-		elseif msg.kind == "complimented" then
-			UIController.toast("Compliment sent")
 		elseif
 			msg.kind == "helped"
 			or msg.kind == "neighbour_helped"

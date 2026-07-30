@@ -29,7 +29,8 @@ local EVENTS = {
 	"ClaimOrder", -- c->s: serve a completed order
 	"CompleteTutorialStep", -- c->s: onboarding progress
 	"VisitCafe", -- c->s: request to visit another plot
-	"NeighbourHelp", -- c->s: help a neighbour's café {plotIndex, actionId} (Phase C §4a)
+	-- (P2c removed `NeighbourHelp`: helping is no longer a message you send, it is
+	-- the owner-gated prompts opening up to a visitor standing in the café.)
 	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit/steal (Phase C §4b, P2a)
 	"SetCafeName", -- c->s: name your own café {name} — filtered server-side (TextService)
 	"WorldReady", -- s->c: café rendered + assets loaded {cafeName} — ends the intro overlay

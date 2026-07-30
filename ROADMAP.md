@@ -144,6 +144,14 @@ gift). Hooks: `VipService` (scheduler), `Config/Vip`, `AssetManifest.vip`, a new
   make each multiplier **also coin-earnable** (a grindable upgrade tier) or frame
   it as a temporary boost, and surface the trade-off to the owner before shipping.
 
+**P2c follow-up (deferred, 2026-07-30):** cooking as a visitor. Cleaning and
+serving were opened to a helper via `SocialService:TryWork`, but starting a cook
+spends the **owner's** coins and pantry, so the same gate would hand a visitor a
+way to drain a neighbour — it needs its own guardrails (an owner-set permission,
+or a per-visitor spend cap). With `Kitchen.autoCollectCooks` on there is also no
+physical collect ritual left to open. Hooks: `KitchenService.handleStartCook`
+(currently keyed to the caller's own profile + `CafeService:IsNearOwnPlot`).
+
 Carry-over (still owed, lower priority): **publish**; a live Robux purchase test
 (IDs are real); the 2-player mischief-lure + neighbour-help playtest; the owner's
 eyeball on the new Clouds sky + sea; VIP name-colour; a café-**style** picker in

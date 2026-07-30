@@ -148,7 +148,10 @@ export type DailyState = {
 -- (see DataService.migrate) whenever this shape changes.
 export type SocialState = {
 	friendship: { [string]: number }, -- other userId (string) → accumulated friendship points
-	helpLog: { [string]: { [string]: number } }, -- other userId → { [actionId] = day last helped }
+	-- other userId → { day = floor(os.time()/86400), count = paid helps done that day }.
+	-- P2c replaced the old { [actionId] = day } shape; SocialService.TryWork heals
+	-- an old row by simply not finding `day`, which reads as "a new day".
+	helpLog: { [string]: { day: number, count: number } },
 	lastGoodNeighbourDay: number, -- floor(os.time()/86400) of the last "Good Neighbour" bonus
 }
 
