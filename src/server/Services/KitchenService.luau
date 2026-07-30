@@ -311,6 +311,49 @@ function KitchenService.AddEmergencyServing(_self: any, player: Player, recipeId
 	return true
 end
 
+-- Receive ONE stolen serving (P2a). Deliberately NOT CompleteProduction: the
+-- thief did not cook it, so there is no XP, no mastery progress, no goal credit
+-- and no produced-stat — the item simply changes hands. Refuses when the thief
+-- has not unlocked the recipe (they would have no shelf to show it on and no
+-- menu slot to sell it from, so it would be dead stock) or is already at the
+-- per-recipe cap. MischiefService checks this BEFORE taking from the victim, so
+-- a refusal here can never destroy the item.
+function KitchenService.AddStolenServing(_self: any, player: Player, recipeId: string): boolean
+	local data = DataService:GetProfile(player)
+	local recipe = Recipes[recipeId]
+	if not data or not recipe or data.unlockedRecipes[recipeId] ~= true then
+		return false
+	end
+	local now = os.time()
+	local kitchen = kitchenOf(data)
+	local total = InventoryMath.count(kitchen, recipeId, now)
+	if total >= Kitchen.maxStockPerRecipe then
+		return false
+	end
+	InventoryMath.addLot(
+		kitchen,
+		recipeId,
+		1,
+		now,
+		now + math.min(recipe.spoilTime, Kitchen.manualServingShelfLife)
+	)
+	syncStock(kitchen, now)
+	DataService:Push(player)
+	refreshCounterDisplay(player)
+	return true
+end
+
+-- Can this player still receive one of `recipeId`? Asked BEFORE the victim's
+-- stock is touched so a steal is all-or-nothing.
+function KitchenService.CanReceiveServing(_self: any, player: Player, recipeId: string): boolean
+	local data = DataService:GetProfile(player)
+	if not data or not Recipes[recipeId] or data.unlockedRecipes[recipeId] ~= true then
+		return false
+	end
+	local total = InventoryMath.count(kitchenOf(data), recipeId, os.time())
+	return total < Kitchen.maxStockPerRecipe
+end
+
 function KitchenService.ExpireStock(_self: any, player: Player, now: number): number
 	local data = DataService:GetProfile(player)
 	if not data then

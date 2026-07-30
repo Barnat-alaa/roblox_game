@@ -36,6 +36,62 @@ local HELP_BUTTONS = {
 local ui: { [string]: any } = {}
 local currentVisitPlot: number? = nil
 
+-- The armed steal (P2a). Choosing an item at the door does NOT take it — it
+-- lights up that item's shelf and puts a prompt on it. You still have to walk
+-- over and press E, which is the whole point: a real, visible action in the
+-- world rather than a button on a card. Disarms itself after
+-- Mischief.theftArmSeconds so a forgotten pick can't linger.
+local armed: { prompt: ProximityPrompt, highlight: Highlight, token: number }? = nil
+local armToken = 0
+
+local function disarmSteal()
+	local current = armed
+	armed = nil
+	if current then
+		current.prompt:Destroy()
+		current.highlight:Destroy()
+	end
+end
+
+local function armSteal(plotIndex: number, recipeId: string, name: string, shelf: BasePart)
+	disarmSteal()
+	armToken += 1
+	local token = armToken
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "StealTarget"
+	highlight.FillColor = Theme.Colors.Berry
+	highlight.FillTransparency = 0.6
+	highlight.OutlineColor = Color3.fromRGB(255, 235, 140)
+	highlight.Adornee = shelf
+	highlight.Parent = shelf
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "StealPrompt"
+	prompt.ActionText = "Steal " .. name
+	prompt.ObjectText = "Neighbour's shelf"
+	prompt.HoldDuration = 0.6 -- a beat of commitment; not an accidental tap
+	prompt.MaxActivationDistance = Mischief.theftShelfRadius
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = shelf
+	prompt.Triggered:Connect(function()
+		Remotes.event("Mischief"):FireServer({
+			method = "steal",
+			plotIndex = plotIndex,
+			recipeId = recipeId,
+		})
+		disarmSteal()
+	end)
+
+	armed = { prompt = prompt, highlight = highlight, token = token }
+	task.delay(Mischief.theftArmSeconds, function()
+		if armed and armed.token == token then
+			disarmSteal()
+		end
+	end)
+	UIController.toast("Go to the " .. name .. " shelf and press E")
+end
+
 -- Keep the smell-bomb button showing the player's current count (server is the
 -- source of truth; the profile carries `smellBombs`). Phase C-4b.
 local function refreshSmellCount()
@@ -51,7 +107,92 @@ end
 local function goHome()
 	Remotes.event("VisitCafe"):FireServer({ home = true })
 	currentVisitPlot = nil
+	disarmSteal()
 	UIController.closePanel(ui.panel)
+end
+
+-- "What could I take?" — the server answers with the neighbour's stocked shelves
+-- (and the shelf part itself), filtered to what this player could actually hold.
+local function buildStealPanel()
+	local panel = Components.Panel(UIController.modalRoot(), "StealPanel")
+	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	panel.Position = UDim2.fromScale(0.5, 0.5)
+	panel.Size = UDim2.fromOffset(300, 360)
+	panel.Visible = false
+	local _, close = Components.PanelHeader(
+		panel,
+		"STEAL AN ITEM",
+		"Pick one, then go to its shelf",
+		Theme.Colors.Berry
+	)
+	close.Activated:Connect(function()
+		UIController.closePanel(panel)
+	end)
+
+	local list = Instance.new("ScrollingFrame")
+	list.Size = UDim2.new(1, -24, 1, -96)
+	list.Position = UDim2.fromOffset(12, 84)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 4
+	list.CanvasSize = UDim2.new()
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.ZIndex = 21
+	list.Parent = panel
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	ui.stealPanel = panel
+	ui.stealList = list
+end
+
+local function openStealPicker()
+	local plotIndex = currentVisitPlot
+	if not plotIndex then
+		return
+	end
+	local list = ui.stealList
+	for _, child in list:GetChildren() do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+
+	local ok, result = pcall(function()
+		return Remotes.func("NeighbourStock"):InvokeServer({ plotIndex = plotIndex })
+	end)
+	if not ok or typeof(result) ~= "table" then
+		UIController.toast("Couldn't see their shelves right now")
+		return
+	end
+
+	local rows = if typeof(result.items) == "table" then result.items else {}
+	if #rows == 0 then
+		local empty = Components.Label(list, "Their shelves are bare — nothing you can take.", 13)
+		empty.Size = UDim2.new(1, 0, 0, 60)
+		empty.TextWrapped = true
+		empty.ZIndex = 22
+	end
+	for order, row in rows do
+		if typeof(row) == "table" and typeof(row.recipeId) == "string" and row.shelf then
+			local button = Components.Button(
+				list,
+				row.name .. "  ×" .. tostring(row.count),
+				Theme.Colors.Berry,
+				UDim2.new(1, 0, 0, 40),
+				"🫳"
+			)
+			button.LayoutOrder = order
+			button.ZIndex = 22
+			button.Activated:Connect(function()
+				armSteal(plotIndex, row.recipeId, tostring(row.name), row.shelf)
+				UIController.closePanel(ui.stealPanel)
+			end)
+		end
+	end
+	UIController.togglePanel(ui.stealPanel)
 end
 
 local function buildPanel()
@@ -154,6 +295,21 @@ local function buildPanel()
 	-- Config.Mischief.enabled. Server (MischiefService) owns every guardrail.
 	if Mischief.enabled then
 		sectionLabel("Cause mischief 😈", 20)
+
+		-- P2a: steal a real item off a real shelf. The button only picks the
+		-- target; the theft itself happens at the shelf, with E.
+		if Mischief.theftEnabled then
+			local steal = Components.Button(
+				list,
+				"🫳 Steal an item",
+				Theme.Colors.Berry,
+				UDim2.new(1, 0, 0, 38)
+			)
+			steal.LayoutOrder = 20.5
+			steal.ZIndex = 22
+			steal.Activated:Connect(openStealPicker)
+		end
+
 		local recruit = Components.Button(
 			list,
 			"😈 Poach a customer (free)",
@@ -276,6 +432,7 @@ end
 
 function InteractionController.Start(_self: any)
 	buildPanel()
+	buildStealPanel()
 	task.spawn(watchPlots)
 	Remotes.event("Notify").OnClientEvent:Connect(function(msg: any)
 		if typeof(msg) ~= "table" then
@@ -309,6 +466,9 @@ function InteractionController.Start(_self: any)
 			or msg.kind == "mischief_hit"
 			or msg.kind == "mischief_blocked"
 			or msg.kind == "mischief_bought"
+			or msg.kind == "steal_done"
+			or msg.kind == "steal_hit"
+			or msg.kind == "steal_blocked"
 		then
 			if typeof(msg.text) == "string" then
 				UIController.toast(msg.text)

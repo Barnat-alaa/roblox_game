@@ -30,7 +30,7 @@ local EVENTS = {
 	"CompleteTutorialStep", -- c->s: onboarding progress
 	"VisitCafe", -- c->s: request to visit another plot
 	"NeighbourHelp", -- c->s: help a neighbour's café {plotIndex, actionId} (Phase C §4a)
-	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit (Phase C §4b)
+	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit/steal (Phase C §4b, P2a)
 	"SetCafeName", -- c->s: name your own café {name} — filtered server-side (TextService)
 	"WorldReady", -- s->c: café rendered + assets loaded {cafeName} — ends the intro overlay
 	"ProfileUpdated", -- s->c: full PlayerData snapshot
@@ -41,6 +41,9 @@ local EVENTS = {
 
 local FUNCTIONS = {
 	"RequestProfile", -- c->s: fetch current PlayerData once
+	-- c->s: {plotIndex} -> the neighbour's steal-able shelves (P2a). Returns the
+	-- shelf PART itself per row, so the client never has to guess a instance path.
+	"NeighbourStock",
 }
 
 local function ensureFolder(): Folder

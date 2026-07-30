@@ -22,6 +22,7 @@ local Mischief = require(Shared.Config.Mischief)
 local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local EconomyConfig = require(Shared.Config.Economy)
+local Recipes = require(Shared.Config.Recipes)
 local Grid = require(Shared.Utilities.Grid)
 local Log = require(Shared.Utilities.Log)
 
@@ -35,6 +36,7 @@ local CafeService: any
 local DataService: any
 local EconomyService: any
 local CustomerService: any
+local KitchenService: any
 local AnalyticsService: any
 
 local rng = Random.new()
@@ -42,8 +44,13 @@ local limiter = RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfi
 -- Per-caster cooldown (os.clock of the last attempt) and per-victim steal window.
 local lastAttemptAt: { [number]: number } = {}
 local stolen: { [number]: { windowStart: number, count: number } } = {}
+-- Theft (P2a) keeps its OWN cooldown + victim window: lures and thefts are
+-- different actions and sharing a timer would let one silently block the other.
+local lastTheftAt: { [number]: number } = {}
+local itemsStolen: { [number]: { windowStart: number, count: number } } = {}
 
-local METHODS: { [string]: boolean } = { buy_bomb = true, smell_bomb = true, recruit = true }
+local METHODS: { [string]: boolean } =
+	{ buy_bomb = true, smell_bomb = true, recruit = true, steal = true }
 
 local function tell(player: Player, kind: string, text: string?)
 	Remotes.event("Notify"):FireClient(player, { kind = kind, text = text })
@@ -81,6 +88,32 @@ local function noteStolen(victimUserId: number)
 	local s = stolen[victimUserId]
 	if s == nil or os.clock() - s.windowStart >= Mischief.windowSeconds then
 		stolen[victimUserId] = { windowStart = os.clock(), count = 1 }
+	else
+		s.count += 1
+	end
+end
+
+-- The same cooldown/cap shape as the lure, on the theft's own timers.
+local function theftCooldownLeft(userId: number): number
+	local last = lastTheftAt[userId]
+	if last == nil then
+		return 0
+	end
+	return math.max(0, math.ceil(Mischief.theftCooldownSeconds - (os.clock() - last)))
+end
+
+local function victimAtItemCap(victimUserId: number): boolean
+	local s = itemsStolen[victimUserId]
+	if s == nil or os.clock() - s.windowStart >= Mischief.theftVictimWindowSeconds then
+		return false
+	end
+	return s.count >= Mischief.theftMaxPerVictimWindow
+end
+
+local function noteItemStolen(victimUserId: number)
+	local s = itemsStolen[victimUserId]
+	if s == nil or os.clock() - s.windowStart >= Mischief.theftVictimWindowSeconds then
+		itemsStolen[victimUserId] = { windowStart = os.clock(), count = 1 }
 	else
 		s.count += 1
 	end
@@ -199,6 +232,187 @@ local function handleLure(player: Player, p: any, method: string)
 	end
 end
 
+-- ————— Theft (P2a): take ONE ready item off a neighbour's wall shelf —————
+
+-- Resolve + fully validate a steal attempt. Returns the pieces the caller needs
+-- on success, or nil plus the reason to show the thief. Everything the client
+-- could lie about (which plot, which recipe, where it is standing) is re-derived
+-- here from server state.
+local function resolveSteal(player: Player, plotIndex: number, recipeId: string): (any?, string?)
+	local origin, ownerUserId = CafeService:GetPlotInfo(plotIndex)
+	if not origin then
+		return nil, nil -- not a real plot: stay silent, this is a malformed payload
+	end
+	if not ownerUserId then
+		return nil, "That café is empty."
+	end
+	if ownerUserId == player.UserId then
+		return nil, "You can't steal from your own café."
+	end
+	local owner = Players:GetPlayerByUserId(ownerUserId)
+	if not owner then
+		return nil, "Your neighbour isn't around right now."
+	end
+	local recipe = Recipes[recipeId]
+	if not recipe then
+		return nil, nil
+	end
+
+	-- You must be AT the shelf. The shelf part is the authority on where that is,
+	-- so a thief cannot stand at the door and claim a shelf across the room.
+	local shelf = KitchenService:GetShelfPart(owner, recipeId)
+	if not shelf then
+		return nil, "They don't have a shelf for that."
+	end
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart")
+	if not (hrp and hrp:IsA("BasePart")) then
+		return nil, nil
+	end
+	if (hrp.Position - shelf.Position).Magnitude > Mischief.theftShelfRadius then
+		return nil, "Get right up to the shelf."
+	end
+
+	local secs = theftCooldownLeft(player.UserId)
+	if secs > 0 then
+		return nil, "Lie low for " .. secs .. "s before your next steal."
+	end
+	if victimAtItemCap(ownerUserId) then
+		return nil, "Their café is watching you — try later."
+	end
+
+	-- The victim must actually have one ready, and the thief must be able to
+	-- HOLD it (unlocked + under the per-recipe cap). Checked before anything is
+	-- removed, so a steal is all-or-nothing and can never destroy the item.
+	local ownerData = DataService:GetProfile(owner)
+	if not ownerData then
+		return nil, nil
+	end
+	local _, available = KitchenService:GetStockCounts(ownerData, recipeId)
+	if available <= 0 then
+		return nil, "That shelf is empty now."
+	end
+	if not KitchenService:CanReceiveServing(player, recipeId) then
+		return nil, "You can't carry any more " .. recipe.displayName .. "."
+	end
+	return { owner = owner, ownerUserId = ownerUserId, recipe = recipe, shelf = shelf }, nil
+end
+
+local function handleSteal(player: Player, p: any)
+	if not Mischief.theftEnabled then
+		return
+	end
+	if typeof(p.plotIndex) ~= "number" or p.plotIndex ~= math.floor(p.plotIndex) then
+		return
+	end
+	if typeof(p.recipeId) ~= "string" then
+		return
+	end
+	local hit, reason = resolveSteal(player, p.plotIndex, p.recipeId)
+	if not hit then
+		if reason then
+			tell(player, "steal_blocked", reason)
+		end
+		return
+	end
+
+	-- Move the item: it LEAVES their café and arrives in yours. Take first, and
+	-- hand back if the receive somehow fails, so a serving is never duplicated
+	-- nor destroyed.
+	if not KitchenService:TakeServing(hit.owner, p.recipeId) then
+		tell(player, "steal_blocked", "That shelf is empty now.")
+		return
+	end
+	if not KitchenService:AddStolenServing(player, p.recipeId) then
+		KitchenService:AddStolenServing(hit.owner, p.recipeId)
+		tell(player, "steal_blocked", "You couldn't carry it.")
+		return
+	end
+
+	lastTheftAt[player.UserId] = os.clock()
+	noteItemStolen(hit.ownerUserId)
+	-- No silent theft: a visible puff at the shelf, same telegraph family as the
+	-- lure vapour.
+	Fx.smellVapour(hit.shelf.Position, Mischief.theftVapourSeconds)
+
+	-- "1×" rather than "a"/"an": dish names are config-driven, so an article
+	-- chosen here goes wrong the moment a vowel shows up ("a Espresso").
+	local dish = "1× " .. hit.recipe.displayName
+	tell(
+		player,
+		"steal_done",
+		"You pocketed " .. dish .. " from " .. hit.owner.DisplayName .. "'s café! 🫳"
+	)
+	-- The victim is told WHO — naming the thief is the point of the mechanic.
+	tell(
+		hit.owner,
+		"steal_hit",
+		player.DisplayName .. " stole " .. dish .. " from your café! 😾"
+	)
+	if AnalyticsService then
+		AnalyticsService:Track(
+			player,
+			"item_stolen",
+			{ recipe = p.recipeId, owner = hit.ownerUserId }
+		)
+	end
+end
+
+-- The picker's data source: which of this neighbour's shelves you could actually
+-- rob right now. Returns the shelf PART per row so the client never guesses a
+-- path. Filtered to recipes the thief has unlocked, because those are the only
+-- ones they can hold (see KitchenService.AddStolenServing).
+local function handleStockQuery(player: Player, payload: unknown): any
+	if not (Mischief.enabled and Mischief.theftEnabled) then
+		return nil
+	end
+	if typeof(payload) ~= "table" then
+		return nil
+	end
+	if not limiter:check(player.UserId, os.clock()) then
+		return nil
+	end
+	local p = payload :: any
+	if typeof(p.plotIndex) ~= "number" or p.plotIndex ~= math.floor(p.plotIndex) then
+		return nil
+	end
+	local origin, ownerUserId = CafeService:GetPlotInfo(p.plotIndex)
+	if not (origin and ownerUserId) or ownerUserId == player.UserId then
+		return nil
+	end
+	local owner = Players:GetPlayerByUserId(ownerUserId)
+	local ownerData = if owner then DataService:GetProfile(owner) else nil
+	local thiefData = DataService:GetProfile(player)
+	if not (owner and ownerData and thiefData) then
+		return nil
+	end
+
+	local rows = {}
+	for recipeId, recipe in Recipes do
+		if thiefData.unlockedRecipes[recipeId] == true then
+			local _, available = KitchenService:GetStockCounts(ownerData, recipeId)
+			local shelf = if available > 0
+				then KitchenService:GetShelfPart(owner, recipeId)
+				else nil
+			if shelf then
+				table.insert(rows, {
+					recipeId = recipeId,
+					name = recipe.displayName,
+					count = available,
+					shelf = shelf,
+				})
+			end
+		end
+	end
+	table.sort(rows, function(a, b)
+		if a.count == b.count then
+			return a.recipeId < b.recipeId
+		end
+		return a.count > b.count
+	end)
+	return { owner = owner.DisplayName, items = rows }
+end
+
 local function handleMischief(player: Player, payload: unknown)
 	if typeof(payload) ~= "table" then
 		return
@@ -212,6 +426,8 @@ local function handleMischief(player: Player, payload: unknown)
 	end
 	if p.method == "buy_bomb" then
 		handleBuy(player)
+	elseif p.method == "steal" then
+		handleSteal(player, p)
 	else
 		handleLure(player, p, p.method)
 	end
@@ -222,6 +438,7 @@ function MischiefService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	EconomyService = ServiceRegistry.get("EconomyService")
 	CustomerService = ServiceRegistry.get("CustomerService")
+	KitchenService = ServiceRegistry.get("KitchenService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 end
 
@@ -231,12 +448,15 @@ function MischiefService.Start(_self: any)
 		return
 	end
 	Remotes.event("Mischief").OnServerEvent:Connect(handleMischief)
+	Remotes.func("NeighbourStock").OnServerInvoke = handleStockQuery
 	Players.PlayerRemoving:Connect(function(player)
 		limiter:clear(player.UserId)
 		lastAttemptAt[player.UserId] = nil
 		stolen[player.UserId] = nil
+		lastTheftAt[player.UserId] = nil
+		itemsStolen[player.UserId] = nil
 	end)
-	Log.info("MischiefService ready (smell bomb + recruit, guardrailed)")
+	Log.info("MischiefService ready (smell bomb + recruit + shelf theft, guardrailed)")
 end
 
 return MischiefService
