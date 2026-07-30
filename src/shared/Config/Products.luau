@@ -139,6 +139,82 @@ Products.passes = {
 	},
 }
 
+-- ————— Production-yield upgrade ladder (P4) —————
+--
+-- Owner spec (2026-07-30): "×5 to add 5 elements for each item — 5 coffees, 5
+-- teas — but only to the items that are unlocked." So this multiplies what a
+-- batch YIELDS, not what it sells for, and only for recipes the player has
+-- unlocked.
+--
+-- RAILS: the owner chose PERMANENT tiers, which is only rails-clean because
+-- every tier is **also buyable with coins**. Robux skips the grind; it never buys
+-- power you cannot earn (HANDOFF §1, docs/MONETISATION.md). The coin prices are
+-- deliberately steep so the ladder is a real long-game goal rather than a
+-- formality — and so a paying player is ahead by TIME, not by ceiling.
+--
+-- ⚠️ Economy note: a permanent ×20 yield is a 20× income ceiling. The per-recipe
+-- stock cap (Kitchen.maxStockPerRecipe) throttles it in practice, but the coin
+-- economy still wants a rebalance pass once this is live — flagged in ROADMAP.
+--
+-- `productId = 0` means "not created in the Creator Dashboard yet": the coin path
+-- works, and the Robux button is simply hidden until a real id is pasted in.
+export type YieldTier = {
+	tier: number,
+	multiplier: number,
+	name: string,
+	blurb: string,
+	icon: string,
+	coinCost: number,
+	productId: number,
+	robuxPrice: number,
+}
+
+Products.yieldTiers = {
+	{
+		tier = 1,
+		multiplier = 5,
+		name = "Batch Output ×5",
+		blurb = "Every batch you make yields 5× the items",
+		icon = "📦",
+		coinCost = 25000,
+		productId = 0, -- paste the Dashboard Product ID here
+		robuxPrice = 99,
+	},
+	{
+		tier = 2,
+		multiplier = 10,
+		name = "Batch Output ×10",
+		blurb = "Every batch you make yields 10× the items",
+		icon = "🏭",
+		coinCost = 120000,
+		productId = 0,
+		robuxPrice = 199,
+	},
+	{
+		tier = 3,
+		multiplier = 20,
+		name = "Batch Output ×20",
+		blurb = "Every batch you make yields 20× the items",
+		icon = "🚀",
+		coinCost = 500000,
+		productId = 0,
+		robuxPrice = 349,
+	},
+}
+
+-- The multiplier a given tier grants. Tier 0 (or anything unrecognised) is ×1, so
+-- an unset/corrupt save simply behaves as an un-upgraded café.
+function Products.yieldMultiplier(tier: number?): number
+	local t = math.floor(tonumber(tier) or 0)
+	local best = 1
+	for _, row in Products.yieldTiers do
+		if row.tier <= t and row.multiplier > best then
+			best = row.multiplier
+		end
+	end
+	return best
+end
+
 -- Display order for the shop (dev products first, then passes).
 Products.order = {
 	{ id = 3611623208, pass = false },

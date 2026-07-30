@@ -5,6 +5,49 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-30 — P4: Robux store folded into UPGRADES + batch-output ladder
+The separate "Store" rail button (P) is gone. The Robux catalogue now lives inside
+the **UPGRADES** dock button — which was a "coming soon" stub — so the coin-bought
+upgrades and the Robux ones sit in **one panel, side by side**. That adjacency is
+the honest presentation of the rails: you can see both ways to get the same thing.
+
+**New: the batch-output ladder — ×5 / ×10 / ×20.** Per the owner's spec, these
+multiply what a batch **yields**, not what it sells for: "×5 to add 5 elements for
+each item — 5 coffees, 5 teas — but only to the items that are unlocked". Applied
+in `KitchenService.CompleteProduction`, the single funnel both automatic
+production and manual collect pass through, and gated on
+`data.unlockedRecipes[recipeId]`.
+
+**Rails.** The owner chose PERMANENT tiers, which is only rails-clean because
+**every tier is also buyable with coins** (25k / 120k / 500k) — Robux skips the
+grind, it never buys power you cannot earn (HANDOFF §1). The coin path is fully
+live now; each Robux button stays hidden until a real Product ID is pasted into
+`Config/Products.yieldTiers`, so an un-created SKU can never show a dead buy
+button. Server-authoritative throughout: the client sends only a tier number, and
+the price, the strict one-rung-at-a-time ordering and the spend all happen on the
+server. `ProcessReceipt` stays idempotent and now also resolves yield-tier
+products; a grant is `math.max`, so it can never downgrade you.
+
+New `PlayerData.yieldTier` (top-level → `reconcile` heals old saves, and the heal
+clamps to a real tier so a corrupt value can't grant an unearned multiplier) and a
+`BuyYieldTier` remote.
+
+⚠️ **Economy follow-up:** a permanent ×20 yield is a 20× income ceiling. The
+per-recipe cap (`Kitchen.maxStockPerRecipe` = 99) throttles it in practice, but
+the coin economy wants a rebalance pass once this is live — flagged in ROADMAP.
+
+Verified in Studio: the Store rail button is gone (rail is Goals/Trophies/Map/
+Music/Settings) and `UpgradesPanel` replaces `RobuxShopPanel`; the panel renders
+BATCH OUTPUT first with all three coin prices, then the dev products, then VIP
+(showing an OWNED chip, since the account owns its own pass in Studio). Guards:
+buying tier 2 first → "Buy the previous upgrade first"; tier 1 without funds →
+"Not enough coins — 25000 🪙 needed"; tier 99 and tier 1.5 → silently ignored;
+`yieldTier` stayed 0 through all of it. With the price temporarily cheapened **in
+Studio's in-memory DataModel only** (disk untouched, reverted after): coins
+233 → 183 (exactly −50), tier 0 → 1, and a re-buy was refused without
+double-charging. The multiplier then measured **+5 stock per batch** (produced
+0 → 5 → 10, espresso 3 → 8 → 13).
+
 ### Feature — 2026-07-30 — P3: the VIP is a scheduled event with a HUD countdown
 The brainrot VIP used to drop in on a random 4–8 minute timer, so nobody could
 plan for it and half the visits went unnoticed. It is now a **fixed 30-minute

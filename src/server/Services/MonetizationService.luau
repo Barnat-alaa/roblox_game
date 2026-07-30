@@ -13,6 +13,8 @@ local Products = require(Shared.Config.Products)
 local Ingredients = require(Shared.Config.Ingredients)
 local Types = require(Shared.Types)
 local Remotes = require(Shared.Network.Remotes)
+local RateLimiter = require(Shared.Utilities.RateLimiter)
+local EconomyConfig = require(Shared.Config.Economy)
 local Log = require(Shared.Utilities.Log)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -23,6 +25,11 @@ MonetizationService.Name = "MonetizationService"
 local DataService: any
 local CafeService: any
 local KitchenService: any
+local EconomyService: any
+local AnalyticsService: any
+
+local buyLimiter =
+	RateLimiter.new(EconomyConfig.maxRequestsPerWindow, EconomyConfig.rateWindowSeconds)
 
 -- Apply one product's reward to a loaded profile. Returns true on success (so
 -- ProcessReceipt only records the grant + returns PurchaseGranted when it worked).
@@ -63,6 +70,11 @@ local function grantProduct(player: Player, entry: any): boolean
 				m.hired = true
 			end
 		end
+	elseif entry.kind == "yield_tier" then
+		-- P4: permanent, and never a downgrade — buying a lower tier after a
+		-- higher one (or re-buying the same) leaves you where you are.
+		local mutable: any = data
+		mutable.yieldTier = math.max(math.floor(tonumber(mutable.yieldTier) or 0), entry.tier)
 	else
 		return false
 	end
@@ -91,6 +103,23 @@ local function processReceipt(receiptInfo: any): Enum.ProductPurchaseDecision
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
 	local entry = Products.developerProducts[receiptInfo.ProductId]
+	if not entry then
+		-- The yield ladder lives in its own table (it has a coin price too), so
+		-- look there before giving up. productId 0 means "not created yet" and
+		-- must never match a real receipt.
+		for _, row in Products.yieldTiers do
+			if row.productId ~= 0 and row.productId == receiptInfo.ProductId then
+				entry = {
+					kind = "yield_tier",
+					key = "yield_tier_" .. tostring(row.tier),
+					tier = row.tier,
+					name = row.name,
+					id = row.productId,
+				}
+				break
+			end
+		end
+	end
 	if not entry then
 		-- Unknown product (config not deployed yet): retry later, don't consume it.
 		Log.warn("ProcessReceipt: unknown product", receiptInfo.ProductId)
@@ -161,14 +190,83 @@ function MonetizationService.BoostActive(
 	return typeof(boosts) == "table" and (tonumber(boosts[boostKey]) or 0) > os.time()
 end
 
+-- P4 — the COIN half of the yield ladder. This is what keeps a permanent paid
+-- multiplier off the pay-to-win rail: every tier Robux can buy is also buyable
+-- with coins, so Robux only skips the grind (HANDOFF §1). Server-authoritative:
+-- the client sends a tier number and nothing else, and the price, the ordering
+-- and the spend all happen here.
+local function handleBuyYieldTier(player: Player, payload: unknown)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	local p = payload :: any
+	if typeof(p.tier) ~= "number" or p.tier ~= math.floor(p.tier) then
+		return
+	end
+	if not buyLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+	local row
+	for _, candidate in Products.yieldTiers do
+		if candidate.tier == p.tier then
+			row = candidate
+			break
+		end
+	end
+	if not row then
+		return
+	end
+
+	local current = math.floor(tonumber((data :: any).yieldTier) or 0)
+	if current >= row.tier then
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "upgrade_blocked",
+			text = "You already have " .. row.name .. ".",
+		})
+		return
+	end
+	-- Strictly one rung at a time, so tier 3 can never be reached for tier 3's
+	-- price alone.
+	if row.tier ~= current + 1 then
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "upgrade_blocked",
+			text = "Buy the previous upgrade first.",
+		})
+		return
+	end
+	if not EconomyService:TrySpendCoins(player, row.coinCost) then
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "upgrade_blocked",
+			text = "Not enough coins — " .. row.coinCost .. " 🪙 needed.",
+		})
+		return
+	end
+	(data :: any).yieldTier = row.tier
+	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, {
+		kind = "upgrade_bought",
+		text = row.name .. " unlocked! Every batch now yields " .. row.multiplier .. "×.",
+	})
+	if AnalyticsService then
+		AnalyticsService:Track(player, "yield_tier_bought", { tier = row.tier, paidWith = "coins" })
+	end
+end
+
 function MonetizationService.Init(_self: any)
 	DataService = ServiceRegistry.get("DataService")
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
+	EconomyService = ServiceRegistry.get("EconomyService")
+	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 end
 
 function MonetizationService.Start(_self: any)
 	MarketplaceService.ProcessReceipt = processReceipt
+	Remotes.event("BuyYieldTier").OnServerEvent:Connect(handleBuyYieldTier)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
