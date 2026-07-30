@@ -1,4 +1,4 @@
-# Session handoff — Social Café City — 2026-07-26
+# Session handoff — Social Café City — 2026-07-28
 
 _Authoritative pick-up doc (supersedes prior handoffs). Written for a fresh AI
 session or a new developer taking over. This is the "start here" prompt — read it
@@ -21,7 +21,8 @@ universeId `10501568035`). You drive Roblox Studio via the **Studio MCP**.
 - `docs/GAMEPLAY_DIRECTION.md` (what/why), `docs/IMPLEMENTATION_MAP.md` (exact
   code hooks per feature), `docs/CORE_LOOP_SPEC.md` (recipe/production balance),
   `docs/MONETISATION.md`.
-- `ROADMAP.md` → "ACTIVE BUILD — Direction phases A–D".
+- `ROADMAP.md` → **"⭐ NEXT — owner priorities (2026-07-28)"** (the ordered to-do)
+  and "ACTIVE BUILD — Direction phases A–D" (context).
 - `CHANGELOG.md` `[Unreleased]` — every change this session, with rationale.
 
 ## 2. State (2026-07-26) — everything below is MERGED to `main`, CI-green
@@ -48,13 +49,20 @@ Also shipped this session (all merged to `main`, CI-green — see `CHANGELOG.md`
 | #39 | **Phase D monetisation** — boost-timer HUD pill, VIP perks wired (+50% gift, faster walk, 👑 sign badge), Auto-Collect pass removed |
 | #40 | **World aesthetics** — natural sky+sun, sea+grass island, more trees, upside-down-sign fix, **spawn-on-wall fix**, cozier 72×72 café |
 | #41 | **Player-named cafés** — typed name, `TextService`-filtered, on the sign (`SetCafeName`, `CafeNameController`) |
+| #42 | **docs** — session handoff update |
+| #43 | **Intro/onboarding + advanced sky + health strip** — first-run naming overlay masking the load (`IntroController`, `WorldReady` remote, controls frozen, reveals in front of café); dropped the fake cloud-wall backdrop for `Sky` + `Atmosphere` + **volumetric Terrain `Clouds`**; café-health redesigned to 4 slim pills at the extreme top-centre (`OperationsController`, `ResponsiveLayout`) |
 
-**Next: PUBLISH** (owner runs `scripts/publish.ps1`), then: a live Robux purchase
-test (IDs are real), the C-4b 2-player lure playtest + 4a two-player path, and the
-owner's visual eyeball of the new sky/sea (easy config tweaks in
-`CafeService.applyLighting`/`buildGroundAndSea`). Deferred polish: VIP name colour;
-café-name presented more artistically if wanted; café **width** reduction (kept at
-72 studs — a bigger change touching street spacing); ProfileStore swap (Phase 6).
+**➡️ NEXT WORK: see `ROADMAP.md` → "⭐ NEXT — owner priorities (2026-07-28)".**
+That section is the ordered to-do (P1 grass-under-road bug → P2 the 3 real
+neighbour actions → P3 VIP timer event → P4 monetisation into Upgrades +
+sell-multiplier SKUs), each with code hooks. Build one deliverable per PR.
+
+Still owed (carry-over): **PUBLISH** (owner runs `scripts/publish.ps1`); a live
+Robux purchase test (IDs are real); the 2-player mischief-lure + neighbour-help
+playtest; the owner's eyeball on the new Clouds sky/sea (tweak in
+`CafeService.applyLighting`/`buildGroundAndSea`); VIP name-colour; café-**style**
+picker in the intro panel; café **width** reduction (kept at 72 studs); ProfileStore
+swap (Phase 6); the pre-existing `Graphics.spec` failure (Coin/Coins glyph).
 
 ⚠️ **NOT PUBLISHED.** All 7 merged features are in `main` but **NOT live** in the
 DEV place. Publish with `./scripts/publish.ps1` — it needs `$env:ROBLOX_API_KEY`

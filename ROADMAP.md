@@ -77,6 +77,80 @@ merge**.
 
 ---
 
+## ⭐ NEXT — owner priorities (2026-07-28), build in THIS order
+
+_Phases A · B · C · D are all shipped + merged (PRs #30–#43) and CI-green, but
+**NOT PUBLISHED** — the owner runs `scripts/publish.ps1` (their Open Cloud key) to
+make any of it live; that is still the gate. Below are the owner's next asks, in
+priority order. Do them **one deliverable at a time**: build → Studio-test → PR →
+wait CI green → merge. Where it says "own PR", ship that slice by itself so it can
+be tested properly._
+
+### P1 — BUG: green grass shows THROUGH / under the road
+The grass island (`CafeService.buildGroundAndSea`, grass top ≈ y −0.2) sits at or
+above the road/sidewalk surface (`buildRoadNetwork`, tiles centred ≈ −0.34, top
+≈ −0.22), so grass pokes up through the road. Lower the grass plane (e.g. centre
+≈ y −1.2 so its top is clearly below the road) or raise the road, so the road
+reads solid with no green bleed. **The owner will paste a screenshot.**
+
+### P2 — Rework the neighbour-café interaction into 3 REAL, VISIBLE actions
+Today "visit a neighbour" is a card of abstract buttons (compliments +
+`SocialService.HELP_ACTIONS` water-plants/bus-table/stir-pot/flyers + the
+`Mischief` recruit/bomb buttons) — most are not real in-world actions. Replace it:
+walk up to a neighbour café + press **E** → a small menu of the actions below; each
+is a REAL thing you do in the world. **Remove** the abstract HELP_ACTIONS + the
+compliment-only card. **Ship each of the three as its own PR** (build + Studio-test
+each before the next one):
+
+- **P2a — Steal an item (bad).** Choose "steal" → the client routes you to that
+  item's WALL SHELF (`KitchenService:GetShelfPart`), press **E** at the shelf → you
+  take one item. The victim café gets a **notification naming the thief**
+  ("<player> stole from your café!"). **Limited** (per thief→victim cooldown + a
+  per-victim cap — mirror `MischiefService`'s cooldown/cap). Server-authoritative;
+  the stock leaves their café.
+- **P2b — Smell bomb.** From the menu → a **green effect UNDER the caster's
+  character** (`Fx.smellVapour` exists — reuse) and **all the neighbour's customers
+  LEAVE** (drive them out via `CustomerService`; the `leaving`/`depart` machinery is
+  the hook — here they just exit, they don't transfer to you). Consumable +
+  cooldown + cap (reuse `Config/Mischief` + `MischiefService`).
+- **P2c — Help by WORKING (good, earns money).** Helping is no longer a button —
+  you **go INSIDE a neighbour's café and do the real actions**: clean a dirty
+  plate, serve a waiting order, cook. Those actions (OrderService pickup/deliver,
+  the dirty-plate `CleanUp` prompt, cooking) are today gated to the café OWNER —
+  open them to a VISITOR standing in a neighbour's café and **pay the helper coins
+  per action** (capped per-neighbour-per-day, like the old anti-farm). Replaces
+  HELP_ACTIONS entirely.
+
+### P3 — Brainrot VIP as a scheduled SPECIAL EVENT with a HUD timer
+Make the VIP a **fixed 30-minute server event** (not the current random 4–8 min
+`Vip.spawnInterval`), with a **HUD countdown** (reuse the SessionReward / Boost
+pill pattern) that shows the **brainrot's picture** + time-to-next-VIP. Make the
+brainrot NPC **bigger** (`Config/Vip.modelHeight`/`hipHeight` +
+`AssetManifest.vip.height`; scaled in `CustomerService.spawnVipModel`). Keep it
+flowing through `CustomerService:SpawnVip` (enter → sit → order rare → served →
+gift). Hooks: `VipService` (scheduler), `Config/Vip`, `AssetManifest.vip`, a new
+`VipEvent` remote for the countdown; the picture = an rbxthumb of the vip asset id.
+
+### P4 — Monetisation: move into UPGRADES + add sell-multiplier SKUs
+- **Move the whole Robux Store into the Upgrades button/panel** (drop the separate
+  "Store" rail button **P**). Fold `RobuxShopController`'s cards into the Upgrades
+  panel as a section/tab.
+- **Add three products — ×5 / ×10 / ×20** on the **output / sell value of every
+  item you sell** (a persisted multiplier on `PlayerData`, applied in
+  `KitchenService`/`OrderService` payout or production yield). New rows in
+  `Config/Products` + grants in `MonetizationService`.
+- ⚠️ **Rails tension:** a permanent ×20 sell multiplier is pay-to-win, which the
+  rails forbid. Handle it responsibly (as the café-name free-text tension was):
+  make each multiplier **also coin-earnable** (a grindable upgrade tier) or frame
+  it as a temporary boost, and surface the trade-off to the owner before shipping.
+
+Carry-over (still owed, lower priority): **publish**; a live Robux purchase test
+(IDs are real); the 2-player mischief-lure + neighbour-help playtest; the owner's
+eyeball on the new Clouds sky + sea; VIP name-colour; a café-**style** picker in
+the intro panel; the pre-existing `Graphics.spec` test failure (Coin/Coins glyph).
+
+---
+
 ## 🎮 Gameplay vision — see docs/GAMEPLAY_UPGRADES.md
 
 _The full backlog of what makes the game addictive & interactive (juice,
