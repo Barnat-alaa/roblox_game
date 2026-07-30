@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage.Shared
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
+local Products = require(Shared.Config.Products)
 local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
@@ -243,7 +244,18 @@ function KitchenService.CompleteProduction(
 	local now = producedAt or os.time()
 	local kitchen = kitchenOf(data)
 	local total = InventoryMath.count(kitchen, recipeId, now)
-	local added = math.clamp(math.floor(quantity), 0, Kitchen.maxStockPerRecipe - total)
+
+	-- P4 batch-output ladder: a finished batch YIELDS more items (owner: "×5 to
+	-- add 5 elements for each item… but only to the items that are unlocked").
+	-- This is the single funnel every producer goes through — the automatic
+	-- production loop and manual collect alike — so the multiplier belongs here
+	-- rather than at each call site. Still clamped by maxStockPerRecipe, which is
+	-- what keeps a ×20 café from stockpiling without limit.
+	local wanted = math.floor(quantity)
+	if data.unlockedRecipes[recipeId] == true then
+		wanted *= Products.yieldMultiplier((data :: any).yieldTier)
+	end
+	local added = math.clamp(wanted, 0, Kitchen.maxStockPerRecipe - total)
 	if added <= 0 then
 		return 0
 	end

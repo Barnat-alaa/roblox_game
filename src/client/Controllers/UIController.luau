@@ -102,7 +102,6 @@ local HUD_BUTTONS: { HudButtonDefinition } = {
 		badge = "4",
 		label = "Upgrades",
 		accent = Theme.Colors.Honey,
-		comingSoon = "Appliance upgrades are on the way.",
 	},
 	{
 		id = "Shop",
@@ -170,15 +169,9 @@ local HUD_BUTTONS: { HudButtonDefinition } = {
 		accent = Theme.Colors.Roast,
 		comingSoon = "The settings panel is on the way.",
 	},
-	{
-		id = "Store",
-		zone = "Rail",
-		order = 6,
-		key = Enum.KeyCode.P,
-		badge = "P",
-		label = "Store",
-		accent = Theme.Colors.Honey,
-	},
+	-- (P4 dropped the separate "Store" rail button: the Robux catalogue now lives
+	-- inside UPGRADES, next to the coin-bought tiers, so a player sees both ways
+	-- to get the same thing side by side.)
 }
 
 -- Stat pills, bottom-left, stacked above the stock dock. Semantic colours are
@@ -1023,6 +1016,9 @@ function UIController.Start(_self: any)
 			)
 		elseif msg.kind == "robux_reward" then
 			UIController.toast("✨ " .. tostring(msg.name) .. " — thank you! Reward added.")
+		elseif msg.kind == "upgrade_bought" or msg.kind == "upgrade_blocked" then
+			-- P4 batch-output ladder (coin path).
+			UIController.toast(tostring(msg.text))
 		elseif msg.kind == "staff_hired" then
 			UIController.toast("⭐ " .. tostring(msg.name) .. " joined your crew!")
 		elseif msg.kind == "staff_upgraded" then

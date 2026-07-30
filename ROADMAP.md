@@ -144,6 +144,16 @@ gift). Hooks: `VipService` (scheduler), `Config/Vip`, `AssetManifest.vip`, a new
   make each multiplier **also coin-earnable** (a grindable upgrade tier) or frame
   it as a temporary boost, and surface the trade-off to the owner before shipping.
 
+**P4 follow-up (2026-07-30): OWNER ACTION + an economy pass.**
+1. **Create three Developer Products** on the Creator Dashboard (Batch Output ×5
+   / ×10 / ×20, suggested R$99 / R$199 / R$349) and paste each Product ID into
+   `Config/Products.yieldTiers[n].productId`. Until then the coin path works and
+   the Robux buttons stay hidden — nothing is broken, just not yet purchasable.
+2. **Rebalance the coin economy.** A permanent ×20 yield is a 20× income ceiling;
+   `Kitchen.maxStockPerRecipe` (99) throttles it, but shop/upgrade prices were
+   tuned before this existed. Re-check the 42–58% per-serving margins from PR #30
+   against a maxed café before this goes live.
+
 **P2c follow-up (deferred, 2026-07-30):** cooking as a visitor. Cleaning and
 serving were opened to a helper via `SocialService:TryWork`, but starting a cook
 spends the **owner's** coins and pantry, so the same gate would hand a visitor a

@@ -1,8 +1,14 @@
 --!strict
--- The Robux store (docs/MONETISATION.md). One card per product/pass; the buy
--- button fires Roblox's NATIVE purchase prompt (which shows the product's real
--- uploaded art + price). Every reward is granted server-side by
--- MonetizationService.ProcessReceipt — this panel only prompts the purchase.
+-- The UPGRADES panel (docs/MONETISATION.md). P4 folded the old separate "Store"
+-- rail button in here, so the coin-bought batch-output ladder and the Robux
+-- catalogue sit in ONE place — a player sees both ways to get the same thing
+-- side by side, which is the honest presentation of the rails.
+--
+-- Layout: the batch-output tiers first (each card carries a coin button and, once
+-- the owner creates the products, a Robux button), then the dev products and
+-- passes. Robux buttons fire Roblox's NATIVE purchase prompt (which shows the
+-- product's real uploaded art + price); every reward is granted server-side by
+-- MonetizationService — this panel only asks.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -10,6 +16,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Products = require(Shared.Config.Products)
+local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -26,6 +33,105 @@ local function infoFor(id: number, pass: boolean): any
 	return if pass then Products.passes[id] else Products.developerProducts[id]
 end
 
+-- P4: the batch-output ladder, shown FIRST and with BOTH prices on the same card
+-- — a coin button and (once the owner creates the products) a Robux button. That
+-- side-by-side is the point: Robux skips the grind, it doesn't buy a ceiling you
+-- can't reach with coins.
+local function buildYieldSection(parent: ScrollingFrame, profile: any)
+	local current = math.floor(tonumber(profile and profile.yieldTier) or 0)
+
+	local heading = Components.Label(parent, "BATCH OUTPUT", 12, true)
+	heading.Size = UDim2.new(1, -6, 0, 22)
+	heading.TextXAlignment = Enum.TextXAlignment.Left
+	heading.TextColor3 = Theme.Colors.Muted
+	heading.LayoutOrder = -100
+	heading.ZIndex = 22
+
+	for _, row in Products.yieldTiers do
+		local ownedTier = current >= row.tier
+		local nextUp = row.tier == current + 1
+
+		local card = Instance.new("Frame")
+		card.Name = "yield_" .. row.tier
+		card.Size = UDim2.new(1, -6, 0, 88)
+		card.BackgroundColor3 = Theme.Colors.Paper
+		card.LayoutOrder = -100 + row.tier
+		card.ZIndex = 22
+		Components.Corner(card, Theme.Radius.Medium)
+		Components.Stroke(card, if ownedTier then Theme.Colors.Mint else Theme.Colors.Line, 1, 0.3)
+		card.Parent = parent
+
+		local thumb = Components.ItemThumbnail(card, {
+			glyph = row.icon,
+			size = 60,
+			accent = Theme.Colors.Honey,
+		})
+		thumb.root.Position = UDim2.fromOffset(12, 14)
+		thumb.root.ZIndex = 23
+
+		local title = Components.Label(card, row.name, 15, true)
+		title.Size = UDim2.new(1, -230, 0, 22)
+		title.Position = UDim2.fromOffset(84, 14)
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextColor3 = Theme.Colors.Ink
+		title.ZIndex = 23
+
+		local blurb = Components.Label(card, row.blurb, 11, false)
+		blurb.Size = UDim2.new(1, -230, 0, 34)
+		blurb.Position = UDim2.fromOffset(84, 38)
+		blurb.TextXAlignment = Enum.TextXAlignment.Left
+		blurb.TextYAlignment = Enum.TextYAlignment.Top
+		blurb.TextWrapped = true
+		blurb.TextColor3 = Theme.Colors.Muted
+		blurb.ZIndex = 23
+
+		if ownedTier then
+			local chip = Components.Label(card, "OWNED", 13, true)
+			chip.Size = UDim2.fromOffset(120, 44)
+			chip.Position = UDim2.new(1, -132, 0.5, -22)
+			chip.BackgroundTransparency = 0
+			chip.BackgroundColor3 = Theme.Colors.Mint
+			chip.TextColor3 = Theme.Colors.White
+			chip.ZIndex = 23
+			Components.Corner(chip, Theme.Radius.Pill)
+		else
+			-- The coin button is the primary path and is always present.
+			local coinButton = Components.Button(
+				card,
+				string.format("%d 🪙", row.coinCost),
+				if nextUp then Theme.Colors.Honey else Theme.Colors.Line,
+				UDim2.fromOffset(120, if row.productId ~= 0 then 30 else 44)
+			)
+			coinButton.Position = UDim2.new(1, -132, 0.5, if row.productId ~= 0 then -34 else -22)
+			coinButton.TextSize = 14
+			coinButton.ZIndex = 23
+			coinButton.Active = nextUp
+			coinButton.Activated:Connect(function()
+				Remotes.event("BuyYieldTier"):FireServer({ tier = row.tier })
+			end)
+
+			-- The Robux button only appears once a real Product ID exists, so an
+			-- un-created SKU can never present a dead buy button.
+			if row.productId ~= 0 then
+				local robux = Components.Button(
+					card,
+					string.format("R$ %d", row.robuxPrice),
+					Theme.Colors.MintDark,
+					UDim2.fromOffset(120, 30)
+				)
+				robux.Position = UDim2.new(1, -132, 0.5, 2)
+				robux.TextColor3 = Theme.Colors.White
+				robux.TextSize = 14
+				robux.ZIndex = 23
+				local pid = row.productId
+				robux.Activated:Connect(function()
+					MarketplaceService:PromptProductPurchase(player, pid)
+				end)
+			end
+		end
+	end
+end
+
 local function rebuild()
 	local profile = UIController.getProfile()
 	if not ui.list then
@@ -38,6 +144,7 @@ local function rebuild()
 	layout.Parent = ui.list
 
 	local owned = (profile and profile.ownedPasses) or {}
+	buildYieldSection(ui.list, profile)
 
 	for order, ref in Products.order do
 		local info = infoFor(ref.id, ref.pass)
@@ -140,14 +247,14 @@ local function applyResponsive(mode: string, viewport: Vector2)
 end
 
 function RobuxShopController.Start(_self: any)
-	local panel = Components.Panel(UIController.modalRoot(), "RobuxShopPanel")
+	local panel = Components.Panel(UIController.modalRoot(), "UpgradesPanel")
 	panel.Size = UDim2.fromOffset(560, 580)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Visible = false
 	local _, close = Components.PanelHeader(
 		panel,
-		"STORE",
-		"Boosts, bundles & VIP — everything's also earnable in-game",
+		"UPGRADES",
+		"Batch output, boosts & VIP — everything's also earnable with coins",
 		Theme.Colors.Honey
 	)
 	close.Activated:Connect(function()
@@ -168,13 +275,13 @@ function RobuxShopController.Start(_self: any)
 	ui.list = list
 	ui.panel = panel
 
-	UIController.registerAction("Store", function()
+	UIController.registerAction("Upgrades", function()
 		UIController.togglePanel(panel)
 		if panel.Visible then
 			rebuild()
 		end
 	end)
-	UIController.bindActionPanel("Store", panel)
+	UIController.bindActionPanel("Upgrades", panel)
 	UIController.subscribeProfile(function()
 		if panel.Visible then
 			rebuild()

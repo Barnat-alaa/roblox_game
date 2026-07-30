@@ -171,6 +171,9 @@ export type PlayerData = {
 	grantedReceipts: { [string]: boolean }, -- Robux PurchaseId → granted (ProcessReceipt idempotency)
 	boosts: { [string]: number }, -- boost key → os.time() expiry (2× coins/reputation)
 	smellBombs: number, -- Phase C-4b mischief consumable count (top-level → reconcile heals)
+	-- P4 permanent production-yield ladder: 0 = ×1, 1 = ×5, 2 = ×10, 3 = ×20.
+	-- Buyable with coins OR Robux (rails: never power you can't earn).
+	yieldTier: number,
 	ownedPasses: { [string]: boolean }, -- pass key → owned (VIP, Auto-Collect), cached on join
 	social: SocialState, -- neighbour friendships + per-day help anti-farm (Phase C §4a)
 	placedFurniture: { PlacedFurniture },
