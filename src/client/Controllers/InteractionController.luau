@@ -101,7 +101,7 @@ local function refreshSmellCount()
 	end
 	local profile = UIController.getProfile()
 	local n = if profile then tonumber(profile.smellBombs) or 0 else 0
-	button.Text = "💨 Smell bomb (×" .. tostring(n) .. ")"
+	button.Text = "💨 Smell bomb — clear their café (×" .. tostring(n) .. ")"
 end
 
 local function goHome()
@@ -329,7 +329,7 @@ local function buildPanel()
 
 		local bomb = Components.Button(
 			list,
-			"💨 Smell bomb (×0)",
+			"💨 Smell bomb — clear their café (×0)",
 			Theme.Colors.Berry,
 			UDim2.new(1, 0, 0, 38)
 		)

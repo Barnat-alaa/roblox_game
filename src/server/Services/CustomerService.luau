@@ -1525,6 +1525,30 @@ function CustomerService.LureOne(
 	return true
 end
 
+-- Drive EVERY customer out of `fromPlayer`'s café (P2b smell bomb). Unlike the
+-- lure, nobody transfers to the caster — they simply walk out. They leave via the
+-- existing `leaving` path, which cancels any order, frees the seat and walks them
+-- to the street with NO Buzz, satisfaction or reputation penalty (an angry
+-- walkout, by contrast, costs all three). VIPs resist, as they do every other
+-- mischief, and anyone already served keeps the meal they paid for. Returns how
+-- many were driven out, so the caller can refuse to spend a bomb on an empty room.
+function CustomerService.ScareAll(_self: any, fromPlayer: Player): number
+	local count = 0
+	for cust in allCustomers do
+		if
+			cust.userId == fromPlayer.UserId
+			and not cust.leaving
+			and not cust.served
+			and not cust.isVip
+		then
+			cust.bubble.Text = "🤢 Ugh — what IS that smell?!"
+			cust.leaving = true
+			count += 1
+		end
+	end
+	return count
+end
+
 function CustomerService.OnOrderResolved(
 	_self: any,
 	orderId: string,

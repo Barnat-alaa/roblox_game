@@ -1,18 +1,21 @@
 --!strict
 -- Phase C-4b mischief (docs/GAMEPLAY_DIRECTION.md §4b, IMPLEMENTATION_MAP
 -- "Feature 4 / 4b"). The ONE rails-BRUSHING mechanic — owner-approved, but ONLY
--- with the FULL guardrails in Config/Mischief, all enforced here. Three actions on
+-- with the FULL guardrails in Config/Mischief, all enforced here. Four actions on
 -- the single `Mischief` remote (method-tagged, validated up front):
 --   • buy_bomb   — spend coins for one smell bomb (a consumable).
---   • smell_bomb — consume a bomb; a GUARANTEED pull if an eligible customer exists.
---   • recruit    — free; success scales with your REPUTATION.
--- The actual pull is CustomerService:LureOne (the victim's WAITING customer leaves
--- calmly — no penalty, no permanent loss — and re-appears at the caster's café).
+--   • smell_bomb — consume a bomb; AREA DENIAL: every customer in the neighbour's
+--                  café walks out (P2b). Nobody transfers to you — that's recruit.
+--   • recruit    — free; PULLS one waiting customer to you; scales with REPUTATION.
+--   • steal      — take ONE ready item off a neighbour's wall shelf (P2a).
+-- The pull is CustomerService:LureOne and the clear-out is CustomerService:ScareAll;
+-- both make the victim's customers leave CALMLY — no Buzz, satisfaction or
+-- reputation penalty, unlike an angry walkout.
 --
 -- Every guardrail (Config/Mischief): bought consumable + per-caster COOLDOWN;
--- proximity to the target; VIPs never eligible (resistance); only NOT-YET-SERVED,
--- un-seated customers; per-customer IMMUNITY + per-victim MAX-STOLEN cap; a VISIBLE
--- green-vapour telegraph. Server-authoritative; ships behind `enabled`.
+-- proximity to the target; VIPs never eligible (resistance); per-customer IMMUNITY
+-- + per-victim MAX-STOLEN cap; a VISIBLE green-vapour telegraph on every action.
+-- Server-authoritative; ships behind `enabled`.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -137,8 +140,89 @@ local function handleBuy(player: Player)
 	end
 end
 
--- smell_bomb / recruit: the guarded pull. Mirrors SocialService.handleHelp's guard
--- ladder, then layers the mischief-specific guardrails.
+-- P2b — the smell bomb is AREA DENIAL, not a pull: it clears the neighbour's
+-- room and nobody transfers to you (that is what `recruit` is for). The telegraph
+-- goes UNDER THE CASTER, so everyone can see who threw it.
+local function handleSmellBomb(player: Player, p: any)
+	if typeof(p.plotIndex) ~= "number" or p.plotIndex ~= math.floor(p.plotIndex) then
+		return
+	end
+	local origin, ownerUserId = CafeService:GetPlotInfo(p.plotIndex)
+	if not origin then
+		return
+	end
+	if not ownerUserId then
+		tell(player, "mischief_blocked", "That café is empty.")
+		return
+	end
+	if ownerUserId == player.UserId then
+		tell(player, "mischief_blocked", "You can't bomb your own café.")
+		return
+	end
+	local owner = Players:GetPlayerByUserId(ownerUserId)
+	if not owner then
+		tell(player, "mischief_blocked", "Your neighbour isn't around right now.")
+		return
+	end
+	if not isNearPlot(player, origin, Mischief.proximityRadius) then
+		tell(player, "mischief_blocked", "Get closer to their café first.")
+		return
+	end
+	local secs = cooldownLeft(player.UserId)
+	if secs > 0 then
+		tell(player, "mischief_blocked", "Cooling off — wait " .. secs .. "s.")
+		return
+	end
+	if victimAtCap(ownerUserId) then
+		tell(player, "mischief_blocked", "Their café is protected right now.")
+		return
+	end
+
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+	if (tonumber(data.smellBombs) or 0) < 1 then
+		tell(player, "mischief_blocked", "No smell bombs — buy one first.")
+		return
+	end
+
+	-- Clear the room FIRST; a bomb is only spent if it actually did something, so
+	-- it is never wasted on an already-empty café.
+	local fled = CustomerService:ScareAll(owner)
+	if fled <= 0 then
+		tell(player, "mischief_blocked", "Nobody in there to scare off.")
+		return
+	end
+
+	lastAttemptAt[player.UserId] = os.clock()
+	noteStolen(ownerUserId)
+	data.smellBombs = math.max(0, (tonumber(data.smellBombs) or 1) - 1)
+	DataService:Push(player)
+
+	-- Under the CASTER, not the café: the offset cancels Fx's own +1.5 lift so the
+	-- vapour billows around the thrower's feet.
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart")
+	local at = if hrp and hrp:IsA("BasePart")
+		then hrp.Position - Vector3.new(0, 3, 0)
+		else origin.Position
+	Fx.smellVapour(at, Mischief.bombVapourSeconds)
+
+	local many = if fled == 1 then "1 customer" else tostring(fled) .. " customers"
+	tell(player, "mischief_done", "💨 Smell bomb! " .. many .. " fled their café.")
+	tell(
+		owner,
+		"mischief_hit",
+		player.DisplayName .. " set off a smell bomb — your café emptied! 💨"
+	)
+	if AnalyticsService then
+		AnalyticsService:Track(player, "smell_bomb_used", { owner = ownerUserId, fled = fled })
+	end
+end
+
+-- recruit: the guarded pull. Mirrors SocialService.handleHelp's guard ladder,
+-- then layers the mischief-specific guardrails.
 local function handleLure(player: Player, p: any, method: string)
 	if typeof(p.plotIndex) ~= "number" or p.plotIndex ~= math.floor(p.plotIndex) then
 		return
@@ -179,12 +263,8 @@ local function handleLure(player: Player, p: any, method: string)
 	if not data then
 		return
 	end
-	if method == "smell_bomb" and (tonumber(data.smellBombs) or 0) < 1 then
-		tell(player, "mischief_blocked", "No smell bombs — buy one first.")
-		return
-	end
 	-- Only NOT-YET-SERVED, un-seated, non-VIP customers are eligible (peeked here so
-	-- a recruit roll / bomb is never spent on an empty café).
+	-- a recruit roll is never spent on an empty café).
 	if not CustomerService:HasLureTarget(ownerUserId) then
 		tell(player, "mischief_blocked", "No waiting customer to lure there.")
 		return
@@ -192,25 +272,23 @@ local function handleLure(player: Player, p: any, method: string)
 
 	-- Recruit is free but chancy — success scales with reputation; a miss still
 	-- costs the cooldown (no spam-retry) and shows a small telegraph.
-	if method == "recruit" then
-		local rep = tonumber(data.reputation) or 0
-		local chance = math.clamp(
-			Mischief.recruitBaseChance + rep * Mischief.recruitRepScale,
-			Mischief.recruitMinChance,
-			Mischief.recruitMaxChance
-		)
-		if rng:NextNumber() > chance then
-			lastAttemptAt[player.UserId] = os.clock()
-			Fx.smellVapour(origin.Position, 2)
-			tell(player, "mischief_blocked", "They weren't tempted this time…")
-			if AnalyticsService then
-				AnalyticsService:Track(player, "mischief_recruit_fail", { owner = ownerUserId })
-			end
-			return
+	local rep = tonumber(data.reputation) or 0
+	local chance = math.clamp(
+		Mischief.recruitBaseChance + rep * Mischief.recruitRepScale,
+		Mischief.recruitMinChance,
+		Mischief.recruitMaxChance
+	)
+	if rng:NextNumber() > chance then
+		lastAttemptAt[player.UserId] = os.clock()
+		Fx.smellVapour(origin.Position, 2)
+		tell(player, "mischief_blocked", "They weren't tempted this time…")
+		if AnalyticsService then
+			AnalyticsService:Track(player, "mischief_recruit_fail", { owner = ownerUserId })
 		end
+		return
 	end
 
-	-- Do the pull FIRST; only charge (cooldown / bomb / victim cap) if it landed.
+	-- Do the pull FIRST; only charge (cooldown / victim cap) if it landed.
 	local pulled = CustomerService:LureOne(owner, player, Mischief.immunitySeconds)
 	if not pulled then
 		tell(player, "mischief_blocked", "They slipped away — try again.")
@@ -218,14 +296,9 @@ local function handleLure(player: Player, p: any, method: string)
 	end
 	lastAttemptAt[player.UserId] = os.clock()
 	noteStolen(ownerUserId)
-	if method == "smell_bomb" then
-		data.smellBombs = math.max(0, (tonumber(data.smellBombs) or 1) - 1)
-		DataService:Push(player)
-	end
 	Fx.smellVapour(origin.Position, Mischief.vapourSeconds)
 
-	local how = if method == "smell_bomb" then "smell bomb" else "charm"
-	tell(player, "mischief_done", "You lured a customer over with a " .. how .. "! 😈")
+	tell(player, "mischief_done", "You charmed a customer over to your café! 😈")
 	tell(owner, "mischief_hit", player.DisplayName .. " lured a customer away! 💨")
 	if AnalyticsService then
 		AnalyticsService:Track(player, "mischief_lure", { method = method, owner = ownerUserId })
@@ -428,6 +501,8 @@ local function handleMischief(player: Player, payload: unknown)
 		handleBuy(player)
 	elseif p.method == "steal" then
 		handleSteal(player, p)
+	elseif p.method == "smell_bomb" then
+		handleSmellBomb(player, p)
 	else
 		handleLure(player, p, p.method)
 	end
