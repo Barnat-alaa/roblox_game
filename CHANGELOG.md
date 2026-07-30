@@ -5,6 +5,44 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-30 — P2a: steal an item off a neighbour's wall shelf
+The first of the three REAL neighbour actions replacing the old card of abstract
+buttons. Choosing "🫳 Steal an item" at a neighbour's café does **not** take
+anything — it lists what they have in stock and then **lights up that item's wall
+shelf and puts a prompt on it**. You still have to walk over and press **E** at
+the shelf. The item then genuinely leaves their café and arrives in yours, and
+**the victim is told who took it** ("<name> stole 1× Espresso from your café!").
+
+Guardrails mirror `MischiefService`'s lure ladder, on their own timers so the two
+actions can't block each other: a 90s per-thief cooldown, a 3-items-per-5-minutes
+per-victim cap (counted across all thieves, so nobody can be farmed), a
+must-be-at-the-shelf proximity check measured against the shelf part itself, a
+30s arming window, and a visible green vapour puff at the shelf — no silent
+theft. All server-authoritative and behind `Mischief.theftEnabled`.
+
+New: `KitchenService.AddStolenServing` / `CanReceiveServing` (deliberately NOT
+`CompleteProduction` — the thief didn't cook it, so there is no XP, mastery, goal
+credit or produced-stat; the item just changes hands), a `NeighbourStock`
+RemoteFunction that returns the shelf **part** per row so the client never guesses
+an instance path, and `steal` as a fourth method on the existing `Mischief` remote.
+Stealing is limited to recipes the thief has also unlocked — otherwise the stock
+would have no shelf to sit on and no menu slot to sell from, i.e. dead weight.
+
+Verified in Studio: the guard ladder returns the right refusal for own-café,
+empty-plot, malformed and out-of-range attempts (and stays silent on malformed
+payloads); `GetShelfPart` resolves to the real `Shelf_espresso/Ledge`; the
+telegraph spawns at the shelf (70, 4.9, 22 = shelf + Fx's lift) with a live
+emitter; the cooldown counts down and blocks (20s → 11s → 3s → success → 82s).
+The transfer itself was proven by temporarily lifting the self-steal block **in
+Studio's in-memory DataModel only** (disk untouched, reverted after) and stealing
+from an own shelf: the FIFO-oldest lot went 3 → 2 and a **new** 1-unit lot with a
+fresh expiry appeared, while `stats.produced` stayed at 1 — exactly the intended
+"changes hands, isn't cooked" behaviour. **Still owed: the 2-player pass** where
+the victim is a different player (same limitation as C-4a/4b).
+
+Note: the compliment card and `SocialService.HELP_ACTIONS` are still in place —
+they are removed in **P2c**, which is the PR that replaces what they did.
+
 ### Fix — 2026-07-30 — grass no longer bleeds up through the road
 The owner reported (with a screenshot) green grass showing through and under the
 road. Cause: the grass island spans the WHOLE neighbourhood, including the ground

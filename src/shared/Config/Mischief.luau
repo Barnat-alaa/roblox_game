@@ -43,6 +43,24 @@ local Mischief = {
 	recruitRepScale = 0.0015, -- +0.15 per 100 reputation
 	recruitMinChance = 0.15,
 	recruitMaxChance = 0.8,
+
+	-- ————— Theft (P2a) — steal ONE ready item off a neighbour's wall shelf —————
+	-- A REAL in-world action, not a menu abstraction: you pick an item at the
+	-- neighbour's door, walk to THAT item's shelf, and press E at the shelf itself.
+	-- Same guardrail family as the lure, with one addition that matters — the
+	-- victim is told WHO took it (naming the thief is the whole social point, and
+	-- it is what keeps this a rivalry rather than an invisible tax).
+	theftEnabled = true,
+	theftCooldownSeconds = 90, -- per-thief gap between steals (longer than a lure)
+	-- You must be AT the shelf, not merely on the plot — this is the range the
+	-- shelf prompt uses and the server re-checks against the shelf part itself.
+	theftShelfRadius = 14,
+	theftArmSeconds = 30, -- a chosen shelf stays armed this long, then disarms
+	-- Victim protection: a café loses at most this many ITEMS per window, counted
+	-- across all thieves, so no one can be farmed.
+	theftMaxPerVictimWindow = 3,
+	theftVictimWindowSeconds = 300,
+	theftVapourSeconds = 3, -- visible telegraph at the shelf (no silent theft)
 }
 
 return Mischief
