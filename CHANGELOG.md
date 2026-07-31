@@ -5,6 +5,48 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-31 — move furniture you have already placed
+You could only ever pick an item back up and re-place it. Now, in Build mode,
+**tapping a placed item picks it up to carry**; the next tap sets it down, and R
+rotates it on the way — the ghost preview and rotation are the same ones normal
+placement uses, so there is nothing new to learn. Picking something from the
+catalogue cancels the carry, and a live hint line in the panel says what a tap
+will do (build mode has three states and the ghost alone did not communicate
+"you are carrying something").
+
+New `MoveFurniture` remote, validated exactly like a placement with two
+deliberate differences:
+- The moving item is **excluded from its own overlap scan**. Without that, nudging
+  a piece one cell would collide with the cell it is standing in, and every small
+  adjustment — the common case — would be rejected.
+- It does **not** re-pay the object cap, since it is not a new object.
+
+Unlike removing, a move is **not** blocked while an appliance is cooking. Removing
+a busy stove would destroy its batch; a move keeps the same `instanceId`, and the
+cook is keyed to that id and runs on the wall clock, so it carries on untouched.
+Guarding it would in practice have made appliances permanently unmovable, because
+the automatic production loop holds a job on every enabled appliance almost
+continuously (measured: the first attempt was refused with `busy_cooking`).
+
+Verified in Studio: the seed espresso machine moved (4,3) → (12,9) with a new
+rotation, then **nudged one cell to (12,10)** — the case that needs the
+self-overlap exclusion — while its production job was live. The world model
+followed to world (50, 42), the exact centre of grid (12,10), keeping
+`instanceId = seed_coffee`. Guards: moving onto the occupied counter → `overlap`;
+out of bounds → `out_of_bounds`; a foreign `instanceId` → silently ignored.
+`placedFurniture` stayed at 2 throughout, so nothing was duplicated.
+
+### Verified — 2026-07-31 — placement and rotation are correct (no change needed)
+Checked before building on top of it, per the owner's ask. Placement and rotation
+are already right: measured true world-space bounds (projecting every part's
+corners onto the world axes — `GetBoundingBox`/`GetExtentsSize` return
+*pivot-oriented* extents and cannot show this) against the reserved grid rect.
+A 6×1 counter at rotation 0 rendered X 16.0→40.0 / Z 12.0→16.0 against a reserved
+X 16→40 / Z 12→16, and at rotation 1 rendered X 8.0→12.0 / Z 48.0→72.0 against a
+reserved X 8→12 / Z 48→72 — matching to the stud. All four rotations apply the
+right visual yaw (`90 × rotation + assetYaw`). A catalogue audit also found no
+non-square item locked to `rotatable = false`.
+
 ### Fix — 2026-07-31 — onboarding no longer dead-ends on step 2/6
 The owner reported being **always stuck on step 2 of 6**. Step 2 was not broken —
 it was **unreachable**. The only action that satisfied it was the AUTO toggle,

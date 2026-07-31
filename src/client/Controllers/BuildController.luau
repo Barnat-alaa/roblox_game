@@ -35,6 +35,10 @@ local active = false
 local selectedId: string? = nil
 local selectedCategory = "All"
 local rotation = 0
+-- Set while CARRYING an already-placed piece (B2). When this is set, a click
+-- moves that item instead of placing a new one; the ghost preview and R-to-rotate
+-- are shared with normal placement.
+local movingInstanceId: string? = nil
 local previewPart: Part? = nil
 local ui: { [string]: any } = {}
 
@@ -139,20 +143,85 @@ local function updatePreview()
 	preview.Parent = workspace
 end
 
+-- Which already-placed item covers this cell? Derived from the same footprint
+-- maths the server validates with, so what you can click is exactly what the
+-- server believes is there — no second raycast pass and no separate hitboxes.
+local function placedAtCell(gridX: number, gridY: number): any
+	local profile = UIController.getProfile()
+	if not profile then
+		return nil
+	end
+	for _, placed in profile.placedFurniture or {} do
+		local definition = Furniture[placed.catalogId]
+		if definition then
+			local w, d = Grid.footprintSize(definition.width, definition.depth, placed.rotation)
+			if
+				gridX >= placed.gridX
+				and gridX < placed.gridX + w
+				and gridY >= placed.gridY
+				and gridY < placed.gridY + d
+			then
+				return placed
+			end
+		end
+	end
+	return nil
+end
+
+local function setHint(text: string)
+	if ui.hint then
+		ui.hint.Text = text
+	end
+end
+
 local function tryPlace(screenPosition: Vector2)
-	if not active or not selectedId then
+	if not active then
 		return
 	end
 	local gridX, gridY = raycastCell(screenPosition)
 	if not gridX or not gridY then
 		return
 	end
-	Remotes.event("PlaceFurniture"):FireServer({
-		catalogId = selectedId,
-		gridX = gridX,
-		gridY = gridY,
-		rotation = rotation,
-	})
+
+	-- Carrying an existing piece: this click sets it down at the new cell.
+	if movingInstanceId then
+		Remotes.event("MoveFurniture"):FireServer({
+			instanceId = movingInstanceId,
+			gridX = gridX,
+			gridY = gridY,
+			rotation = rotation,
+		})
+		movingInstanceId = nil
+		selectedId = nil
+		setHint("Moved. Tap another placed item to move it.")
+		return
+	end
+
+	-- A catalogue item is chosen: place a new one.
+	if selectedId then
+		Remotes.event("PlaceFurniture"):FireServer({
+			catalogId = selectedId,
+			gridX = gridX,
+			gridY = gridY,
+			rotation = rotation,
+		})
+		return
+	end
+
+	-- Nothing chosen: pick up whatever is under the cursor and carry it. The
+	-- ghost preview and R-to-rotate then work exactly as they do for a new piece.
+	local placed = placedAtCell(gridX, gridY)
+	if placed then
+		movingInstanceId = placed.instanceId
+		selectedId = placed.catalogId
+		rotation = math.floor(tonumber(placed.rotation) or 0) % 4
+		local definition = Furniture[placed.catalogId]
+		setHint(
+			"Moving "
+				.. ((definition and definition.displayName) or placed.catalogId)
+				.. " — tap a new spot (R rotates)."
+		)
+	end
 end
 
 local function setCategoryButtons(activeButton: TextButton?)
@@ -248,7 +317,10 @@ local function refreshCatalogue()
 		detail.ZIndex = 23
 
 		button.Activated:Connect(function()
+			-- Choosing from the catalogue abandons any piece being carried.
+			movingInstanceId = nil
 			selectedId = id
+			setHint("Tap a spot to place it (R rotates).")
 			refreshCatalogue()
 		end)
 		button.Parent = ui.list
@@ -259,6 +331,7 @@ end
 local function leaveBuildMode()
 	active = false
 	selectedId = nil
+	movingInstanceId = nil
 	if previewPart then
 		previewPart.Parent = nil
 	end
@@ -284,10 +357,22 @@ local function buildPanel()
 	local _, close = Components.PanelHeader(
 		panel,
 		"BUILD MODE",
-		"Choose an item, then tap the cafe floor",
+		"Tap a placed item to MOVE it, or pick one below to add",
 		Theme.Colors.Coral
 	)
 	close.Activated:Connect(toggle)
+
+	-- Live instruction line: what a tap will do right now. Build mode has three
+	-- states (idle / placing a new item / carrying an existing one) and without
+	-- this the only feedback for "you are carrying something" is the ghost.
+	local hint = Components.Label(panel, "", 11, true)
+	hint.Size = UDim2.new(1, -20, 0, 18)
+	hint.Position = UDim2.fromOffset(10, 108)
+	hint.TextXAlignment = Enum.TextXAlignment.Left
+	hint.TextTruncate = Enum.TextTruncate.AtEnd
+	hint.TextColor3 = Theme.Colors.Muted
+	hint.ZIndex = 22
+	ui.hint = hint
 
 	local categories = Instance.new("Frame")
 	categories.Size = UDim2.new(1, -20, 0, 36)

@@ -35,12 +35,17 @@ local function newInstanceId(): string
 	return "f_" .. nextInstance
 end
 
+-- `ignoreInstanceId` excludes one already-placed item from the overlap scan. It is
+-- what makes MOVING an item possible: without it, a piece nudged one cell over
+-- would collide with the cell it is currently standing in and every move that
+-- overlapped its own old footprint would be rejected.
 local function validatePlacement(
 	data: Types.PlayerData,
 	def: Types.FurnitureDefinition,
 	gridX: number,
 	gridY: number,
-	rotation: number
+	rotation: number,
+	ignoreInstanceId: string?
 ): (boolean, string?)
 	-- Reject NaN / non-integers / bad rotation up front.
 	if gridX ~= gridX or gridY ~= gridY then
@@ -62,14 +67,16 @@ local function validatePlacement(
 	if not Grid.inBounds(gridX, gridY, def.width, def.depth, rotation, nil, depthCells) then
 		return false, "out_of_bounds"
 	end
-	if #data.placedFurniture >= EconomyConfig.maxPlacedFurniture then
+	-- A move re-places an item that is already counted, so the cap only applies to
+	-- genuinely NEW objects.
+	if ignoreInstanceId == nil and #data.placedFurniture >= EconomyConfig.maxPlacedFurniture then
 		return false, "too_many_objects"
 	end
 
 	local nw, nd = Grid.footprintSize(def.width, def.depth, rotation)
 	for _, placed in data.placedFurniture do
 		local pdef = Furniture[placed.catalogId]
-		if pdef then
+		if pdef and placed.instanceId ~= ignoreInstanceId then
 			local pw, pd = Grid.footprintSize(pdef.width, pdef.depth, placed.rotation)
 			if Grid.rectsOverlap(gridX, gridY, nw, nd, placed.gridX, placed.gridY, pw, pd) then
 				return false, "overlap"
@@ -569,6 +576,74 @@ local function handlePlace(player: Player, payload: unknown)
 	DataService:Push(player)
 end
 
+-- Move an ALREADY-PLACED item to a new cell/rotation, without the
+-- remove-then-re-place round trip (which briefly returned the piece to the
+-- inventory and lost its instanceId, breaking anything keyed to it — a cooking
+-- stove most of all). Validated exactly like a placement, except the item is
+-- excluded from its own overlap scan and does not re-pay the object cap.
+local function handleMove(player: Player, payload: unknown)
+	if typeof(payload) ~= "table" then
+		return
+	end
+	local p = payload :: any
+	local instanceId, gridX, gridY, rotation = p.instanceId, p.gridX, p.gridY, p.rotation
+	if typeof(instanceId) ~= "string" then
+		return
+	end
+	if typeof(gridX) ~= "number" or typeof(gridY) ~= "number" or typeof(rotation) ~= "number" then
+		return
+	end
+	if not placeLimiter:check(player.UserId, os.clock()) then
+		return
+	end
+	-- Deliberately NOT guarded on IsCooking, unlike removing. Removing a busy
+	-- stove would destroy its batch, but a move keeps the same instanceId — the
+	-- cook is keyed to that id and runs on the wall clock, so it carries on
+	-- untouched and only the position changes. Guarding here would in practice
+	-- make appliances permanently unmovable, because the automatic production
+	-- loop holds a job on every enabled appliance almost continuously.
+	local data = DataService:GetProfile(player)
+	if not data then
+		return
+	end
+
+	-- Ownership: the item must be one of THIS player's placed pieces. The client
+	-- sends only an id, so this is the check that stops moving a neighbour's café.
+	local placed: Types.PlacedFurniture? = nil
+	for _, candidate in data.placedFurniture do
+		if candidate.instanceId == instanceId then
+			placed = candidate
+			break
+		end
+	end
+	if placed == nil then
+		return
+	end
+	local entry = placed :: Types.PlacedFurniture
+	local def = Furniture[entry.catalogId]
+	if not def then
+		return
+	end
+
+	local ok, reason = validatePlacement(data, def, gridX, gridY, rotation, instanceId)
+	if not ok then
+		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = reason })
+		return
+	end
+	if entry.gridX == gridX and entry.gridY == gridY and entry.rotation == rotation then
+		return -- nothing moved; skip the re-render
+	end
+	entry.gridX = gridX
+	entry.gridY = gridY
+	entry.rotation = rotation
+
+	local changed = autoFaceSeats(data)
+	changed[instanceId] = true
+	respawnFurniture(player, data, changed)
+	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, { kind = "moved", instanceId = instanceId })
+end
+
 local function handleRemove(player: Player, instanceId: unknown)
 	if typeof(instanceId) ~= "string" then
 		return
@@ -613,6 +688,7 @@ end
 
 function BuildService.Start(_self: any)
 	Remotes.event("PlaceFurniture").OnServerEvent:Connect(handlePlace)
+	Remotes.event("MoveFurniture").OnServerEvent:Connect(handleMove)
 	Remotes.event("RemoveFurniture").OnServerEvent:Connect(handleRemove)
 	Players.PlayerRemoving:Connect(function(player)
 		placeLimiter:clear(player.UserId)

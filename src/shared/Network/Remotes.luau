@@ -13,6 +13,7 @@ local FOLDER_NAME = "Remotes"
 -- client -> server, and server -> client, events
 local EVENTS = {
 	"PlaceFurniture", -- c->s: request a placement
+	"MoveFurniture", -- c->s: move an already-placed item {instanceId, gridX, gridY, rotation}
 	"RemoveFurniture", -- c->s: pick up a placed item
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
 	"MarketBuyIngredient", -- c->s: buy ingredients in bulk {ingredientId, qty}
