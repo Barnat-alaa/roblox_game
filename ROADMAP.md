@@ -77,6 +77,50 @@ merge**.
 
 ---
 
+## ⭐ NEXT — owner priorities (2026-07-31): café customisation
+
+_Owner ask: "allow the players to buy and customise more their restaurant."
+Seven items; **four are done** (PRs #52, #53). The three below are outstanding,
+in the owner's own order, with hooks. One deliverable per PR, Studio-tested._
+
+✅ **B1 placement/rotation audit** — already correct, verified to the stud (PR #53).
+✅ **B2 move already-placed items** — tap to carry, tap to set down (PR #53).
+✅ **B6 onboarding step 2/6 dead-end** — fixed, all 6 steps verified (PR #52).
+
+### B3 — Floor + wall customisation (buy 1×1 floor tiles and 1×length wall panels)
+The biggest of the three. Needs a new **surfaces** layer that is NOT furniture:
+- New `Config/Surfaces.luau` (tile + panel catalogue: id, price, colour/texture,
+  `kind = "floor" | "wall"`).
+- New persisted `PlayerData.surfaces` — top-level so `reconcile` heals old saves:
+  `{ floor = { ["x,y"] = tileId }, wall = { [wallId .. ":" .. span] = panelId } }`.
+- Rendering in `CafeService.rebuildShell` (the `Floor` / `GardenFloor` parts and
+  the side/back walls are built there) — paint per-cell decals/parts rather than
+  one flat colour.
+- A placement mode in `BuildController` — reuse `raycastCell` for floor tiles;
+  walls need a wall-face raycast, which build mode does not have yet.
+- ⚠️ Floor tiles must NOT collide with the furniture grid (they are a separate
+  layer); walls need a span model (1×length), so the panel is a run, not a cell.
+
+### B4 — Door colour + exterior façade customisation
+Smallest of the three; a good next one.
+- `PlayerData.cafeStyle = { doorColor, facadeColor }` (top-level, reconcile-healed).
+- Applied in `CafeService`: the door is `DoorLeaf` on the plot model, the façade is
+  the `WallFront` parts + `AwningSlat`s (see `rebuildShell` / the facade builder).
+- A `SetCafeStyle` remote validated against a **whitelist of colours** in config —
+  do not accept an arbitrary Color3 from the client.
+- Sits naturally as a section in the existing Upgrades panel or the intro panel
+  (a café-STYLE picker was already listed as owed there).
+
+### B5 — More buyable garden items
+- The garden is currently **outside the buildable area**: `validatePlacement`
+  clamps placement to `World.interiorDepthTiers[tier + 1]`, so nothing can be
+  placed behind the back wall. This needs a garden placement zone (a second
+  allowed rect between the interior depth and `TOTAL_DEPTH`), not just new rows.
+- Then add garden-category items to `Config/Furniture` (+ `AssetManifest` entries
+  if they use Creator Store models) and a "Garden" tab in the build catalogue.
+
+---
+
 ## ⭐ NEXT — owner priorities (2026-07-28), build in THIS order
 
 _Phases A · B · C · D are all shipped + merged (PRs #30–#43) and CI-green, but
