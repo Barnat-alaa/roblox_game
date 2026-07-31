@@ -18,6 +18,9 @@ local EVENTS = {
 	--   {surface="floor", gridX, gridY, colorId, motifId}
 	--   {surface="wall", wallId="left"|"right"|"back", index, colorId, motifId}
 	"PaintSurface",
+	-- c->s: restyle the café FRONT (B4). Any subset of the seven axes:
+	-- {architecture, color, motif, doorStyle, doorWood, windowShape, glass}
+	"SetFacade",
 	"RemoveFurniture", -- c->s: pick up a placed item
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
 	"MarketBuyIngredient", -- c->s: buy ingredients in bulk {ingredientId, qty}

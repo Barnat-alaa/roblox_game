@@ -5,6 +5,57 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-31 — B4: exterior personalisation (façade, door, windows)
+The café front is the one thing every neighbour sees from the street, so it gets
+the deepest customisation in the game — **seven independent axes**:
+
+| Axis | Options |
+| --- | --- |
+| Architecture | **3** — Classic Awning · Cottage Gable · Modern Flat |
+| Colour | **8** — Cream · Sage · Terracotta · Navy · Charcoal · Blush · Mustard · Mint |
+| Motif | **6** — Plain · Vertical battens · Horizontal boards · Half-timbered · Wainscot · Pilasters |
+| Door style | **6** — Slab · Two panel · Four panel · Arched · Cottage window · Barn cross |
+| Door wood | **6** — Golden Oak · Dark Walnut · Pale Pine · Red Mahogany · White Ash · Smoked Ebony |
+| Window shape | **3** — Squared · Rounded · Lozenge |
+| Glass tint | **3** — Clear · Sea green · Amber |
+
+That is **46,656 distinct café fronts** from ~35 rows of config. Independent axes
+rather than a flat list of "themes" is what lets two cafés on the same street look
+different without the config becoming thousands of rows.
+
+The architecture axis genuinely changes the silhouette: the `crown` above the door
+is either the striped canvas awning (which the other two hide), a stepped pitched
+**gable**, or a flat **cornice** with a deep sill. The wood finishes are engine
+material (`Wood` / `WoodPlanks`) + base colour + procedural grain lines, differing
+in count and tone — pale ash has nine fine lines, mahogany three broad dark ones —
+so they read as different timbers rather than recolours of one plank. Nothing is
+imported (`docs/ART_DIRECTION.md`).
+
+`FacadeService` **restyles** the front `CafeService` already built rather than
+replacing that builder: it recolours the existing `WallFront` / `DoorLeaf` /
+window parts and owns a `FacadeStyle` folder for its own decoration. All the
+load-bearing geometry (door hinge, collision walls, sign) stays in one place, and
+a restyle is a cheap repaint rather than a plot rebuild. Door panels and grain are
+**welded** to the leaf, because the leaf swings.
+
+New `Config/Facade`, `FacadeService`, `SetFacade` remote, `PlayerData.facade`.
+`Facade.resolve` falls back **per axis**, so retiring one config entry degrades
+that single choice instead of resetting somebody's whole café front.
+
+Verified in Studio: a full seven-axis restyle (gable / navy / half-timbered /
+arched / mahogany / lozenge / amber) persisted every axis and charged once.
+Rendering measured: 4 battens + 4 boards for half-timbered (bands = 4), 7 gable
+bars, 2 lozenge panes + 2 frames, all 8 awning slats hidden by the gable, door
+recoloured to mahogany on `Enum.Material.Wood` with 5 trim parts (3 grain + panel
++ arch), every trim **unanchored and welded to the leaf** (`Part0 = DoorLeaf`), and
+amber glass at transparency 0.25. Guards: unknown ids on any axis are dropped
+rather than stored and are not charged; re-sending the same style is a no-op;
+insufficient coins refuses.
+
+⚠️ **No picker UI yet** — the remote, validation, persistence and rendering are
+done and verified, but nothing in-game lets a player *choose* a style. That is the
+next slice (tracked in ROADMAP).
+
 ### Feature — 2026-07-31 — B3: floor tiles + wall panels you buy and place
 Players can now decorate the café itself, not just fill it with furniture. A new
 **Floor/Wall** tab in Build mode arms a style; tapping the floor tiles that 1×1
