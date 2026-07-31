@@ -75,40 +75,89 @@ local function styleFrontWall(model: Instance, origin: CFrame, folder: Folder, s
 		end
 	end
 
+	-- THE DOORWAY IS KEPT CLEAR (owner bug 2026-07-31: boards were running across
+	-- the door). Battens and boards are cladding on the WALL, so they must stop at
+	-- the opening the way real cladding does — a plank does not cross a doorway.
+	-- `reveal` is the clean margin left around the frame.
+	local doorCx = width * World.doorCenterFrac
+	local reveal = 0.9
+	local gapL = doorCx - World.doorWidth / 2 - reveal
+	local gapR = doorCx + World.doorWidth / 2 + reveal
+	local clearTop = World.doorHeight + reveal
+
 	-- Motif battens/boards sit just proud of the front face (local z = -0.5).
 	local z = -0.5 - Facade.trimDepth / 2
 	local w = 0.7
-	if motif.kind == "vertical" or motif.kind == "both" then
-		for _, offset in bandOffsets(width, motif.bands) do
+
+	-- A horizontal band below the door head is emitted as the two wall segments
+	-- either side of the opening; above the head it can run the full width.
+	local function board(name: string, centreY: number, thickness: number)
+		if centreY - thickness / 2 >= clearTop then
 			part(
-				"Batten",
-				Vector3.new(w, wallH, Facade.trimDepth),
-				origin * CFrame.new(width / 2 + offset, wallH / 2, z),
+				name,
+				Vector3.new(width, thickness, Facade.trimDepth),
+				origin * CFrame.new(width / 2, centreY, z),
 				color.trim,
 				folder
 			)
+			return
+		end
+		if gapL > 0 then
+			part(
+				name,
+				Vector3.new(gapL, thickness, Facade.trimDepth),
+				origin * CFrame.new(gapL / 2, centreY, z),
+				color.trim,
+				folder
+			)
+		end
+		if gapR < width then
+			part(
+				name,
+				Vector3.new(width - gapR, thickness, Facade.trimDepth),
+				origin * CFrame.new(gapR + (width - gapR) / 2, centreY, z),
+				color.trim,
+				folder
+			)
+		end
+	end
+
+	if motif.kind == "vertical" or motif.kind == "both" then
+		for _, offset in bandOffsets(width, motif.bands) do
+			local x = width / 2 + offset
+			if x > gapL and x < gapR then
+				-- This batten would land on the doorway: run it only from the door
+				-- head up, so the rhythm continues overhead without dressing the door.
+				local height = wallH - clearTop
+				if height > 0.4 then
+					part(
+						"Batten",
+						Vector3.new(w, height, Facade.trimDepth),
+						origin * CFrame.new(x, clearTop + height / 2, z),
+						color.trim,
+						folder
+					)
+				end
+			else
+				part(
+					"Batten",
+					Vector3.new(w, wallH, Facade.trimDepth),
+					origin * CFrame.new(x, wallH / 2, z),
+					color.trim,
+					folder
+				)
+			end
 		end
 	end
 	if motif.kind == "horizontal" or motif.kind == "both" then
 		for _, offset in bandOffsets(wallH, motif.bands) do
-			part(
-				"Board",
-				Vector3.new(width, w, Facade.trimDepth),
-				origin * CFrame.new(width / 2, wallH / 2 + offset, z),
-				color.trim,
-				folder
-			)
+			board("Board", wallH / 2 + offset, w)
 		end
 	end
 	if motif.kind == "wainscot" then
-		-- A single waist-high panelled band, the classic shopfront dado.
-		part(
-			"Wainscot",
-			Vector3.new(width, 3.2, Facade.trimDepth),
-			origin * CFrame.new(width / 2, 1.8, z),
-			color.trim,
-			folder
-		)
+		-- A single waist-high panelled band, the classic shopfront dado. Waist
+		-- height is below the door head, so this always splits around the opening.
+		board("Wainscot", 1.8, 3.2)
 	end
 	if motif.kind == "pilaster" then
 		-- Two tall columns framing the shopfront.

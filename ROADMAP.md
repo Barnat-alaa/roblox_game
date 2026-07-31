@@ -101,7 +101,13 @@ The biggest of the three. Needs a new **surfaces** layer that is NOT furniture:
 - ⚠️ Floor tiles must NOT collide with the furniture grid (they are a separate
   layer); walls need a span model (1×length), so the panel is a run, not a cell.
 
-### B4a — Façade picker UI (the remaining half of B4)
+### B4a — Façade picker UI ✅ SHIPPED (PR #57)
+_A "Front" tab in Build mode with one row per axis; each button sends only its own
+axis. Same PR fixed the owner's motif-over-the-door bug._
+
+<details><summary>original scope (kept for reference)</summary>
+
+#### B4a — Façade picker UI (the remaining half of B4)
 The B4 backend is done and verified (`Config/Facade`, `FacadeService`, `SetFacade`,
 `PlayerData.facade`, rendering for all seven axes). **What is missing is the panel
 that lets a player choose.** Hooks:
@@ -113,6 +119,8 @@ that lets a player choose.** Hooks:
   owed.
 - `Config/Facade.architectures[n].blurb` is written for use as card copy.
 - Price is `Facade.changePrice` (250 🪙 per change), already enforced server-side.
+
+</details>
 
 ### B4 — Door colour + exterior façade customisation ✅ BACKEND SHIPPED (PR #56)
 _Superseded by B4a above for the UI half._

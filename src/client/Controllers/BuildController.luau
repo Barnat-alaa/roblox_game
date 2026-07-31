@@ -13,6 +13,7 @@ local World = require(Shared.Config.World)
 local AssetManifest = require(Shared.Config.AssetManifest)
 local Furniture = require(Shared.Config.Furniture)
 local Surfaces = require(Shared.Config.Surfaces)
+local Facade = require(Shared.Config.Facade)
 
 -- Every catalogue id has a Creator Store model, so the row can show the real
 -- item. Returns nil for anything unmapped, which falls back to a glyph badge.
@@ -329,6 +330,73 @@ end
 -- tapped, and the catalogue in turn renders the picker.
 local refreshCatalogue: () -> ()
 
+-- The Front tab (B4a): one labelled row per façade axis. Every button sends just
+-- its own axis, because `SetFacade` accepts any SUBSET — so one tap changes one
+-- thing and the other six choices are left alone.
+local FACADE_AXES = {
+	{ axis = "architecture", label = "ARCHITECTURE", list = Facade.architectures },
+	{ axis = "color", label = "FRONT COLOUR", list = Facade.colors },
+	{ axis = "motif", label = "FRONT MOTIF", list = Facade.motifs },
+	{ axis = "doorStyle", label = "DOOR STYLE", list = Facade.doorStyles },
+	{ axis = "doorWood", label = "DOOR WOOD", list = Facade.doorWoods },
+	{ axis = "windowShape", label = "WINDOW SHAPE", list = Facade.windowShapes },
+	{ axis = "glass", label = "GLASS", list = Facade.glassTints },
+}
+
+local function buildFacadePicker()
+	local profile = UIController.getProfile()
+	local chosen = Facade.resolve(profile and profile.facade)
+	local order = 0
+
+	order += 1
+	local intro = Components.Label(
+		ui.list,
+		string.format("Restyle your café front — %d 🪙 per change", Facade.changePrice),
+		11,
+		true
+	)
+	intro.Name = "SurfaceHeading"
+	intro.Size = UDim2.new(1, -6, 0, 22)
+	intro.LayoutOrder = order
+	intro.TextXAlignment = Enum.TextXAlignment.Left
+	intro.TextColor3 = Theme.Colors.Muted
+	intro.ZIndex = 22
+
+	for _, group in FACADE_AXES do
+		order += 1
+		local heading = Components.Label(ui.list, group.label, 11, true)
+		heading.Name = "SurfaceHeading"
+		heading.Size = UDim2.new(1, -6, 0, 18)
+		heading.LayoutOrder = order
+		heading.TextXAlignment = Enum.TextXAlignment.Left
+		heading.TextColor3 = Theme.Colors.Muted
+		heading.ZIndex = 22
+
+		for _, entry in group.list do
+			order += 1
+			local isChosen = chosen[group.axis] and chosen[group.axis].id == entry.id
+			-- Colour axes preview themselves; the rest use the panel palette.
+			local face = (entry :: any).base
+				or (if isChosen then Theme.Colors.Mint else Theme.Colors.Paper)
+			local button = Components.Button(ui.list, entry.name, face, UDim2.new(1, -6, 0, 30))
+			button.Name = group.axis .. "_" .. entry.id
+			button.TextSize = 12
+			button.LayoutOrder = order
+			button.TextColor3 = (entry :: any).grain
+				or (entry :: any).trim
+				or (if isChosen then Theme.Colors.White else Theme.Colors.Ink)
+			button.ZIndex = 22
+			if isChosen then
+				Components.Stroke(button, Theme.Colors.Ink, 3, 0.15)
+			end
+			button.Activated:Connect(function()
+				Remotes.event("SetFacade"):FireServer({ [group.axis] = entry.id })
+				setHint("Applying " .. entry.name .. "…")
+			end)
+		end
+	end
+end
+
 -- The Surfaces tab (B3): a colour swatch row and a motif row, instead of the
 -- furniture list. Picking both arms "painting" — clicking the floor tiles a cell,
 -- clicking a wall panels that segment.
@@ -425,6 +493,11 @@ refreshCatalogue = function()
 	if selectedCategory == "Surfaces" then
 		ui.empty.Visible = false
 		buildSurfacePicker()
+		return
+	end
+	if selectedCategory == "Front" then
+		ui.empty.Visible = false
+		buildFacadePicker()
 		return
 	end
 	local profile = UIController.getProfile()
@@ -568,15 +641,16 @@ local function buildPanel()
 	categoryLayout.Parent = categories
 	ui.categories = categories
 	local firstButton: TextButton? = nil
-	for order, category in { "All", "Appliance", "Seating", "Decoration", "Surfaces" } do
+	for order, category in { "All", "Appliance", "Seating", "Decoration", "Surfaces", "Front" } do
 		local button = Components.Button(
 			categories,
 			if category == "Decoration"
 				then "Decor"
 				elseif category == "Surfaces" then "Floor/Wall"
+				elseif category == "Appliance" then "Appl."
 				else category,
 			Theme.Colors.PaperDark,
-			UDim2.new(0.2, -4, 1, 0)
+			UDim2.new(1 / 6, -4, 1, 0)
 		)
 		button.LayoutOrder = order
 		button.TextColor3 = Theme.Colors.Ink
