@@ -5,6 +5,40 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-07-31 — façade motifs no longer run across the door
+Owner report, with the screenshot: the horizontal boards were drawn straight over
+the doorway. Battens and boards are **cladding on the wall**, so they now stop at
+the opening the way real cladding does — a plank does not cross a doorway.
+
+- A horizontal band **below the door head** is emitted as the two wall segments
+  either side of the opening; above the head it still runs the full width.
+- A vertical batten that would land on the doorway is drawn **only from the door
+  head up**, so the rhythm continues overhead without dressing the door.
+- The wainscot band sits at waist height, so it always splits.
+- A 0.9-stud `reveal` margin keeps a clean edge around the frame.
+
+Verified in Studio on the hardest case — half-timbered, which has bands in BOTH
+directions: **11 motif parts, 0 overlapping the doorway** (local x 46.5–54.3,
+y 0–7.9). The count also proves the parts SPLIT rather than vanish: 4 battens +
+7 boards, where the 3 bands below the door head each became two segments.
+
+### Feature — 2026-07-31 — B4a: the façade picker
+The B4 backend had no way to reach it. Build mode now has a **Front** tab beside
+Floor/Wall, with one labelled row per axis — Architecture, Front colour, Front
+motif, Door style, Door wood, Window shape, Glass — and the current choice
+outlined. Colour and wood options preview themselves as their own swatch.
+
+Each button sends **only its own axis**, because `SetFacade` accepts any subset:
+one tap changes one thing and leaves the other six alone. Reusing the build
+panel's existing list, scrolling and responsive layout meant no new panel,
+DisplayOrder or modal plumbing.
+
+Verified in Studio: the tab row renders all six categories (All · Appl. · Seating
+· Decor · Floor/Wall · Front); the picker builds **8 headings and 35 option
+buttons** — 3+8+6+6+6+3+3, exactly the catalogue; and clicking "Modern Flat" set
+`facade.architecture = modern`, built the Cornice + CorniceLip crown and hid all
+8 awning slats, leaving every other axis untouched.
+
 ### Feature — 2026-07-31 — B4: exterior personalisation (façade, door, windows)
 The café front is the one thing every neighbour sees from the street, so it gets
 the deepest customisation in the game — **seven independent axes**:
