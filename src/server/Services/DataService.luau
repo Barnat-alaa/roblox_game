@@ -179,6 +179,9 @@ local function defaultProfile(): Types.PlayerData
 		-- Permanent production-yield ladder (P4). 0 = ×1; buyable with coins OR
 		-- Robux, so it never becomes power you can't earn.
 		yieldTier = 0,
+		-- Painted floor tiles + wall panels (B3). Empty = the default oak floor
+		-- and cream walls.
+		surfaces = { floor = {}, wall = {} },
 		ownedPasses = {},
 		-- Neighbour friendships + per-day help anti-farm (Phase C §4a). Top-level
 		-- maps → reconcile heals old saves; SocialService.socialOf heals sub-tables.
@@ -333,6 +336,19 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 	local mutableTier: any = data
 	mutableTier.yieldTier =
 		math.clamp(math.floor(tonumber(mutableTier.yieldTier) or 0), 0, #Products.yieldTiers)
+
+	-- Painted surfaces (B3). reconcile fills the top-level key, but the two
+	-- sub-tables need healing themselves — same pattern as socialOf/kitchenOf.
+	local mutableSurfaces: any = data
+	if typeof(mutableSurfaces.surfaces) ~= "table" then
+		mutableSurfaces.surfaces = { floor = {}, wall = {} }
+	end
+	if typeof(mutableSurfaces.surfaces.floor) ~= "table" then
+		mutableSurfaces.surfaces.floor = {}
+	end
+	if typeof(mutableSurfaces.surfaces.wall) ~= "table" then
+		mutableSurfaces.surfaces.wall = {}
+	end
 
 	-- Heal staff: legacy members predate the `hired` flag, so default them to
 	-- hired (their NPCs were already active). reconcile can't reach array elements.

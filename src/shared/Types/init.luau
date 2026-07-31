@@ -146,6 +146,15 @@ export type DailyState = {
 
 -- The full persisted player document. Bump `schemaVersion` and add a migration
 -- (see DataService.migrate) whenever this shape changes.
+-- Painted floor tiles and wall panels (B3). Keys are compact strings so a fully
+-- tiled café is a flat map rather than a nested grid:
+--   floor["<gridX>,<gridY>"] = "<colourId>:<motifId>"
+--   wall["<wallId>:<index>"] = "<colourId>:<motifId>"   (wallId = left|right|back)
+export type SurfaceState = {
+	floor: { [string]: string },
+	wall: { [string]: string },
+}
+
 export type SocialState = {
 	friendship: { [string]: number }, -- other userId (string) → accumulated friendship points
 	-- other userId → { day = floor(os.time()/86400), count = paid helps done that day }.
@@ -174,6 +183,8 @@ export type PlayerData = {
 	-- P4 permanent production-yield ladder: 0 = ×1, 1 = ×5, 2 = ×10, 3 = ×20.
 	-- Buyable with coins OR Robux (rails: never power you can't earn).
 	yieldTier: number,
+	-- B3 painted floor tiles + wall panels (top-level → reconcile heals old saves).
+	surfaces: SurfaceState,
 	ownedPasses: { [string]: boolean }, -- pass key → owned (VIP, Auto-Collect), cached on join
 	social: SocialState, -- neighbour friendships + per-day help anti-farm (Phase C §4a)
 	placedFurniture: { PlacedFurniture },

@@ -14,6 +14,10 @@ local FOLDER_NAME = "Remotes"
 local EVENTS = {
 	"PlaceFurniture", -- c->s: request a placement
 	"MoveFurniture", -- c->s: move an already-placed item {instanceId, gridX, gridY, rotation}
+	-- c->s: paint a floor tile or wall panel (B3)
+	--   {surface="floor", gridX, gridY, colorId, motifId}
+	--   {surface="wall", wallId="left"|"right"|"back", index, colorId, motifId}
+	"PaintSurface",
 	"RemoveFurniture", -- c->s: pick up a placed item
 	"PurchaseItem", -- c->s: buy a catalogue item with coins
 	"MarketBuyIngredient", -- c->s: buy ingredients in bulk {ingredientId, qty}

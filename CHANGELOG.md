@@ -5,6 +5,49 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-07-31 — B3: floor tiles + wall panels you buy and place
+Players can now decorate the café itself, not just fill it with furniture. A new
+**Floor/Wall** tab in Build mode arms a style; tapping the floor tiles that 1×1
+cell, tapping a wall panels that segment full-height.
+
+**8 colours × 5 motifs = 40 looks** out of thirteen rows of config — Cream, Sage,
+Terracotta, Ocean, Charcoal, Blush, Honey, Mint, each crossed with Plain,
+**Vertical lines**, **Horizontal lines**, Grid and Checker. Colour × motif rather
+than one flat list means a new colour adds five looks and a new motif adds eight.
+Every colour carries its own `ink` (the tone its lines are drawn in) — one global
+line colour looked wrong on the dark tones, and letting players pick both would
+have doubled the UI for nothing. Motifs are drawn from plain thin parts laid over
+the base slab, so no textures are imported (`docs/ART_DIRECTION.md`).
+
+Surfaces are a **separate layer from furniture**: they take no grid cells and are
+`CanCollide = false` / `CanQuery = false`, so you can tile a floor that already
+has tables on it, they never block walking, and they never intercept build mode's
+own raycast. Painting is **pay-as-you-go** (45 🪙 a tile, 70 🪙 a panel) rather
+than stocking tiles into an inventory nobody would want to manage.
+
+Walls needed a **new raycast pass** — build mode filters to the floor, so wall
+picking has its own pass against the shell's wall parts, converting the hit into
+plot-local space to read off which wall and which segment. Walls are tested
+**before** the floor, because a wall stands between the camera and the floor
+behind it and would otherwise be unpaintable.
+
+New `Config/Surfaces`, `SurfaceService`, `PaintSurface` remote, and
+`PlayerData.surfaces` (top-level → `reconcile` heals old saves; the two sub-tables
+are healed explicitly, like `socialOf`). Server-authoritative: the client sends a
+cell and a style **id**, never a colour, and the price, bounds and spend all
+happen server-side.
+
+Verified in Studio: 3 floor tiles painted in different motifs persisted with the
+right style ids and charged exactly 3 × 45 (coins 150 → 15); tile geometry
+measured at 4 × 0.12 × 4 centred on the cell's true world centre (34, 0.06, 34)
+with its top 0.12 above the café floor, non-colliding and non-queryable; band
+counts matched each motif (vlines/hlines → 3 stripes, checker → 2 quarters, grid
+→ 4). One panel on each wall mounted exactly on the inner faces — left x=0.56
+against a 0.5 face, right x=71.44 against 71.5, back z=71.4 — at the full 12-stud
+wall height. Guards: an unknown wall id, an unknown colour id and a non-integer
+cell are silently rejected; index 99 and cell (500,500) return `out_of_bounds`;
+too few coins returns `insufficient_coins`.
+
 ### Feature — 2026-07-31 — move furniture you have already placed
 You could only ever pick an item back up and re-place it. Now, in Build mode,
 **tapping a placed item picks it up to carry**; the next tap sets it down, and R

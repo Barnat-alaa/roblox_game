@@ -12,6 +12,7 @@ local Grid = require(Shared.Utilities.Grid)
 local World = require(Shared.Config.World)
 local AssetManifest = require(Shared.Config.AssetManifest)
 local Furniture = require(Shared.Config.Furniture)
+local Surfaces = require(Shared.Config.Surfaces)
 
 -- Every catalogue id has a Creator Store model, so the row can show the real
 -- item. Returns nil for anything unmapped, which falls back to a glyph badge.
@@ -39,6 +40,10 @@ local rotation = 0
 -- moves that item instead of placing a new one; the ghost preview and R-to-rotate
 -- are shared with normal placement.
 local movingInstanceId: string? = nil
+-- The armed surface style (B3). Both must be set for a click to paint; they
+-- default to the first entries so the tab is usable the moment it is opened.
+local surfaceColor = Surfaces.palette[1].id
+local surfaceMotif = Surfaces.motifs[1].id
 local previewPart: Part? = nil
 local ui: { [string]: any } = {}
 
@@ -47,18 +52,26 @@ local function getOrigin(): CFrame?
 	return if typeof(origin) == "CFrame" then origin else nil
 end
 
-local function ownPlotFloor(): BasePart?
+local function ownPlotModel(): Instance?
 	local plotsFolder = workspace:FindFirstChild("Plots")
 	if not plotsFolder then
 		return nil
 	end
 	for _, plot in plotsFolder:GetChildren() do
 		if plot:GetAttribute("ownerUserId") == player.UserId then
-			local shell = plot:FindFirstChild("Shell")
-			local floor = shell and shell:FindFirstChild("Floor")
-			if floor and floor:IsA("BasePart") then
-				return floor
-			end
+			return plot
+		end
+	end
+	return nil
+end
+
+local function ownPlotFloor(): BasePart?
+	local plot = ownPlotModel()
+	if plot then
+		local shell = plot:FindFirstChild("Shell")
+		local floor = shell and shell:FindFirstChild("Floor")
+		if floor and floor:IsA("BasePart") then
+			return floor
 		end
 	end
 	return nil
@@ -174,8 +187,83 @@ local function setHint(text: string)
 	end
 end
 
+-- Which wall segment is under the cursor? Build mode's normal raycast filters to
+-- the FLOOR, so painting walls needs its own pass against the shell's wall parts.
+-- The hit is converted into plot-local space and read off the wall it landed on.
+local function raycastWall(viewportPosition: Vector2): (string?, number?)
+	local origin = getOrigin()
+	local camera = workspace.CurrentCamera
+	local plot = ownPlotModel()
+	local shell = plot and plot:FindFirstChild("Shell")
+	if not origin or not camera or not shell then
+		return nil, nil
+	end
+	local walls: { Instance } = {}
+	for _, part in shell:GetChildren() do
+		if
+			part:IsA("BasePart")
+			and (part.Name == "WallLeft" or part.Name == "WallRight" or part.Name == "WallBack")
+		then
+			table.insert(walls, part)
+		end
+	end
+	if #walls == 0 then
+		return nil, nil
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = walls
+	local ray = camera:ViewportPointToRay(viewportPosition.X, viewportPosition.Y)
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 600, params)
+	if not result or not result.Instance then
+		return nil, nil
+	end
+	local localPos = origin:PointToObjectSpace(result.Position)
+	local name = result.Instance.Name
+	if name == "WallBack" then
+		return "back", math.floor(localPos.X / Grid.CELL_SIZE)
+	end
+	-- Left and right walls both run along local Z, so the segment index is the
+	-- same maths; which one it is comes from the part that was hit.
+	return (if name == "WallLeft" then "left" else "right"), math.floor(localPos.Z / Grid.CELL_SIZE)
+end
+
+-- Paint whatever is under the cursor. Walls are tried FIRST: a wall stands
+-- between the camera and the floor behind it, so testing the floor first would
+-- make the far wall unpaintable.
+local function tryPaint(screenPosition: Vector2): boolean
+	local wallId, index = raycastWall(screenPosition)
+	if wallId and index and index >= 0 then
+		Remotes.event("PaintSurface"):FireServer({
+			surface = "wall",
+			wallId = wallId,
+			index = index,
+			colorId = surfaceColor,
+			motifId = surfaceMotif,
+		})
+		return true
+	end
+	local gridX, gridY = raycastCell(screenPosition)
+	if gridX and gridY then
+		Remotes.event("PaintSurface"):FireServer({
+			surface = "floor",
+			gridX = gridX,
+			gridY = gridY,
+			colorId = surfaceColor,
+			motifId = surfaceMotif,
+		})
+		return true
+	end
+	return false
+end
+
 local function tryPlace(screenPosition: Vector2)
 	if not active then
+		return
+	end
+	-- The Surfaces tab paints instead of placing.
+	if selectedCategory == "Surfaces" then
+		tryPaint(screenPosition)
 		return
 	end
 	local gridX, gridY = raycastCell(screenPosition)
@@ -237,14 +325,107 @@ local function setCategoryButtons(activeButton: TextButton?)
 	end
 end
 
-local function refreshCatalogue()
+-- Forward declaration: buildSurfacePicker re-runs the catalogue when a swatch is
+-- tapped, and the catalogue in turn renders the picker.
+local refreshCatalogue: () -> ()
+
+-- The Surfaces tab (B3): a colour swatch row and a motif row, instead of the
+-- furniture list. Picking both arms "painting" — clicking the floor tiles a cell,
+-- clicking a wall panels that segment.
+local function buildSurfacePicker()
+	local order = 0
+	local function row(labelText: string)
+		order += 1
+		local label = Components.Label(ui.list, labelText, 11, true)
+		label.Name = "SurfaceHeading"
+		label.Size = UDim2.new(1, -6, 0, 18)
+		label.LayoutOrder = order
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextColor3 = Theme.Colors.Muted
+		label.ZIndex = 22
+	end
+
+	row("COLOUR")
+	for _, entry in Surfaces.palette do
+		order += 1
+		local chosen = surfaceColor == entry.id
+		local button = Components.Button(ui.list, entry.name, entry.base, UDim2.new(1, -6, 0, 34))
+		button.Name = "color_" .. entry.id
+		button.LayoutOrder = order
+		button.TextColor3 = entry.ink
+		button.TextSize = 12
+		button.ZIndex = 22
+		Components.Stroke(
+			button,
+			if chosen then Theme.Colors.Ink else entry.ink,
+			if chosen then 3 else 1,
+			0.2
+		)
+		button.Activated:Connect(function()
+			surfaceColor = entry.id
+			movingInstanceId = nil
+			selectedId = nil
+			refreshCatalogue()
+			setHint("Painting " .. entry.name .. " — tap the floor or a wall.")
+		end)
+	end
+
+	row("MOTIF")
+	for _, entry in Surfaces.motifs do
+		order += 1
+		local chosen = surfaceMotif == entry.id
+		local button = Components.Button(
+			ui.list,
+			entry.name,
+			if chosen then Theme.Colors.Mint else Theme.Colors.Paper,
+			UDim2.new(1, -6, 0, 32)
+		)
+		button.Name = "motif_" .. entry.id
+		button.LayoutOrder = order
+		button.TextColor3 = if chosen then Theme.Colors.White else Theme.Colors.Ink
+		button.TextSize = 12
+		button.ZIndex = 22
+		button.Activated:Connect(function()
+			surfaceMotif = entry.id
+			movingInstanceId = nil
+			selectedId = nil
+			refreshCatalogue()
+			setHint("Painting " .. entry.name .. " — tap the floor or a wall.")
+		end)
+	end
+
+	order += 1
+	local prices = Components.Label(
+		ui.list,
+		string.format(
+			"Floor tile %d 🪙  ·  Wall panel %d 🪙",
+			Surfaces.floorTilePrice,
+			Surfaces.wallPanelPrice
+		),
+		11,
+		true
+	)
+	prices.Name = "SurfaceHeading"
+	prices.Size = UDim2.new(1, -6, 0, 26)
+	prices.LayoutOrder = order
+	prices.TextXAlignment = Enum.TextXAlignment.Left
+	prices.TextColor3 = Theme.Colors.Muted
+	prices.ZIndex = 22
+end
+
+refreshCatalogue = function()
 	if not ui.list then
 		return
 	end
 	for _, child in ui.list:GetChildren() do
-		if child:IsA("TextButton") then
+		if child:IsA("TextButton") or child.Name == "SurfaceHeading" then
 			child:Destroy()
 		end
+	end
+	if selectedCategory == "Surfaces" then
+		ui.empty.Visible = false
+		buildSurfacePicker()
+		return
 	end
 	local profile = UIController.getProfile()
 	if not profile then
@@ -387,12 +568,15 @@ local function buildPanel()
 	categoryLayout.Parent = categories
 	ui.categories = categories
 	local firstButton: TextButton? = nil
-	for order, category in { "All", "Appliance", "Seating", "Decoration" } do
+	for order, category in { "All", "Appliance", "Seating", "Decoration", "Surfaces" } do
 		local button = Components.Button(
 			categories,
-			if category == "Decoration" then "Decor" else category,
+			if category == "Decoration"
+				then "Decor"
+				elseif category == "Surfaces" then "Floor/Wall"
+				else category,
 			Theme.Colors.PaperDark,
-			UDim2.new(0.25, -4, 1, 0)
+			UDim2.new(0.2, -4, 1, 0)
 		)
 		button.LayoutOrder = order
 		button.TextColor3 = Theme.Colors.Ink
