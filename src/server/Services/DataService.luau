@@ -182,6 +182,9 @@ local function defaultProfile(): Types.PlayerData
 		-- Painted floor tiles + wall panels (B3). Empty = the default oak floor
 		-- and cream walls.
 		surfaces = { floor = {}, wall = {} },
+		-- Exterior personalisation (B4). Empty = Config/Facade.defaults, which is
+		-- the classic awning front every café has had until now.
+		facade = {},
 		ownedPasses = {},
 		-- Neighbour friendships + per-day help anti-farm (Phase C §4a). Top-level
 		-- maps → reconcile heals old saves; SocialService.socialOf heals sub-tables.
@@ -348,6 +351,13 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 	end
 	if typeof(mutableSurfaces.surfaces.wall) ~= "table" then
 		mutableSurfaces.surfaces.wall = {}
+	end
+
+	-- Exterior style (B4). A sparse or missing table is fine — Facade.resolve
+	-- fills each axis from the defaults — so this only guards the type.
+	local mutableFacade: any = data
+	if typeof(mutableFacade.facade) ~= "table" then
+		mutableFacade.facade = {}
 	end
 
 	-- Heal staff: legacy members predate the `hired` flag, so default them to

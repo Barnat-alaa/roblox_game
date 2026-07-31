@@ -101,8 +101,21 @@ The biggest of the three. Needs a new **surfaces** layer that is NOT furniture:
 - ⚠️ Floor tiles must NOT collide with the furniture grid (they are a separate
   layer); walls need a span model (1×length), so the panel is a run, not a cell.
 
-### B4 — Door colour + exterior façade customisation
-Smallest of the three; a good next one.
+### B4a — Façade picker UI (the remaining half of B4)
+The B4 backend is done and verified (`Config/Facade`, `FacadeService`, `SetFacade`,
+`PlayerData.facade`, rendering for all seven axes). **What is missing is the panel
+that lets a player choose.** Hooks:
+- Seven rows of swatch/label buttons, one per axis, each firing `SetFacade` with
+  that axis's id — the remote already accepts any SUBSET of axes, so one button =
+  one field.
+- Natural home: a "Café front" tab in the Upgrades panel (`RobuxShopController`
+  owns it), or the intro panel where a café-STYLE picker was already listed as
+  owed.
+- `Config/Facade.architectures[n].blurb` is written for use as card copy.
+- Price is `Facade.changePrice` (250 🪙 per change), already enforced server-side.
+
+### B4 — Door colour + exterior façade customisation ✅ BACKEND SHIPPED (PR #56)
+_Superseded by B4a above for the UI half._
 - `PlayerData.cafeStyle = { doorColor, facadeColor }` (top-level, reconcile-healed).
 - Applied in `CafeService`: the door is `DoorLeaf` on the plot model, the façade is
   the `WallFront` parts + `AwningSlat`s (see `rebuildShell` / the facade builder).

@@ -185,6 +185,10 @@ export type PlayerData = {
 	yieldTier: number,
 	-- B3 painted floor tiles + wall panels (top-level → reconcile heals old saves).
 	surfaces: SurfaceState,
+	-- B4 exterior personalisation: one chosen id per axis (architecture, color,
+	-- motif, doorStyle, doorWood, windowShape, glass). Config/Facade.resolve fills
+	-- any missing or retired axis from the defaults, so this is safe to leave sparse.
+	facade: { [string]: string },
 	ownedPasses: { [string]: boolean }, -- pass key → owned (VIP, Auto-Collect), cached on join
 	social: SocialState, -- neighbour friendships + per-day help anti-farm (Phase C §4a)
 	placedFurniture: { PlacedFurniture },
