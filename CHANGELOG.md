@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-07-31 — onboarding no longer dead-ends on step 2/6
+The owner reported being **always stuck on step 2 of 6**. Step 2 was not broken —
+it was **unreachable**. The only action that satisfied it was the AUTO toggle,
+which lives on the pantry's **second tab** (AUTO PRODUCTION), while the step text
+only said "Open 🥫 Pantry and choose what it makes" and the pantry opens on FRESH
+STOCK — a list of stock numbers with nothing to choose. Players opened the
+pantry, saw no way to "choose", and stopped.
+
+Fixed on three fronts so it can't dead-end again:
+- **The step text names the tab** ("Open 🥫 PANTRY → the AUTO PRODUCTION tab, and
+  switch a dish ON").
+- **The pantry opens on that tab** while the step is active (`InventoryController.
+  openDrawer`), putting the player where the control is.
+- **Tuning counts too** — `ProductionService` now fires `kitchen_tuned` when a
+  target stock or priority changes, and the tutorial accepts it alongside the
+  toggle. A player who fiddles with targets instead of the switch now advances.
+
+Audited the other five steps rather than assuming: steps 1, 3, 4, 5 and 6 were all
+fine, and their signals (`purchased`, the `PlazaCenter` workspace attribute) do
+exist. Step 2 was the only dead-end.
+
+Verified in Studio on a fresh profile, driven end-to-end: step 1 (place furniture)
+→ **step 2 via the NEW signal alone** (`SetTargetStock`, which previously did
+nothing) → step 3 (the waiter serves a customer) → steps 4+5 (buy + place a
+decoration) → step 6 (walk to the plaza) → **`tutorialCompleted = true`** with the
+completion reward paid.
+
 ### Feature — 2026-07-30 — P4: Robux store folded into UPGRADES + batch-output ladder
 The separate "Store" rail button (P) is gone. The Robux catalogue now lives inside
 the **UPGRADES** dock button — which was a "coming soon" stub — so the coin-bought

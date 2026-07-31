@@ -399,6 +399,10 @@ local function handleTarget(player: Player, recipeId: unknown, target: unknown)
 	kitchen.targetStock[recipeId] =
 		math.clamp(math.floor(target), Kitchen.minTargetStock, Kitchen.maxTargetStock)
 	DataService:Push(player)
+	-- Also a "you worked the kitchen" signal for the tutorial. The onboarding step
+	-- used to accept ONLY the auto-toggle, which is one button on a tab the step
+	-- never named — so a player who tuned targets instead sat on step 2 forever.
+	Remotes.event("Notify"):FireClient(player, { kind = "kitchen_tuned", recipe = recipeId })
 end
 
 local function handlePriority(player: Player, recipeId: unknown, priority: unknown)
@@ -418,6 +422,7 @@ local function handlePriority(player: Player, recipeId: unknown, priority: unkno
 	local kitchen = KitchenService:GetKitchen(data)
 	kitchen.priorities[recipeId] = math.clamp(math.floor(priority), 1, 3)
 	DataService:Push(player)
+	Remotes.event("Notify"):FireClient(player, { kind = "kitchen_tuned", recipe = recipeId })
 end
 
 -- Set how many of one recipe a staff role makes per hour (the plan editor). The
