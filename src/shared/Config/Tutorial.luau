@@ -19,8 +19,17 @@ local Tutorial = {
 			-- appliance, so a manual StartCook answers "stove_busy" (measured).
 			-- The menu IS the player's real lever over the kitchen in a
 			-- cook-ahead game, and it is always available.
+			-- 2026-07-31 (owner: "always stuck in step 2/6"). The step was NOT
+			-- broken — it was unreachable. The only action that satisfied it was
+			-- the AUTO toggle, which lives on the pantry's second tab, and the
+			-- text never said so: you opened the pantry, saw a list of stock
+			-- numbers, and there was nothing to "choose". Fixed on three fronts —
+			-- the text now names the tab, the pantry OPENS on that tab while this
+			-- step is active (InventoryController), and tuning a target or
+			-- priority now counts too (ProductionService fires `kitchen_tuned`).
 			id = "menu",
-			text = "☕ Your kitchen cooks on its own. Open 🥫 Pantry (bottom-left) and choose what it makes.",
+			text = "☕ Your kitchen cooks on its own. Open 🥫 PANTRY (bottom-left) → the"
+				.. " AUTO PRODUCTION tab, and switch a dish ON.",
 		},
 		{
 			id = "serve",

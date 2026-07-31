@@ -206,6 +206,7 @@ function TutorialController.Start(_self: any)
 		-- appliance while the automatic loop happens to be idle.
 		if
 			msg.kind == "menu_changed"
+			or msg.kind == "kitchen_tuned"
 			or msg.kind == "cook_collected"
 			or msg.kind == "cook_result"
 		then
