@@ -24,6 +24,7 @@ end
 local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
+local StylePreview = require(script.Parent.Parent.UI.StylePreview)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local UIController = require(script.Parent.UIController)
@@ -351,7 +352,7 @@ local function buildFacadePicker()
 	order += 1
 	local intro = Components.Label(
 		ui.list,
-		string.format("Restyle your café front — %d 🪙 per change", Facade.changePrice),
+		string.format("Restyle your café front — %d coins per change", Facade.changePrice),
 		11,
 		true
 	)
@@ -375,20 +376,64 @@ local function buildFacadePicker()
 		for _, entry in group.list do
 			order += 1
 			local isChosen = chosen[group.axis] and chosen[group.axis].id == entry.id
-			-- Colour axes preview themselves; the rest use the panel palette.
-			local face = (entry :: any).base
-				or (if isChosen then Theme.Colors.Mint else Theme.Colors.Paper)
-			local button = Components.Button(ui.list, entry.name, face, UDim2.new(1, -6, 0, 30))
+			local button = Components.Button(
+				ui.list,
+				"",
+				if isChosen then Theme.Colors.Mint else Theme.Colors.Paper,
+				UDim2.new(1, -6, 0, 46)
+			)
 			button.Name = group.axis .. "_" .. entry.id
-			button.TextSize = 12
 			button.LayoutOrder = order
-			button.TextColor3 = (entry :: any).grain
-				or (entry :: any).trim
-				or (if isChosen then Theme.Colors.White else Theme.Colors.Ink)
 			button.ZIndex = 22
 			if isChosen then
 				Components.Stroke(button, Theme.Colors.Ink, 3, 0.15)
 			end
+
+			-- A drawn preview of what this option actually gives you, using the
+			-- CURRENT choices for the axes it depends on: a door style previews in
+			-- YOUR wood, a window shape in YOUR glass, a motif in YOUR colour. So
+			-- the swatch shows the result of picking it, not the option in isolation.
+			local axis = group.axis
+			local preview: Frame
+			if axis == "architecture" then
+				preview = StylePreview.architecture(button, entry, chosen.color, 36)
+			elseif axis == "motif" then
+				preview = StylePreview.facadeMotif(button, chosen.color, entry, 36)
+			elseif axis == "doorStyle" then
+				preview = StylePreview.door(button, entry, chosen.doorWood, 36)
+			elseif axis == "doorWood" then
+				preview = StylePreview.door(button, chosen.doorStyle, entry, 36)
+			elseif axis == "windowShape" then
+				preview = StylePreview.window(button, entry, chosen.glass, 36)
+			elseif axis == "color" then
+				preview = StylePreview.color(button, entry, 36)
+			else
+				preview = StylePreview.glass(button, entry, 36)
+			end
+			preview.Position = UDim2.fromOffset(6, 5)
+
+			local name = Components.Label(button, entry.name, 12, true)
+			name.Size = UDim2.new(1, -118, 1, 0)
+			name.Position = UDim2.fromOffset(50, 0)
+			name.TextXAlignment = Enum.TextXAlignment.Left
+			name.TextTruncate = Enum.TextTruncate.AtEnd
+			name.TextColor3 = if isChosen then Theme.Colors.White else Theme.Colors.Ink
+			name.ZIndex = 24
+
+			if isChosen then
+				local owned = Components.Label(button, "IN USE", 10, true)
+				owned.AnchorPoint = Vector2.new(1, 0.5)
+				owned.Position = UDim2.new(1, -8, 0.5, 0)
+				owned.Size = UDim2.fromOffset(58, 20)
+				owned.BackgroundTransparency = 0
+				owned.BackgroundColor3 = Theme.Colors.MintDark
+				owned.TextColor3 = Theme.Colors.White
+				owned.ZIndex = 24
+				Components.Corner(owned, Theme.Radius.Pill)
+			else
+				StylePreview.priceChip(button, Facade.changePrice)
+			end
+
 			button.Activated:Connect(function()
 				Remotes.event("SetFacade"):FireServer({ [group.axis] = entry.id })
 				setHint("Applying " .. entry.name .. "…")
@@ -413,23 +458,56 @@ local function buildSurfacePicker()
 		label.ZIndex = 22
 	end
 
+	-- Both rows preview the SAME pairing you would paint: a colour is shown
+	-- wearing the motif you have armed, and vice versa — you see the result,
+	-- not the ingredient.
+	local activeMotif = Surfaces.motif(surfaceMotif) or Surfaces.motifs[1]
+	local activeColor = Surfaces.color(surfaceColor) or Surfaces.palette[1]
+
+	local function optionRow(
+		name: string,
+		label: string,
+		chosen: boolean,
+		preview: (Instance) -> Frame,
+		onPick: () -> ()
+	)
+		order += 1
+		local button = Components.Button(
+			ui.list,
+			"",
+			if chosen then Theme.Colors.Mint else Theme.Colors.Paper,
+			UDim2.new(1, -6, 0, 46)
+		)
+		button.Name = name
+		button.LayoutOrder = order
+		button.ZIndex = 22
+		if chosen then
+			Components.Stroke(button, Theme.Colors.Ink, 3, 0.15)
+		end
+		preview(button).Position = UDim2.fromOffset(6, 5)
+
+		local text = Components.Label(button, label, 12, true)
+		text.Size = UDim2.new(1, -132, 1, 0)
+		text.Position = UDim2.fromOffset(50, 0)
+		text.TextXAlignment = Enum.TextXAlignment.Left
+		text.TextTruncate = Enum.TextTruncate.AtEnd
+		text.TextColor3 = if chosen then Theme.Colors.White else Theme.Colors.Ink
+		text.ZIndex = 24
+
+		-- Painting is charged per placement and a wall panel costs more than a
+		-- floor tile, so the chip shows both rather than one misleading number.
+		local chip = StylePreview.priceChip(button, Surfaces.floorTilePrice)
+		chip.Text = Surfaces.floorTilePrice .. " / " .. Surfaces.wallPanelPrice
+		chip.Size = UDim2.fromOffset(74, 20)
+
+		button.Activated:Connect(onPick)
+	end
+
 	row("COLOUR")
 	for _, entry in Surfaces.palette do
-		order += 1
-		local chosen = surfaceColor == entry.id
-		local button = Components.Button(ui.list, entry.name, entry.base, UDim2.new(1, -6, 0, 34))
-		button.Name = "color_" .. entry.id
-		button.LayoutOrder = order
-		button.TextColor3 = entry.ink
-		button.TextSize = 12
-		button.ZIndex = 22
-		Components.Stroke(
-			button,
-			if chosen then Theme.Colors.Ink else entry.ink,
-			if chosen then 3 else 1,
-			0.2
-		)
-		button.Activated:Connect(function()
+		optionRow("color_" .. entry.id, entry.name, surfaceColor == entry.id, function(parent)
+			return StylePreview.surface(parent, entry, activeMotif, 36)
+		end, function()
 			surfaceColor = entry.id
 			movingInstanceId = nil
 			selectedId = nil
@@ -440,20 +518,9 @@ local function buildSurfacePicker()
 
 	row("MOTIF")
 	for _, entry in Surfaces.motifs do
-		order += 1
-		local chosen = surfaceMotif == entry.id
-		local button = Components.Button(
-			ui.list,
-			entry.name,
-			if chosen then Theme.Colors.Mint else Theme.Colors.Paper,
-			UDim2.new(1, -6, 0, 32)
-		)
-		button.Name = "motif_" .. entry.id
-		button.LayoutOrder = order
-		button.TextColor3 = if chosen then Theme.Colors.White else Theme.Colors.Ink
-		button.TextSize = 12
-		button.ZIndex = 22
-		button.Activated:Connect(function()
+		optionRow("motif_" .. entry.id, entry.name, surfaceMotif == entry.id, function(parent)
+			return StylePreview.surface(parent, activeColor, entry, 36)
+		end, function()
 			surfaceMotif = entry.id
 			movingInstanceId = nil
 			selectedId = nil
@@ -463,16 +530,8 @@ local function buildSurfacePicker()
 	end
 
 	order += 1
-	local prices = Components.Label(
-		ui.list,
-		string.format(
-			"Floor tile %d 🪙  ·  Wall panel %d 🪙",
-			Surfaces.floorTilePrice,
-			Surfaces.wallPanelPrice
-		),
-		11,
-		true
-	)
+	local prices =
+		Components.Label(ui.list, "Floor tile / wall panel — charged as you place", 11, true)
 	prices.Name = "SurfaceHeading"
 	prices.Size = UDim2.new(1, -6, 0, 26)
 	prices.LayoutOrder = order

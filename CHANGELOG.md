@@ -5,6 +5,38 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — C1: the customisation menus show what you are buying
+Owner feedback: *"the menu is ugly — for floor, window, façade etc don't show only
+a text, show also the photo generated next to each item to show what that item
+will give you, and show a coin with price next to it."*
+
+Every option row in the Floor/Wall and Front pickers now carries a **drawn preview
+swatch** and a **price chip with a real coin**. New `UI/StylePreview`.
+
+The previews are **drawn from the same config the world renderer uses** — nested
+Frames, no images — so a swatch can never drift from what actually gets built, and
+adding a colour or motif needs no new art. Frames also cost far less than a
+`ViewportFrame` per row, which matters for the phone build.
+
+Each swatch previews the **result of picking it**, not the option in isolation: a
+door style is drawn in YOUR wood, a window shape in YOUR glass, a motif in YOUR
+colour, and a surface colour wearing the motif you have armed. The façade motif
+swatch even draws the door notch, so it shows the rule that bands stop at the
+opening. Architecture previews are silhouettes of their crown (striped awning /
+stepped gable / flat cornice), and each wood draws its own grain count and tone.
+
+The currently-applied option shows an **IN USE** chip instead of a price.
+
+**The 🪙 emoji renders as a tofu box** in Roblox's UI font (confirmed in Studio —
+it showed as `□ 250`), so the coin is now two drawn circles: guaranteed to render
+everywhere and consistent with the procedural art direction. The three other
+places that had a bare 🪙 in this UI were switched to plain text.
+
+Verified in Studio: the Front picker builds 35 rows, **35 with a preview**, 28 with
+a price chip and 7 marked IN USE (one per axis); the Floor/Wall picker shows each
+colour wearing the armed motif with a `45 / 70` floor/wall chip. Confirmed
+visually — the coin draws as a gold coin, not a box.
+
 ### Fix — 2026-07-31 — façade motifs no longer run across the door
 Owner report, with the screenshot: the horizontal boards were drawn straight over
 the doorway. Battens and boards are **cladding on the wall**, so they now stop at
