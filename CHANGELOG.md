@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — stock packs are CONSUMABLE, not a permanent multiplier
+Owner clarification: *"if a player chooses +5 it will add +5 in every item, ONE
+TIME only (+5 coffees, +5 teas etc)"*. P4 shipped a permanent production-yield
+multiplier, which is a different mechanic. Reworked to a consumable restock, and
+wired to the owner's three real Developer Products.
+
+| Pack | Effect | Coins | Robux | Product ID |
+| --- | --- | ---: | ---: | --- |
+| Stock Pack +5 | +5 of every unlocked dish | 900 | R$29 | `3612636850` |
+| Stock Pack +10 | +10 of every unlocked dish | 1,700 | R$59 | `3612636928` |
+| Stock Pack +20 | +20 of every unlocked dish | 3,000 | R$99 | `3612637043` |
+
+**Removed** the permanent ladder entirely: `PlayerData.yieldTier` and its
+reconcile clamp, `Products.yieldMultiplier` and its application in
+`KitchenService.CompleteProduction`, and the OWNED/IN-USE state in the panel (a
+consumable is meant to be re-bought).
+
+**Added** `KitchenService.GrantStockPack`, which tops every UNLOCKED dish up by
+`amount` and returns how many units actually landed. Deliberately not
+`CompleteProduction`: none of it was cooked, so it grants no XP, mastery, goal
+credit or produced-stat. It is clamped per recipe by `maxStockPerRecipe`, so a
+nearly-full café gets the remainder rather than overflowing.
+
+Because the grant reports what it delivered, **neither path charges for nothing**:
+`ProcessReceipt` returns `NotProcessedYet` (so Roblox retries rather than taking
+the money) and the coin path refunds and says "Your shelves are already full."
+
+Developer Products are now the CORRECT type — the earlier Game Pass concern was
+for a permanent unlock, and this is repeatable by design. Prices dropped from the
+placeholder R$99/199/349 and 25k/120k/500k coins, which had been sized for a
+permanent ×20 income ceiling. The **economy-rebalance debt from P4 is gone**: this
+is a convenience restock you can also grind for, not a permanent income ceiling.
+
+Verified in Studio (coin price temporarily lowered in Studio's in-memory DataModel
+only — disk untouched, reverted after): buying +5 took **espresso 3 → 8 and tea
+3 → 8** (+10 across 2 unlocked dishes = 5 × 2), charged once; **buying it again
+added another +5 each** (8 → 13), confirming it repeats. Guards: an amount that is
+not a real pack does nothing, and insufficient coins refuses with
+"Not enough coins — 900 needed."
+
+
 ### Fix — 2026-08-01 — the coin glyph no longer renders as an empty box
 Roblox's UI font has no glyph for **🪙 (U+1FA99)**, so every coin amount in the
 game rendered as a tofu box — `□ 250`, `+6 □`, `Buy smell bomb (150 □)`. Verified

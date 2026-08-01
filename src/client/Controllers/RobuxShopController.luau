@@ -33,32 +33,29 @@ local function infoFor(id: number, pass: boolean): any
 	return if pass then Products.passes[id] else Products.developerProducts[id]
 end
 
--- P4: the batch-output ladder, shown FIRST and with BOTH prices on the same card
--- — a coin button and (once the owner creates the products) a Robux button. That
--- side-by-side is the point: Robux skips the grind, it doesn't buy a ceiling you
--- can't reach with coins.
-local function buildYieldSection(parent: ScrollingFrame, profile: any)
-	local current = math.floor(tonumber(profile and profile.yieldTier) or 0)
-
-	local heading = Components.Label(parent, "BATCH OUTPUT", 12, true)
+-- Stock packs (P4, reworked 2026-08-01): CONSUMABLE restocks, shown first with
+-- BOTH prices on the same card. Side-by-side is the point — Robux skips the
+-- grind, it never buys something coins cannot.
+--
+-- There is no owned/in-use state: a pack is meant to be bought again whenever
+-- your shelves run down.
+local function buildStockPackSection(parent: ScrollingFrame)
+	local heading = Components.Label(parent, "STOCK PACKS", 12, true)
 	heading.Size = UDim2.new(1, -6, 0, 22)
 	heading.TextXAlignment = Enum.TextXAlignment.Left
 	heading.TextColor3 = Theme.Colors.Muted
 	heading.LayoutOrder = -100
 	heading.ZIndex = 22
 
-	for _, row in Products.yieldTiers do
-		local ownedTier = current >= row.tier
-		local nextUp = row.tier == current + 1
-
+	for index, row in Products.stockPacks do
 		local card = Instance.new("Frame")
-		card.Name = "yield_" .. row.tier
+		card.Name = "stockpack_" .. row.amount
 		card.Size = UDim2.new(1, -6, 0, 88)
 		card.BackgroundColor3 = Theme.Colors.Paper
-		card.LayoutOrder = -100 + row.tier
+		card.LayoutOrder = -100 + index
 		card.ZIndex = 22
 		Components.Corner(card, Theme.Radius.Medium)
-		Components.Stroke(card, if ownedTier then Theme.Colors.Mint else Theme.Colors.Line, 1, 0.3)
+		Components.Stroke(card, Theme.Colors.Line, 1, 0.3)
 		card.Parent = parent
 
 		local thumb = Components.ItemThumbnail(card, {
@@ -85,50 +82,35 @@ local function buildYieldSection(parent: ScrollingFrame, profile: any)
 		blurb.TextColor3 = Theme.Colors.Muted
 		blurb.ZIndex = 23
 
-		if ownedTier then
-			local chip = Components.Label(card, "OWNED", 13, true)
-			chip.Size = UDim2.fromOffset(120, 44)
-			chip.Position = UDim2.new(1, -132, 0.5, -22)
-			chip.BackgroundTransparency = 0
-			chip.BackgroundColor3 = Theme.Colors.Mint
-			chip.TextColor3 = Theme.Colors.White
-			chip.ZIndex = 23
-			Components.Corner(chip, Theme.Radius.Pill)
-		else
-			-- The coin button is the primary path and is always present.
-			local coinButton = Components.Button(
-				card,
-				string.format("%d coins", row.coinCost),
-				if nextUp then Theme.Colors.Honey else Theme.Colors.Line,
-				UDim2.fromOffset(120, if row.productId ~= 0 then 30 else 44)
-			)
-			coinButton.Position = UDim2.new(1, -132, 0.5, if row.productId ~= 0 then -34 else -22)
-			coinButton.TextSize = 14
-			coinButton.ZIndex = 23
-			coinButton.Active = nextUp
-			coinButton.Activated:Connect(function()
-				Remotes.event("BuyYieldTier"):FireServer({ tier = row.tier })
-			end)
+		-- Coins first: it is the path that exists for everyone.
+		local coinButton = Components.Button(
+			card,
+			string.format("%d coins", row.coinCost),
+			Theme.Colors.Honey,
+			UDim2.fromOffset(120, 30)
+		)
+		coinButton.Position = UDim2.new(1, -132, 0.5, -34)
+		coinButton.TextSize = 14
+		coinButton.ZIndex = 23
+		local amount = row.amount
+		coinButton.Activated:Connect(function()
+			Remotes.event("BuyStockPack"):FireServer({ amount = amount })
+		end)
 
-			-- The Robux button only appears once a real Product ID exists, so an
-			-- un-created SKU can never present a dead buy button.
-			if row.productId ~= 0 then
-				local robux = Components.Button(
-					card,
-					string.format("R$ %d", row.robuxPrice),
-					Theme.Colors.MintDark,
-					UDim2.fromOffset(120, 30)
-				)
-				robux.Position = UDim2.new(1, -132, 0.5, 2)
-				robux.TextColor3 = Theme.Colors.White
-				robux.TextSize = 14
-				robux.ZIndex = 23
-				local pid = row.productId
-				robux.Activated:Connect(function()
-					MarketplaceService:PromptProductPurchase(player, pid)
-				end)
-			end
-		end
+		local robux = Components.Button(
+			card,
+			string.format("R$ %d", row.robuxPrice),
+			Theme.Colors.MintDark,
+			UDim2.fromOffset(120, 30)
+		)
+		robux.Position = UDim2.new(1, -132, 0.5, 2)
+		robux.TextColor3 = Theme.Colors.White
+		robux.TextSize = 14
+		robux.ZIndex = 23
+		local pid = row.productId
+		robux.Activated:Connect(function()
+			MarketplaceService:PromptProductPurchase(player, pid)
+		end)
 	end
 end
 
@@ -144,7 +126,7 @@ local function rebuild()
 	layout.Parent = ui.list
 
 	local owned = (profile and profile.ownedPasses) or {}
-	buildYieldSection(ui.list, profile)
+	buildStockPackSection(ui.list)
 
 	for order, ref in Products.order do
 		local info = infoFor(ref.id, ref.pass)

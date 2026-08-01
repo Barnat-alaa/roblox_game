@@ -139,28 +139,21 @@ Products.passes = {
 	},
 }
 
--- ————— Production-yield upgrade ladder (P4) —————
+-- ————— Stock packs (P4, reworked 2026-08-01) —————
 --
--- Owner spec (2026-07-30): "×5 to add 5 elements for each item — 5 coffees, 5
--- teas — but only to the items that are unlocked." So this multiplies what a
--- batch YIELDS, not what it sells for, and only for recipes the player has
--- unlocked.
+-- Owner spec: "if a player chooses +5 it will add +5 in every item, ONE TIME
+-- only (+5 coffees, +5 teas, etc)". So these are CONSUMABLE restocks, not the
+-- permanent yield multiplier this started as — buying one immediately tops every
+-- UNLOCKED dish up by `amount`, and buying it again does it again.
 --
--- RAILS: the owner chose PERMANENT tiers, which is only rails-clean because
--- every tier is **also buyable with coins**. Robux skips the grind; it never buys
--- power you cannot earn (HANDOFF §1, docs/MONETISATION.md). The coin prices are
--- deliberately steep so the ladder is a real long-game goal rather than a
--- formality — and so a paying player is ahead by TIME, not by ceiling.
+-- Consumable is why these are Developer Products rather than Game Passes: a Pass
+-- can only be bought once, which is wrong for something you are meant to re-buy.
 --
--- ⚠️ Economy note: a permanent ×20 yield is a 20× income ceiling. The per-recipe
--- stock cap (Kitchen.maxStockPerRecipe) throttles it in practice, but the coin
--- economy still wants a rebalance pass once this is live — flagged in ROADMAP.
---
--- `productId = 0` means "not created in the Creator Dashboard yet": the coin path
--- works, and the Robux button is simply hidden until a real id is pasted in.
-export type YieldTier = {
-	tier: number,
-	multiplier: number,
+-- RAILS: far cleaner than the permanent multiplier it replaces. This is a
+-- convenience restock you can also grind for with coins, not a permanent income
+-- ceiling, so there is no economy-rebalance debt attached to it.
+export type StockPack = {
+	amount: number,
 	name: string,
 	blurb: string,
 	icon: string,
@@ -169,50 +162,54 @@ export type YieldTier = {
 	robuxPrice: number,
 }
 
-Products.yieldTiers = {
+Products.stockPacks = {
 	{
-		tier = 1,
-		multiplier = 5,
-		name = "Batch Output ×5",
-		blurb = "Every batch you make yields 5× the items",
+		amount = 5,
+		name = "Stock Pack +5",
+		blurb = "Instantly adds 5 of every dish you have unlocked",
 		icon = "📦",
-		coinCost = 25000,
-		productId = 0, -- paste the Dashboard Product ID here
-		robuxPrice = 99,
+		coinCost = 900,
+		productId = 3612636850,
+		robuxPrice = 29,
 	},
 	{
-		tier = 2,
-		multiplier = 10,
-		name = "Batch Output ×10",
-		blurb = "Every batch you make yields 10× the items",
+		amount = 10,
+		name = "Stock Pack +10",
+		blurb = "Instantly adds 10 of every dish you have unlocked",
 		icon = "🏭",
-		coinCost = 120000,
-		productId = 0,
-		robuxPrice = 199,
+		coinCost = 1700,
+		productId = 3612636928,
+		robuxPrice = 59,
 	},
 	{
-		tier = 3,
-		multiplier = 20,
-		name = "Batch Output ×20",
-		blurb = "Every batch you make yields 20× the items",
+		amount = 20,
+		name = "Stock Pack +20",
+		blurb = "Instantly adds 20 of every dish you have unlocked",
 		icon = "🚀",
-		coinCost = 500000,
-		productId = 0,
-		robuxPrice = 349,
+		coinCost = 3000,
+		productId = 3612637043,
+		robuxPrice = 99,
 	},
 }
 
--- The multiplier a given tier grants. Tier 0 (or anything unrecognised) is ×1, so
--- an unset/corrupt save simply behaves as an un-upgraded café.
-function Products.yieldMultiplier(tier: number?): number
-	local t = math.floor(tonumber(tier) or 0)
-	local best = 1
-	for _, row in Products.yieldTiers do
-		if row.tier <= t and row.multiplier > best then
-			best = row.multiplier
+-- Look a pack up by its Dashboard Product ID (ProcessReceipt's entry point).
+function Products.stockPackForProduct(productId: number): StockPack?
+	for _, pack in Products.stockPacks do
+		if pack.productId == productId then
+			return pack
 		end
 	end
-	return best
+	return nil
+end
+
+-- …and by amount, for the coin path (the client sends an amount, never a price).
+function Products.stockPackForAmount(amount: number): StockPack?
+	for _, pack in Products.stockPacks do
+		if pack.amount == amount then
+			return pack
+		end
+	end
+	return nil
 end
 
 -- Display order for the shop (dev products first, then passes).
