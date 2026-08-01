@@ -5,6 +5,37 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — HUD declutter + a tap-to-hide tab (phone)
+Owner, with a phone screenshot: *"I still don't like all the menus and buttons,
+they take a lot of the screen… make smart decisions so the central screen stays
+clean, and you can even add a sort of sliding button to hide them."*
+
+**A hide-the-HUD tab.** One small chevron on the right edge; tap it and the entire
+interface slides away, leaving just the café. Tap again and it all comes back.
+What stays visible when hidden is deliberate: the tab itself (or there is no way
+back), the camera arrows (so you can still look around), the attack banner (being
+robbed must never be silently missed), and any open panel (hiding the HUD should
+not cancel what you were doing).
+
+**Button names no longer sit pinned open on touch.** With no hover to reveal
+them, every dock and rail button carried a permanent caption — eleven of them —
+and that caption row was most of what made the HUD tall. A tap now FLASHES the
+name for about a second instead: you still learn what you pressed, and the rest
+of the time the screen belongs to the café.
+
+**Phone plates came down with them**, now that they no longer reserve room for a
+caption: dock 54 → 46, rail 40 → 38, dock gap 10 → 8. Both stay at or above the
+44px touch floor where they are the tap target.
+
+Verified in Studio: the tab builds at 44×44 on the right edge at 40% transparency;
+**permanently-visible captions went from one per button to 0**; one tap hid all
+six managed HUDs (`HUD`, `InventoryHUD`, `OperationsHUD`, `SessionRewardHud`,
+`VipEventHud`, `TutorialHint`) with **0 left on**, while all four essentials
+(`AlertHud`, `CameraGui`, `CafeModals`, `HudToggleHud`) stayed up, and the chevron
+flipped to 180° to point the way back. Confirmed visually — a completely clean
+café view with only the tab remaining.
+
+
 ### Change — 2026-08-01 — C4/C5: panels dock to the edges, mobile baselines
 Owner: *"all the menus and buttons are not well organised, they are in the middle
 of the screen"* and *"be sure every item is in the extreme top, bottom and left so
