@@ -93,9 +93,11 @@ a screenshot that nothing overlaps and the PANTRY button reads clearly.
 
 **M2 — camera arrows.** Now always visible (they were touch-only) and flanking
 the action dock, deriving their position from `hudLayout`'s already-cleared dock
-so they inherit the pantry and rail clearances. On screens narrower than ~700 the
-left gap is smaller than a 44px touch target, so BOTH arrows fall back to sitting
-side by side right of the dock. Confirm that reads sensibly in the hand.
+so they inherit the pantry and rail clearances. Where a screen is too narrow for
+a 44px touch target either side of the dock (anything under ~700, and desktop by
+2px), the pair falls back to the empty band DIRECTLY ABOVE the dock. Measured
+clear of the pantry, dock, rail and screen edge on all six test viewports;
+confirm it reads sensibly in the hand.
 
 **M3 — the remaining centre-screen offender.** The "Name your café" prompt is a
 world `ProximityPrompt`, so Roblox renders it at the object's screen position —
@@ -126,6 +128,8 @@ between the interior depth and `TOTAL_DEPTH`, then catalogue rows + a Garden tab
 | — | Dock overlapped the pantry on narrow screens | The "does it fit beside?" test used a looser threshold than the shift acting on it |
 | — | HUD toggle would ERROR on short screens | `math.clamp` with max < min, when the rail starts above where the pills end |
 | — | Appliances could never be moved | The move guard reused `IsCooking`, and the auto-production loop keeps a job on every appliance |
+| — | Camera arrows were invisible | They were touch-gated, so anything reporting a mouse (Studio, a laptop) hid them entirely |
+| — | Arrow fallback ran off a 560px screen | The narrow-screen branch offset from the dock without re-checking the rail or the screen edge |
 
 ### Also shipped this session
 P1–P4, B1–B4, B6, C1–C5 — see `CHANGELOG.md [Unreleased]` for the full list with
