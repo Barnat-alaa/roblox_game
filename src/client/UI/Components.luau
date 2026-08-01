@@ -560,9 +560,9 @@ function Components.IconButton(parent: Instance, opts: IconButtonOpts): IconButt
 	end
 	Components.Corner(label, Theme.Radius.Pill)
 	label.Parent = root
-	local shown = opts.alwaysShowLabel == true
-	label.BackgroundTransparency = if shown then hud.LabelBackgroundTransparency else 1
-	label.TextTransparency = if shown then 0 else 1
+	-- Always starts hidden now, on every platform.
+	label.BackgroundTransparency = 1
+	label.TextTransparency = 1
 
 	local active = false
 	local hovered = false
@@ -579,17 +579,35 @@ function Components.IconButton(parent: Instance, opts: IconButtonOpts): IconButt
 	end
 
 	local function setLabelShown(visible: boolean)
-		if opts.alwaysShowLabel then
-			return
-		end
 		TweenService:Create(label, Theme.Motion.Fast, {
 			BackgroundTransparency = if visible then hud.LabelBackgroundTransparency else 1,
 			TextTransparency = if visible then 0 else 1,
 		}):Play()
 	end
 
+	-- On touch a name used to be pinned open under every button, because there is
+	-- no hover to reveal it. Eleven permanent captions is a lot of a phone screen
+	-- (owner, 2026-08-01: "the menus and buttons take a lot of the screen"), so a
+	-- tap now FLASHES the name instead: you still get told what you pressed, and
+	-- the rest of the time the screen belongs to the café.
+	local labelToken = 0
+	local function flashLabel()
+		labelToken += 1
+		local mine = labelToken
+		setLabelShown(true)
+		task.delay(1.1, function()
+			if labelToken == mine then
+				setLabelShown(false)
+			end
+		end)
+	end
+
 	local function settle()
 		TweenService:Create(scale, Theme.Motion.Settle, { Scale = targetScale() }):Play()
+	end
+
+	if opts.alwaysShowLabel then
+		plate.Activated:Connect(flashLabel)
 	end
 
 	plate.MouseEnter:Connect(function()

@@ -93,11 +93,18 @@ local Theme = {
 		--     it, mis-taps climb sharply.
 		TouchTarget = 44,
 		-- Phone sizes are tuned against the measured world-visibility floor
-		-- (phone >=55%), not picked by eye: five dock plates plus a five-button
+		-- (phone >=55%), not picked by eye: six dock plates plus a five-button
 		-- rail plus three pills is a lot of furniture on a 560px screen.
-		DockPlate = { Desktop = 72, Phone = 54 },
-		DockGap = 10,
-		RailPlate = { Desktop = 46, Phone = 40 },
+		--
+		-- 2026-08-01: phone plates came down again (54 -> 46 dock, 40 -> 38 rail)
+		-- now that names FLASH on tap instead of sitting pinned open under every
+		-- button. The caption row was most of what made the dock tall. Both stay
+		-- at or above TouchTarget (44) where they are the tap target; the rail's
+		-- 38 is deliberate — its buttons are secondary and it is the widest thing
+		-- on the right edge.
+		DockPlate = { Desktop = 72, Phone = 46 },
+		DockGap = 8,
+		RailPlate = { Desktop = 46, Phone = 38 },
 		RailPlateMin = 30,
 		RailGap = 10,
 		-- Viewports shorter than this get phone-sized plates and pills even when
