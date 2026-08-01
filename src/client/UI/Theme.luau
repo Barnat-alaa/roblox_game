@@ -141,7 +141,12 @@ local Theme = {
 		-- dish slots instead of a wide, short strip (owner 2026-08-01: "make the
 		-- pantry and production less wide and more length"). Narrow is the point —
 		-- it frees the whole bottom edge for the six menu buttons.
-		StockDockPhone = { Width = 132, SlotHeight = 34, Header = 26 },
+		-- Header is two rows on a phone (status line, then a full-width PANTRY
+		-- button) so the button is never squeezed against the status text.
+		-- `Slots` CAPS how many dishes the dock shows: it is a glance widget, not
+		-- the inventory, and reserving four slots left a block of empty black
+		-- whenever fewer were active (owner 2026-08-01: "make it less lengthy").
+		StockDockPhone = { Width = 132, SlotHeight = 32, Header = 46, Slots = 2 },
 		EdgeMargin = 10,
 	},
 	-- Catalogue item pictures (shop rows, build rows, cookbook cards).

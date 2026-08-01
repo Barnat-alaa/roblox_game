@@ -46,7 +46,7 @@ local function build()
 	local frame = Instance.new("Frame")
 	frame.Name = "VipTimer"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -10, 0, 42)
+	frame.Position = UDim2.new(1, -6, 0, 36)
 	frame.Size = UDim2.fromOffset(132, 32)
 	frame.BackgroundColor3 = Theme.Colors.Berry
 	frame.BackgroundTransparency = 0.06

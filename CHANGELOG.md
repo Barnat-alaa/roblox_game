@@ -5,6 +5,39 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — pantry shortened, corners cleared, arrows always on
+Owner, on the phone build: *"the pantry and production make it less lengthy and
+make the orange button appear and clear… with that you leave more room so the ?
+menu with the steps will be put above the star money icons. On the right put the
+VIP and gift at the extreme top right so it doesn't hide any buttons. And make
+the arrows that control the camera always visible, put them in a place where
+there is no buttons or icons."*
+
+**The pantry lost a third of its height** — 162px to 110px on a phone. Two
+changes got it there: the header is now two rows so the **PANTRY button owns a
+full-width row of its own** instead of being squeezed against the status text,
+and the dock **caps at two dish slots**. That cap is the bigger win: four slots
+were always reserved, so with one dish active the column ended in a block of
+empty black. It is a glance widget, not the inventory.
+
+**The tutorial "?" card moved above the stat pills** rather than below them, and
+**gift and VIP moved to the extreme top-right corner** (y=4 and y=36), where
+nothing else lives, so they can no longer sit over a button.
+
+**The camera arrows are always visible.** They had been touch-only, which meant
+they vanished the moment Studio or a laptop reported a mouse — the owner could
+not see the thing they had asked for. They now flank the action dock, and where a
+screen is too narrow for a touch target either side of it, the pair moves into
+the empty band directly above the dock instead of overlapping the rail.
+
+Verified by measurement across six viewports (844×390, 667×375, 932×430,
+560×320, 1600×900, 390×844 portrait): **0 arrow clashes** with the pantry, the
+dock, the rail, or the screen edge. Two bugs were caught this way that no
+screenshot would have shown — the HUD toggle's `math.clamp` inverting its bounds
+on a short screen (`math.clamp` *errors* when max < min), and the narrow-screen
+arrow fallback running off the right edge of a 560-wide display.
+
+
 ### Change — 2026-08-01 — mobile HUD rearranged around a narrow pantry
 Owner, on the phone build: *"make the pantry and production less wide and more
 length… with that you liberate more space at the bottom so you can put at the

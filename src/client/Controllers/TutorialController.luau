@@ -124,11 +124,19 @@ function TutorialController.Start(_self: any)
 		-- of the screen and rearrange it").
 		return Theme.Hud.EdgeMargin
 	end
-	local function cardTop(_viewport: Vector2): number
-		-- Below Roblox's own top bar. These ScreenGuis span the whole screen
-		-- (DeviceSafeInsets), so y=8 puts the card under the platform's menu
-		-- and chat buttons and you cannot read it.
-		return 62
+	-- The card now lives in the BOTTOM-left column, directly above the money /
+	-- star / buzz pills (owner 2026-08-01: "the ? menu with the steps will be put
+	-- above the star money etc icons"). Up in the top-left it sat on top of those
+	-- pills and hid them.
+	local function cardTop(viewport: Vector2): number
+		local layout = ResponsiveLayout.currentHudLayout()
+		local height = if expandedSize.Y.Offset > 0 then expandedSize.Y.Offset else 72
+		-- chipsTopFromTop is where the pill stack begins; sit just above it, and
+		-- never let the card climb under Roblox's own topbar.
+		return math.max(
+			ResponsiveLayout.topInset() + 4,
+			math.min(layout.chipsTopFromTop - height - 8, viewport.Y - height - 8)
+		)
 	end
 
 	local card = Instance.new("Frame")

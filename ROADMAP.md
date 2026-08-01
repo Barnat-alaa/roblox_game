@@ -77,6 +77,65 @@ merge**.
 
 ---
 
+## ⭐ NEXT — owner priorities (2026-08-01): mobile HUD polish
+
+_Everything below came from the owner playing the PHONE build and sending
+screenshots. **The owner will send a fresh screenshot for each round** — read it
+before changing layout, and measure the result rather than eyeballing it._
+
+### Outstanding
+
+**M1 — the left column, checked on a real phone.** The pantry is now a narrow
+vertical strip (132 wide, 110 tall, 2 dish slots, two-row header with a
+full-width PANTRY button) and the tutorial "?" card sits above the money/star
+pills. All three share the left edge and it is FULL top-to-bottom. Verify against
+a screenshot that nothing overlaps and the PANTRY button reads clearly.
+
+**M2 — camera arrows.** Now always visible (they were touch-only) and flanking
+the action dock, deriving their position from `hudLayout`'s already-cleared dock
+so they inherit the pantry and rail clearances. On screens narrower than ~700 the
+left gap is smaller than a 44px touch target, so BOTH arrows fall back to sitting
+side by side right of the dock. Confirm that reads sensibly in the hand.
+
+**M3 — the remaining centre-screen offender.** The "Name your café" prompt is a
+world `ProximityPrompt`, so Roblox renders it at the object's screen position —
+dead centre. Moving it needs a CUSTOM prompt style (`ProximityPromptService.
+PromptShown` + `Style = Custom`), not a layout change.
+
+**M4 — publish and test on a phone.** Nothing below has ever run on a real
+device. `./scripts/publish.ps1` with the owner's Open Cloud key, then join the
+private DEV place from the Roblox app as Barnat-alaa. Two things REQUIRE a real
+phone because they key off "touch device with no mouse": the vertical pantry and
+the flash-on-tap button names.
+
+**B5 — garden items** (carried over). Still blocked on the garden not being a
+placeable zone: `validatePlacement` clamps to `World.interiorDepthTiers[tier+1]`,
+so nothing can be placed behind the back wall. Needs a second allowed rect
+between the interior depth and `TOTAL_DEPTH`, then catalogue rows + a Garden tab.
+
+### Bugs found and fixed this session (all merged, CI-green)
+
+| # | Bug | Cause |
+| --- | --- | --- |
+| P1 | Grass bled through the road | Grass top face sat 0.02 studs ABOVE the road's, so it won the depth test |
+| B6 | Onboarding dead-ended on step 2/6 | The only qualifying action was on the pantry's SECOND tab, which the step never named |
+| — | Coin amounts showed as `□` | Roblox's UI font has no glyph for 🪙 (U+1FA99); same for 🫳 and the medals |
+| — | Panels sat in the middle of the screen | All fourteen had their own layout and every one centred on Desktop |
+| — | Panel headers hid under the Roblox topbar | Nothing accounted for `GuiService:GetGuiInset()` (58px) |
+| — | Action dock under-measured by a whole plate | Width said `5 * dockPlate`; there have been six buttons since Market |
+| — | Dock overlapped the pantry on narrow screens | The "does it fit beside?" test used a looser threshold than the shift acting on it |
+| — | HUD toggle would ERROR on short screens | `math.clamp` with max < min, when the rail starts above where the pills end |
+| — | Appliances could never be moved | The move guard reused `IsCooking`, and the auto-production loop keeps a job on every appliance |
+
+### Also shipped this session
+P1–P4, B1–B4, B6, C1–C5 — see `CHANGELOG.md [Unreleased]` for the full list with
+verification notes. Headlines: the three real neighbour actions (steal / smell
+bomb / help-by-working), the scheduled VIP event, floor+wall painting (8 colours
+x 5 motifs), façade personalisation (46,656 fronts), consumable Stock Packs wired
+to the owner's real Product IDs, and the mobile HUD pass.
+
+---
+
 ## ⭐ NEXT — owner priorities (2026-07-31): café customisation
 
 _Owner ask: "allow the players to buy and customise more their restaurant."
