@@ -4,10 +4,11 @@
 -- each one as it lands. The server (SessionRewardService) owns the clock and the
 -- grant — this only DISPLAYS the countdown it is told, and never asks for a gift.
 --
--- Placement: top-right is the one HUD corner ResponsiveLayout leaves free (the
--- order ticket + health bars are top-centre, the stat pills bottom-left, the dock
--- bottom-centre, the rail vertically-centred on the right). Full modals sit at a
--- higher DisplayOrder, so they cover the pill while open — as intended.
+-- Placement: FIRST in the shared right-edge column declared by Theme.Hud.Pills —
+-- gift pill, VIP pill, order ticket, then the rail, each derived from the one
+-- above it in ResponsiveLayout. Do not hand-position it; the corner is shared
+-- with three other files. Full modals sit at a higher DisplayOrder and cover the
+-- pill while open, as intended.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,15 +46,23 @@ local function build()
 	gui.Name = "SessionRewardHud"
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 15 -- above the world HUD, below the modals (20)
-	gui.IgnoreGuiInset = false
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	-- The gift and VIP pills were the only two HUDs that never set this, so they
+	-- inherited CoreUISafeInsets and Roblox pushed them a topbar's height DOWN the
+	-- screen. Their y=4 was landing near y=90 on a phone — level with the rail's
+	-- first button, which they then covered. Every other HUD positions from the
+	-- true top, and these two must agree or the corner cannot be shared.
+	pcall(function()
+		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	end)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	local frame = Instance.new("Frame")
 	frame.Name = "GiftTimer"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -6, 0, 4)
-	frame.Size = UDim2.fromOffset(132, 28)
+	-- Extreme top-right, first in the shared right-edge column (Theme.Hud.Pills).
+	frame.Position = UDim2.new(1, -6, 0, Theme.Hud.Pills.Top)
+	frame.Size = UDim2.fromOffset(Theme.Hud.Pills.Width, Theme.Hud.Pills.GiftHeight)
 	frame.BackgroundColor3 = Theme.Colors.Honey
 	frame.BackgroundTransparency = 0.06
 	frame.Visible = false
@@ -93,8 +102,9 @@ local function celebrate()
 	grow:Play()
 	grow.Completed:Once(function()
 		if pill == frame then
-			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(132, 28) })
-				:Play()
+			TweenService:Create(frame, Theme.Motion.Settle, {
+				Size = UDim2.fromOffset(Theme.Hud.Pills.Width, Theme.Hud.Pills.GiftHeight),
+			}):Play()
 		end
 	end)
 end

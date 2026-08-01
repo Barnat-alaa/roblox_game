@@ -78,6 +78,7 @@ export type HudLayout = {
 	stockWidth: number,
 	stockHeight: number,
 	ticketTop: number,
+	pillsBottom: number,
 	ticketHeight: number,
 	serveHeight: number,
 	serveBottom: number,
@@ -99,7 +100,15 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	-- keys off the short axis too, not off the mode alone.
 	local phoneSized = phone or viewport.Y < hud.ShortViewport
 
-	local ticketTop = if viewport.X < 1000 then 58 else 9
+	-- The gift and VIP pills own the extreme top-right corner, so the ticket
+	-- starts under them and the rail starts under the ticket. The old literals
+	-- (58 narrow / 9 wide) were a hand-rolled topbar allowance that only ever
+	-- missed the pills because Roblox's default insets had pushed those DOWN past
+	-- the ticket; once the pills were corrected to sit where they claimed to, the
+	-- two overlapped by 10px.
+	local pills = hud.Pills
+	local pillsBottom = pills.Top + pills.GiftHeight + pills.Gap + pills.VipHeight
+	local ticketTop = pillsBottom + 8
 	local ticketHeight = if compact then 42 else 48
 	local ticketBottomFromTop = ticketTop + ticketHeight
 
@@ -213,6 +222,7 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 		stockWidth = stockWidth,
 		stockHeight = stockHeight,
 		ticketTop = ticketTop,
+		pillsBottom = pillsBottom,
 		ticketHeight = ticketHeight,
 		serveHeight = serveHeight,
 		serveBottom = serveBottom,

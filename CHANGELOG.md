@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-01 — the gift and VIP pills really are in the top-right now
+Owner, from the phone: *"the VIP and gift message, make it more at the top
+right — now it hides some parameters button."*
+
+They were positioned at y=4 and y=36 and I had verified those numbers, but they
+were the only two HUDs in the game that never set `ScreenInsets`. So they
+inherited the default `CoreUISafeInsets` and Roblox pushed them a topbar's
+height DOWN the screen — a measured y of 4 was landing near y=90 on the phone,
+level with the rail's first button, which they then covered. Every other HUD had
+`DeviceSafeInsets` and positioned from the true top; these two silently
+disagreed. Both now set it.
+
+**That exposed a second collision.** Correcting the pills to sit where they
+claimed to put them straight into the order ticket, which also lives on the
+right edge at y 58–100 — a 10px overlap, and worse on desktop where the ticket
+started at y=9. The right edge is now **one derived column** instead of four
+files each choosing a number: `Theme.Hud.Pills` declares the band, `hudLayout`
+starts the ticket at `pillsBottom + 8`, and the rail starts below the ticket.
+`HudToggleController` reads the same value rather than re-deriving `36 + 32 + 8`
+by hand.
+
+Measured live on the running client (gift `4..32`, VIP `36..68`, ticket
+`76..118`, rail `126..351`) and across seven viewports: **0 overlaps of 7** on
+the right-edge column, and the camera arrows re-checked at **0 clashes of 7**
+since the rail's top moving from 108 to 126 changes `railPlate`.
+
+
 ### Change — 2026-08-01 — pantry shortened, corners cleared, arrows always on
 Owner, on the phone build: *"the pantry and production make it less lengthy and
 make the orange button appear and clear… with that you leave more room so the ?

@@ -116,7 +116,7 @@ function HudToggleController.Start(_self: any)
 	-- it straight through the pills.
 	ResponsiveLayout.watch(function(mode, viewport)
 		local layout = ResponsiveLayout.hudLayout(mode, viewport)
-		local pillsBottom = 36 + 32 + 8 -- VIP pill top + its height + a gap
+		local pillsBottom = layout.pillsBottom + 8
 		local railTop = layout.railTopFromTop or (viewport.Y - layout.railHeight) / 2
 		-- On a short screen the rail starts ABOVE where the pills end, so there is
 		-- no gap between them and clamping to [pillsBottom, railTop] would invert
