@@ -98,7 +98,7 @@ local function buildYieldSection(parent: ScrollingFrame, profile: any)
 			-- The coin button is the primary path and is always present.
 			local coinButton = Components.Button(
 				card,
-				string.format("%d 🪙", row.coinCost),
+				string.format("%d coins", row.coinCost),
 				if nextUp then Theme.Colors.Honey else Theme.Colors.Line,
 				UDim2.fromOffset(120, if row.productId ~= 0 then 30 else 44)
 			)

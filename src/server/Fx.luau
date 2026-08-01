@@ -10,7 +10,7 @@ local Fx = {}
 
 local rng = Random.new()
 
--- Floating "+6 🪙" style text that drifts up and fades.
+-- Floating "+6 coins" style text that drifts up and fades.
 function Fx.floatText(position: Vector3, text: string, color: Color3?)
 	local anchor = Instance.new("Part")
 	anchor.Anchored = true

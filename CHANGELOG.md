@@ -5,6 +5,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-01 — the coin glyph no longer renders as an empty box
+Roblox's UI font has no glyph for **🪙 (U+1FA99)**, so every coin amount in the
+game rendered as a tofu box — `□ 250`, `+6 □`, `Buy smell bomb (150 □)`. Verified
+in Studio.
+
+All eleven live sites now read **"coins"** instead: tip pickups, the served-customer
+bubbles, combo bonuses, neighbour-help payouts, the smell-bomb buy button, the
+batch-output coin buttons and the not-enough-coins message. Two other
+recently-added glyphs went the same way — **🫳 (U+1FAF3)**, a Unicode 14 addition
+used on the steal button, and the **🏆 / 🥇🥈🥉** medals on the leaderboard
+(already swapped to "1st / 2nd / 3rd" in C3, with one straggler in the empty-state
+string caught here).
+
+Anything that wants a real coin *picture* draws one — `UI/StylePreview.coin`,
+added in C1, is two circles and renders everywhere.
+
+Verified in Studio by scanning what is actually on screen rather than the source:
+**402 text elements checked live, 0 tofu-glyph hits**, and the new wording
+confirmed in place ("Buy smell bomb (150 coins)", "+87 coins").
+
 ### Feature — 2026-08-01 — C2: you are TOLD when a neighbour hits your café
 Owner: *"when a next door café owner does something bad to you, show a clear
 message"* and *"I like the smell bomb effect — make it visible in all the café you

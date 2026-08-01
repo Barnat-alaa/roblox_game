@@ -241,9 +241,9 @@ function SocialService.TryWork(
 	end
 	DataService:Push(worker)
 
-	local bits = { "+" .. pay .. " 🪙", "+" .. Neighbour.friendshipPerAction .. " 💚" }
+	local bits = { "+" .. pay .. " coins", "+" .. Neighbour.friendshipPerAction .. " 💚" }
 	if bonus > 0 then
-		table.insert(bits, "+" .. bonus .. " 🪙 Good Neighbour!")
+		table.insert(bits, "+" .. bonus .. " coins Good Neighbour!")
 	end
 	Remotes.event("Notify"):FireClient(worker, {
 		kind = "helped",

@@ -241,7 +241,7 @@ local function handleBuyYieldTier(player: Player, payload: unknown)
 	if not EconomyService:TrySpendCoins(player, row.coinCost) then
 		Remotes.event("Notify"):FireClient(player, {
 			kind = "upgrade_blocked",
-			text = "Not enough coins — " .. row.coinCost .. " 🪙 needed.",
+			text = "Not enough coins — " .. row.coinCost .. " needed.",
 		})
 		return
 	end
