@@ -41,7 +41,7 @@ local EVENTS = {
 	-- the owner-gated prompts opening up to a visitor standing in the café.)
 	"Mischief", -- c->s: mischief action {method, plotIndex} — buy/smell bomb/recruit/steal (Phase C §4b, P2a)
 	"SetCafeName", -- c->s: name your own café {name} — filtered server-side (TextService)
-	"BuyYieldTier", -- c->s: buy the next batch-output tier WITH COINS {tier} (P4)
+	"BuyStockPack", -- c->s: buy a stock pack WITH COINS {amount} (P4, consumable)
 	"WorldReady", -- s->c: café rendered + assets loaded {cafeName} — ends the intro overlay
 	"ProfileUpdated", -- s->c: full PlayerData snapshot
 	"Notify", -- s->c: toast / error feedback

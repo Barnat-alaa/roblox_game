@@ -13,7 +13,6 @@ local Shared = ReplicatedStorage.Shared
 local Recipes = require(Shared.Config.Recipes)
 local Furniture = require(Shared.Config.Furniture)
 local Kitchen = require(Shared.Config.Kitchen)
-local Products = require(Shared.Config.Products)
 local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
@@ -245,17 +244,7 @@ function KitchenService.CompleteProduction(
 	local kitchen = kitchenOf(data)
 	local total = InventoryMath.count(kitchen, recipeId, now)
 
-	-- P4 batch-output ladder: a finished batch YIELDS more items (owner: "×5 to
-	-- add 5 elements for each item… but only to the items that are unlocked").
-	-- This is the single funnel every producer goes through — the automatic
-	-- production loop and manual collect alike — so the multiplier belongs here
-	-- rather than at each call site. Still clamped by maxStockPerRecipe, which is
-	-- what keeps a ×20 café from stockpiling without limit.
-	local wanted = math.floor(quantity)
-	if data.unlockedRecipes[recipeId] == true then
-		wanted *= Products.yieldMultiplier((data :: any).yieldTier)
-	end
-	local added = math.clamp(wanted, 0, Kitchen.maxStockPerRecipe - total)
+	local added = math.clamp(math.floor(quantity), 0, Kitchen.maxStockPerRecipe - total)
 	if added <= 0 then
 		return 0
 	end
@@ -353,6 +342,47 @@ function KitchenService.AddStolenServing(_self: any, player: Player, recipeId: s
 	DataService:Push(player)
 	refreshCounterDisplay(player)
 	return true
+end
+
+-- A STOCK PACK: top every UNLOCKED dish up by `amount`, once (owner spec — "+5
+-- adds +5 in every item, one time only"). Returns how many units actually
+-- landed, so the caller can refuse to charge for a pack that did nothing to an
+-- already-full café.
+--
+-- Per-recipe it is clamped by maxStockPerRecipe, so a nearly-full café gets the
+-- remainder rather than overflowing. Deliberately NOT CompleteProduction: none of
+-- this was cooked, so it grants no XP, mastery, goal credit or produced-stat.
+function KitchenService.GrantStockPack(_self: any, player: Player, amount: number): number
+	local data = DataService:GetProfile(player)
+	if not data then
+		return 0
+	end
+	local units = math.max(0, math.floor(amount))
+	if units <= 0 then
+		return 0
+	end
+	local now = os.time()
+	local kitchen = kitchenOf(data)
+	local granted = 0
+	for recipeId, unlocked in data.unlockedRecipes do
+		local recipe = Recipes[recipeId]
+		if unlocked == true and recipe then
+			local total = InventoryMath.count(kitchen, recipeId, now)
+			local room = math.max(0, Kitchen.maxStockPerRecipe - total)
+			local add = math.min(units, room)
+			if add > 0 then
+				InventoryMath.addLot(kitchen, recipeId, add, now, now + recipe.spoilTime)
+				granted += add
+			end
+		end
+	end
+	if granted <= 0 then
+		return 0
+	end
+	syncStock(kitchen, now)
+	DataService:Push(player)
+	refreshCounterDisplay(player)
+	return granted
 end
 
 -- Can this player still receive one of `recipeId`? Asked BEFORE the victim's

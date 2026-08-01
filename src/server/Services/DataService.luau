@@ -22,7 +22,6 @@ local Recipes = require(Shared.Config.Recipes)
 local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
 local Mischief = require(Shared.Config.Mischief)
-local Products = require(Shared.Config.Products)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
 local Log = require(Shared.Utilities.Log)
 local Remotes = require(Shared.Network.Remotes)
@@ -176,9 +175,6 @@ local function defaultProfile(): Types.PlayerData
 		grantedReceipts = {},
 		boosts = {},
 		smellBombs = Mischief.startingBombs, -- Phase C-4b consumable (top-level → reconcile heals)
-		-- Permanent production-yield ladder (P4). 0 = ×1; buyable with coins OR
-		-- Robux, so it never becomes power you can't earn.
-		yieldTier = 0,
 		-- Painted floor tiles + wall panels (B3). Empty = the default oak floor
 		-- and cream walls.
 		surfaces = { floor = {}, wall = {} },
@@ -333,12 +329,6 @@ local function migrate(data: Types.PlayerData): Types.PlayerData
 	-- this guard just floors/clamps a corrupt value. Phase C-4b.
 	local mutableBombs: any = data
 	mutableBombs.smellBombs = math.max(0, math.floor(tonumber(mutableBombs.smellBombs) or 0))
-
-	-- Same shape for the yield ladder (P4): clamp to a real tier so a corrupt or
-	-- hand-edited value can never grant an unearned multiplier.
-	local mutableTier: any = data
-	mutableTier.yieldTier =
-		math.clamp(math.floor(tonumber(mutableTier.yieldTier) or 0), 0, #Products.yieldTiers)
 
 	-- Painted surfaces (B3). reconcile fills the top-level key, but the two
 	-- sub-tables need healing themselves — same pattern as socialOf/kitchenOf.

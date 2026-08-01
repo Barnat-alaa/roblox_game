@@ -70,11 +70,15 @@ local function grantProduct(player: Player, entry: any): boolean
 				m.hired = true
 			end
 		end
-	elseif entry.kind == "yield_tier" then
-		-- P4: permanent, and never a downgrade — buying a lower tier after a
-		-- higher one (or re-buying the same) leaves you where you are.
-		local mutable: any = data
-		mutable.yieldTier = math.max(math.floor(tonumber(mutable.yieldTier) or 0), entry.tier)
+	elseif entry.kind == "stock_pack" then
+		-- A CONSUMABLE restock: top every unlocked dish up by `amount`, once.
+		-- KitchenService owns the per-recipe cap and the save.
+		if KitchenService:GrantStockPack(player, entry.amount) <= 0 then
+			-- Nothing landed (every dish already at the cap). Refuse the grant so
+			-- ProcessReceipt returns NotProcessedYet and Roblox retries later
+			-- rather than charging for nothing.
+			return false
+		end
 	else
 		return false
 	end
@@ -104,20 +108,17 @@ local function processReceipt(receiptInfo: any): Enum.ProductPurchaseDecision
 	end
 	local entry = Products.developerProducts[receiptInfo.ProductId]
 	if not entry then
-		-- The yield ladder lives in its own table (it has a coin price too), so
-		-- look there before giving up. productId 0 means "not created yet" and
-		-- must never match a real receipt.
-		for _, row in Products.yieldTiers do
-			if row.productId ~= 0 and row.productId == receiptInfo.ProductId then
-				entry = {
-					kind = "yield_tier",
-					key = "yield_tier_" .. tostring(row.tier),
-					tier = row.tier,
-					name = row.name,
-					id = row.productId,
-				}
-				break
-			end
+		-- Stock packs live in their own table (they carry a coin price too), so
+		-- look there before giving up.
+		local pack = Products.stockPackForProduct(receiptInfo.ProductId)
+		if pack then
+			entry = {
+				kind = "stock_pack",
+				key = "stock_pack_" .. tostring(pack.amount),
+				amount = pack.amount,
+				name = pack.name,
+				id = pack.productId,
+			}
 		end
 	end
 	if not entry then
@@ -190,69 +191,58 @@ function MonetizationService.BoostActive(
 	return typeof(boosts) == "table" and (tonumber(boosts[boostKey]) or 0) > os.time()
 end
 
--- P4 — the COIN half of the yield ladder. This is what keeps a permanent paid
--- multiplier off the pay-to-win rail: every tier Robux can buy is also buyable
--- with coins, so Robux only skips the grind (HANDOFF §1). Server-authoritative:
--- the client sends a tier number and nothing else, and the price, the ordering
--- and the spend all happen here.
-local function handleBuyYieldTier(player: Player, payload: unknown)
+-- The COIN half of the stock packs. This is what keeps a paid restock off the
+-- pay-to-win rail: every pack Robux can buy is also buyable with coins, so Robux
+-- only skips the grind (HANDOFF §1). Server-authoritative — the client sends an
+-- amount and nothing else; the price and the spend happen here.
+local function handleBuyStockPack(player: Player, payload: unknown)
 	if typeof(payload) ~= "table" then
 		return
 	end
 	local p = payload :: any
-	if typeof(p.tier) ~= "number" or p.tier ~= math.floor(p.tier) then
+	if typeof(p.amount) ~= "number" or p.amount ~= math.floor(p.amount) then
 		return
 	end
 	if not buyLimiter:check(player.UserId, os.clock()) then
 		return
 	end
-	local data = DataService:GetProfile(player)
-	if not data then
+	local pack = Products.stockPackForAmount(p.amount)
+	if not pack then
 		return
 	end
-	local row
-	for _, candidate in Products.yieldTiers do
-		if candidate.tier == p.tier then
-			row = candidate
-			break
-		end
-	end
-	if not row then
+	if not DataService:GetProfile(player) then
 		return
 	end
 
-	local current = math.floor(tonumber((data :: any).yieldTier) or 0)
-	if current >= row.tier then
+	-- Charge only if the pack would actually deliver something: a café already at
+	-- the per-recipe cap should not pay for nothing.
+	if not EconomyService:TrySpendCoins(player, pack.coinCost) then
 		Remotes.event("Notify"):FireClient(player, {
 			kind = "upgrade_blocked",
-			text = "You already have " .. row.name .. ".",
+			text = "Not enough coins — " .. pack.coinCost .. " needed.",
 		})
 		return
 	end
-	-- Strictly one rung at a time, so tier 3 can never be reached for tier 3's
-	-- price alone.
-	if row.tier ~= current + 1 then
+	local granted = KitchenService:GrantStockPack(player, pack.amount)
+	if granted <= 0 then
+		-- Refund: nothing landed, so the spend is undone rather than pocketed.
+		EconomyService:AddCoins(player, pack.coinCost)
 		Remotes.event("Notify"):FireClient(player, {
 			kind = "upgrade_blocked",
-			text = "Buy the previous upgrade first.",
+			text = "Your shelves are already full.",
 		})
 		return
 	end
-	if not EconomyService:TrySpendCoins(player, row.coinCost) then
-		Remotes.event("Notify"):FireClient(player, {
-			kind = "upgrade_blocked",
-			text = "Not enough coins — " .. row.coinCost .. " needed.",
-		})
-		return
-	end
-	(data :: any).yieldTier = row.tier
-	DataService:Push(player)
 	Remotes.event("Notify"):FireClient(player, {
 		kind = "upgrade_bought",
-		text = row.name .. " unlocked! Every batch now yields " .. row.multiplier .. "×.",
+		text = pack.name .. " — " .. granted .. " items added to your stock!",
 	})
 	if AnalyticsService then
-		AnalyticsService:Track(player, "yield_tier_bought", { tier = row.tier, paidWith = "coins" })
+		AnalyticsService:Track(
+			player,
+			"stock_pack_bought",
+			{ amount = pack.amount, granted = granted, paidWith = "coins" }
+		)
 	end
 end
 
@@ -266,7 +256,7 @@ end
 
 function MonetizationService.Start(_self: any)
 	MarketplaceService.ProcessReceipt = processReceipt
-	Remotes.event("BuyYieldTier").OnServerEvent:Connect(handleBuyYieldTier)
+	Remotes.event("BuyStockPack").OnServerEvent:Connect(handleBuyStockPack)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(
 		function(player: Player, passId: number, purchased: boolean)
