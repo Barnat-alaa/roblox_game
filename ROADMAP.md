@@ -130,6 +130,8 @@ between the interior depth and `TOTAL_DEPTH`, then catalogue rows + a Garden tab
 | — | Appliances could never be moved | The move guard reused `IsCooking`, and the auto-production loop keeps a job on every appliance |
 | — | Camera arrows were invisible | They were touch-gated, so anything reporting a mouse (Studio, a laptop) hid them entirely |
 | — | Arrow fallback ran off a 560px screen | The narrow-screen branch offset from the dock without re-checking the rail or the screen edge |
+| — | Gift/VIP pills covered a rail button | The only two HUDs that never set `ScreenInsets`, so Roblox's default pushed them a topbar's height down the screen |
+| — | Pills vs order ticket (latent) | Exposed by the fix above: both own the right edge, and neither derived from the other |
 
 ### Also shipped this session
 P1–P4, B1–B4, B6, C1–C5 — see `CHANGELOG.md [Unreleased]` for the full list with

@@ -7,9 +7,10 @@
 -- `nextAt` it is told, ticking it down against workspace:GetServerTimeNow() so
 -- every client agrees. It never asks for a VIP.
 --
--- Placement: directly below SessionRewardController's gift pill, which sits at
--- top-right y=8 and is 38 tall — this takes y=54. Full modals are at a higher
--- DisplayOrder and cover it while open, as intended.
+-- Placement: SECOND in the shared right-edge column declared by Theme.Hud.Pills,
+-- directly under the gift pill. Its height is what pushes the order ticket and
+-- the rail down, so changing it moves them too — that is the point. Full modals
+-- are at a higher DisplayOrder and cover it while open, as intended.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,13 +42,20 @@ local function build()
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 15 -- same band as the gift pill; under the modals (20)
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	-- Same fix as the gift pill: without this the default CoreUISafeInsets pushes
+	-- the pill a topbar's height down and it lands on the rail's first button.
+	pcall(function()
+		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	end)
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 	local frame = Instance.new("Frame")
 	frame.Name = "VipTimer"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -6, 0, 36)
-	frame.Size = UDim2.fromOffset(132, 32)
+	-- Second in the shared right-edge column, directly under the gift pill.
+	frame.Position =
+		UDim2.new(1, -6, 0, Theme.Hud.Pills.Top + Theme.Hud.Pills.GiftHeight + Theme.Hud.Pills.Gap)
+	frame.Size = UDim2.fromOffset(Theme.Hud.Pills.Width, Theme.Hud.Pills.VipHeight)
 	frame.BackgroundColor3 = Theme.Colors.Berry
 	frame.BackgroundTransparency = 0.06
 	frame.Visible = false
@@ -99,8 +107,9 @@ local function celebrate()
 	grow:Play()
 	grow.Completed:Once(function()
 		if pill == frame then
-			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(132, 32) })
-				:Play()
+			TweenService:Create(frame, Theme.Motion.Settle, {
+				Size = UDim2.fromOffset(Theme.Hud.Pills.Width, Theme.Hud.Pills.VipHeight),
+			}):Play()
 		end
 	end)
 end

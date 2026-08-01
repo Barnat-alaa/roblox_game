@@ -147,6 +147,13 @@ local Theme = {
 		-- the inventory, and reserving four slots left a block of empty black
 		-- whenever fewer were active (owner 2026-08-01: "make it less lengthy").
 		StockDockPhone = { Width = 132, SlotHeight = 32, Header = 46, Slots = 2 },
+		-- The extreme top-right is ONE column, in this order: gift pill, VIP pill,
+		-- order ticket, rail. It is declared here rather than inside each
+		-- controller because those four pieces live in four different files, and
+		-- the only way they never land on each other is by deriving from one set
+		-- of numbers — `hudLayout` starts the ticket at `PillsBottom` + 8 and the
+		-- rail below the ticket.
+		Pills = { Top = 4, Gap = 4, Width = 132, GiftHeight = 28, VipHeight = 32 },
 		EdgeMargin = 10,
 	},
 	-- Catalogue item pictures (shop rows, build rows, cookbook cards).
