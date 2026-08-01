@@ -5,6 +5,44 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — C4 (part 1): camera arrows + mobile baselines
+Owner: *"don't show Q, E etc icon, just add a small arrow right and left
+transparent to direct the camera"*.
+
+The touch camera pad was an opaque 100×100 slab of four lettered buttons
+(Q / E / + / −). The letters mean nothing on a phone, which has no keyboard, and
+the slab ate a corner of the view. It is now **two transparent chevrons pinned to
+the extreme left and right edges** at thumb height — nothing in the middle of the
+screen.
+
+The **zoom buttons are gone**: pinch-to-zoom already existed and is the gesture a
+phone player reaches for, so two controls beat four. Desktop keeps the scroll
+wheel. (`zoomBy` went with them — pinch and scroll set `targetZoom` directly.)
+
+Each chevron is drawn from two rotated bars rather than a glyph, so it can never
+land on a font that lacks the character — the lesson from the coin emoji.
+
+New shared `Theme.Hud.TouchTarget = 44`, the size Apple and Google both publish
+as the floor for a reliable finger press, so every surface sizes taps against one
+number instead of inventing its own. New `ResponsiveLayout.viewport()` and
+`ResponsiveLayout.topInset()` — the latter exists because Roblox draws its own
+topbar over the screen, so anything pinned to the "extreme top" has to start below
+that inset or its header is unreadable (which is what was happening to the build
+panel).
+
+Verified in Studio: both chevrons build at **44×44**, anchored to the true screen
+edges (left `(0, 10)`, right `(1, −10)`) at y=357 of a 576-tall viewport,
+background transparency 0.55, two drawn bars each, and **zero** Q/E/+/− buttons
+remain.
+
+⚠️ **Not yet done — the rest of C4/C5.** `ResponsiveLayout.panelSize/
+panelPosition/panelAnchor` now describe an edge-docked layout (left column on
+desktop, bottom sheet on phone), but **no panel calls them** — each controller
+still sets its own centred position, so the panels themselves have not moved yet.
+Migrating the six panel controllers and doing the touch-target audit is the
+remaining work.
+
+
 ### Change — 2026-08-01 — stock packs are CONSUMABLE, not a permanent multiplier
 Owner clarification: *"if a player chooses +5 it will add +5 in every item, ONE
 TIME only (+5 coffees, +5 teas etc)"*. P4 shipped a permanent production-yield
