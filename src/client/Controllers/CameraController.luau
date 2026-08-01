@@ -77,10 +77,19 @@ local function rotate(step: number)
 	targetYaw = math.rad(YAWS[yawIndex])
 end
 
-local function zoomBy(delta: number)
-	targetZoom = math.clamp(targetZoom + delta, ZOOM_MIN, ZOOM_MAX)
-end
-
+-- Camera controls, rebuilt mobile-first (owner 2026-08-01: "don't show Q, E etc
+-- icon, just add a small arrow right and left transparent to direct the camera",
+-- and "be sure every item is in the extreme top, bottom and left so they are not
+-- in the center of the screen").
+--
+-- Was: an opaque 100x100 pad of four chunky lettered buttons (Q / E / + / -).
+-- The letters meant nothing on a phone, which has no keyboard, and the slab ate
+-- a corner of the view.
+--
+-- Now: two TRANSPARENT chevrons pinned to the extreme left and right edges at
+-- thumb height. Zoom buttons are gone entirely -- pinch-to-zoom already exists
+-- (see the pinch handler below), and it is the gesture a phone player reaches
+-- for anyway, so two buttons beat four.
 local function buildTouchControls()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "CameraGui"
@@ -93,72 +102,55 @@ local function buildTouchControls()
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Touch only. On a mouse and keyboard these four buttons duplicate Q/E and
-	-- the scroll wheel and just take up the top-left corner, but a phone has no
-	-- other way to rotate the camera at all, so they stay there.
+	-- Touch only: a mouse has Q/E and the scroll wheel already.
 	local touchOnly = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
-	local holder = Instance.new("Frame")
-	holder.AnchorPoint = Vector2.new(0, 0.5)
-	holder.Position = UDim2.new(0, 10, 0.5, 0)
-	holder.Size = UDim2.fromOffset(100, 100)
-	holder.Visible = touchOnly
-	holder.BackgroundColor3 = Theme.Colors.Espresso
-	holder.BackgroundTransparency = 0.12
-	Components.Corner(holder, Theme.Radius.Large)
-	Components.Stroke(holder, Theme.Colors.Cream, 1, 0.7)
-	holder.Parent = gui
-	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.fromOffset(42, 42)
-	layout.CellPadding = UDim2.fromOffset(6, 6)
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = holder
-	ResponsiveLayout.watch(function(mode, viewport)
-		if mode == "Desktop" then
-			holder.Position = UDim2.new(0, 10, 0.5, 0)
-			return
-		end
-		-- The HUD's stat pills claim the lower-left on small screens; keep this
-		-- pad's bottom edge clear of them rather than letting the chips draw
-		-- over invisible-but-tappable camera buttons.
-		local hud = ResponsiveLayout.hudLayout(mode, viewport)
-		local centre = if mode == "Compact" then 112 else viewport.Y * 0.5
-		-- Stay clear of everything else that wants this column: the stat pills
-		-- below, and the cafe-health card above once it drops down here.
-		centre = math.min(centre, hud.chipsTopFromTop - 56)
-		if hud.healthLeft < 110 then
-			centre = math.min(centre, hud.healthTopFromTop - 50)
-		end
-		holder.Position = UDim2.fromOffset(10, math.max(50, centre))
-	end)
+	-- A chevron drawn from two bars rather than a glyph, so it can never land on
+	-- a font without the character (the coin-emoji lesson).
+	local function arrow(name: string, onLeft: boolean, onTap: () -> ())
+		local button = Instance.new("TextButton")
+		button.Name = name
+		button.Text = ""
+		button.AutoButtonColor = false
+		button.Visible = touchOnly
+		button.AnchorPoint = Vector2.new(if onLeft then 0 else 1, 0.5)
+		button.BackgroundColor3 = Theme.Colors.Espresso
+		button.BackgroundTransparency = 0.55 -- transparent, as asked
+		button.Size = UDim2.fromOffset(Theme.Hud.TouchTarget, Theme.Hud.TouchTarget)
+		Components.Corner(button, Theme.Radius.Pill)
+		Components.Stroke(button, Theme.Colors.Cream, 1, 0.75)
+		button.Parent = gui
 
-	local function button(text: string, order: number, onTap: () -> ())
-		local value = Instance.new("TextButton")
-		value.Size = UDim2.fromOffset(42, 42)
-		value.BackgroundColor3 = if order <= 2 then Theme.Colors.Coral else Theme.Colors.Roast
-		value.BackgroundTransparency = 0.02
-		value.Font = Theme.Font.Bold
-		value.TextSize = 14
-		value.TextColor3 = Theme.Colors.Cream
-		value.Text = text
-		value.LayoutOrder = order
-		Components.Corner(value, Theme.Radius.Medium)
-		value.Activated:Connect(onTap)
-		value.Parent = holder
+		for index, tilt in { 38, -38 } do
+			local bar = Instance.new("Frame")
+			bar.Size = UDim2.fromOffset(4, 15)
+			bar.AnchorPoint = Vector2.new(0.5, if index == 1 then 1 else 0)
+			bar.Position = UDim2.fromScale(0.5, 0.5)
+			bar.BackgroundColor3 = Theme.Colors.Cream
+			bar.BackgroundTransparency = 0.15
+			bar.BorderSizePixel = 0
+			bar.Rotation = if onLeft then tilt else -tilt
+			Components.Corner(bar, 2)
+			bar.Parent = button
+		end
+
+		button.Activated:Connect(onTap)
+		return button
 	end
-	button("Q", 1, function()
+
+	local left = arrow("CameraLeft", true, function()
 		rotate(1)
 	end)
-	button("E", 2, function()
+	local right = arrow("CameraRight", false, function()
 		rotate(-1)
 	end)
-	button("+", 3, function()
-		zoomBy(-10)
-	end)
-	button("-", 4, function()
-		zoomBy(10)
+
+	ResponsiveLayout.watch(function(_mode, viewport)
+		-- Extreme edges, at thumb height: a touch below centre, where a hand
+		-- holding a phone actually rests.
+		local y = math.floor(viewport.Y * 0.62)
+		left.Position = UDim2.new(0, Theme.Hud.EdgeMargin, 0, y)
+		right.Position = UDim2.new(1, -Theme.Hud.EdgeMargin, 0, y)
 	end)
 end
 

@@ -86,6 +86,12 @@ local Theme = {
 	-- the dock, rail, and stat pills use lives here - controllers hold no
 	-- layout literals.
 	Hud = {
+		-- Mobile baselines (2026-08-01). One source of truth so every surface
+		-- agrees rather than each controller inventing its own number.
+		--   TouchTarget — the minimum tappable square. 44 is the size both Apple
+		--     and Google publish as the floor for a reliable finger press; below
+		--     it, mis-taps climb sharply.
+		TouchTarget = 44,
 		-- Phone sizes are tuned against the measured world-visibility floor
 		-- (phone >=55%), not picked by eye: five dock plates plus a five-button
 		-- rail plus three pills is a lot of furniture on a 560px screen.

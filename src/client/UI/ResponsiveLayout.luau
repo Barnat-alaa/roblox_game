@@ -6,6 +6,12 @@ local ResponsiveLayout = {}
 
 export type Mode = "Phone" | "Compact" | "Desktop"
 
+-- The live viewport, with the same fallback every other helper here uses.
+function ResponsiveLayout.viewport(): Vector2
+	return (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize)
+		or Vector2.new(1280, 720)
+end
+
 function ResponsiveLayout.mode(viewport: Vector2?): Mode
 	local size = viewport
 		or (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize)
@@ -196,18 +202,46 @@ function ResponsiveLayout.currentHudLayout(): HudLayout
 	return ResponsiveLayout.hudLayout(ResponsiveLayout.mode(viewport), viewport)
 end
 
-function ResponsiveLayout.panelSize(desktopWidth: number, desktopHeight: number): UDim2
-	if ResponsiveLayout.isPhone() then
-		return UDim2.new(1, -20, 0.76, 0)
-	end
-	return UDim2.fromOffset(desktopWidth, desktopHeight)
+-- Roblox draws its own topbar over the top of the screen. A panel pinned to the
+-- "extreme top" therefore has to start BELOW that inset or its header is
+-- unreadable — which is exactly what was happening to the build panel.
+function ResponsiveLayout.topInset(): number
+	local ok, inset = pcall(function()
+		return game:GetService("GuiService"):GetGuiInset()
+	end)
+	return if ok and inset then math.max(inset.Y, 36) else 36
 end
 
-function ResponsiveLayout.panelPosition(desktopX: number?): UDim2
+function ResponsiveLayout.panelSize(desktopWidth: number, desktopHeight: number): UDim2
 	if ResponsiveLayout.isPhone() then
-		return UDim2.new(0.5, 0, 1, -10)
+		-- A bottom sheet, not a full-screen takeover: leaving the top third of
+		-- the screen showing the café is what keeps a phone playable while a
+		-- panel is open.
+		return UDim2.new(1, -2 * Theme.Hud.EdgeMargin, 0.62, 0)
 	end
-	return UDim2.new(0.5, desktopX or 0, 0.5, 0)
+	local viewport = ResponsiveLayout.viewport()
+	return UDim2.fromOffset(
+		math.min(desktopWidth, viewport.X - 24),
+		math.min(desktopHeight, viewport.Y - ResponsiveLayout.topInset() - 24)
+	)
+end
+
+-- Panels dock to an EDGE rather than the middle of the screen (owner rule
+-- 2026-08-01: "be sure every item is in the extreme top, bottom and left so they
+-- are not in the center of the screen"). Phone gets a bottom sheet; anything
+-- larger gets a left-hand column, which also leaves the café itself visible
+-- beside the panel instead of behind it.
+function ResponsiveLayout.panelPosition(_desktopX: number?): UDim2
+	if ResponsiveLayout.isPhone() then
+		return UDim2.new(0.5, 0, 1, -Theme.Hud.EdgeMargin)
+	end
+	return UDim2.new(0, Theme.Hud.EdgeMargin, 0, ResponsiveLayout.topInset() + Theme.Hud.EdgeMargin)
+end
+
+-- The anchor that goes with panelPosition, so callers cannot pair a left-edge
+-- position with a centred anchor and land the panel half off-screen.
+function ResponsiveLayout.panelAnchor(): Vector2
+	return if ResponsiveLayout.isPhone() then Vector2.new(0.5, 1) else Vector2.new(0, 0)
 end
 
 function ResponsiveLayout.watch(callback: (Mode, Vector2) -> ()): RBXScriptConnection?
