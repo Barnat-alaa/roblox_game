@@ -60,7 +60,7 @@ local function ranking(): string
 		end
 	end
 	if #rows == 0 then
-		return "🏆 CAFÉ LEADERBOARD\n\nNo cafés open yet — claim a plot!"
+		return "CAFÉ LEADERBOARD\n\nNo cafés open yet — claim a plot!"
 	end
 	table.sort(rows, function(a, b)
 		return a.buzz > b.buzz

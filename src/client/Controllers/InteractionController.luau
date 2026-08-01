@@ -169,7 +169,7 @@ local function openStealPicker()
 				row.name .. "  ×" .. tostring(row.count),
 				Theme.Colors.Berry,
 				UDim2.new(1, 0, 0, 40),
-				"🫳"
+				"+"
 			)
 			button.LayoutOrder = order
 			button.ZIndex = 22
@@ -254,12 +254,8 @@ local function buildPanel()
 		-- P2a: steal a real item off a real shelf. The button only picks the
 		-- target; the theft itself happens at the shelf, with E.
 		if Mischief.theftEnabled then
-			local steal = Components.Button(
-				list,
-				"🫳 Steal an item",
-				Theme.Colors.Berry,
-				UDim2.new(1, 0, 0, 38)
-			)
+			local steal =
+				Components.Button(list, "Steal an item", Theme.Colors.Berry, UDim2.new(1, 0, 0, 38))
 			steal.LayoutOrder = 20.5
 			steal.ZIndex = 22
 			steal.Activated:Connect(openStealPicker)
@@ -302,7 +298,7 @@ local function buildPanel()
 
 		local buy = Components.Button(
 			list,
-			"🛒 Buy smell bomb (" .. Mischief.bombCost .. " 🪙)",
+			"Buy smell bomb (" .. Mischief.bombCost .. " coins)",
 			Theme.Colors.Roast,
 			UDim2.new(1, 0, 0, 38)
 		)

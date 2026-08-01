@@ -200,7 +200,7 @@ local function bumpCombo(player: Player, position: Vector3)
 		EconomyService:AddCoins(player, bonus)
 		Fx.floatText(
 			position + Vector3.new(0, 5.6, 0),
-			string.format("COMBO ×%d  +%d 🪙", state.count, bonus),
+			string.format("COMBO ×%d  +%d coins", state.count, bonus),
 			Color3.fromRGB(255, 224, 130)
 		)
 	end
@@ -835,7 +835,7 @@ local function dropTip(player: Player, seatCf: CFrame, amount: number)
 	label.Font = Enum.Font.GothamBold
 	label.TextColor3 = Color3.fromRGB(255, 224, 130)
 	label.TextStrokeTransparency = 0.3
-	label.Text = "🪙 Tip!"
+	label.Text = "Tip!"
 	label.Parent = gui
 
 	local prompt = Instance.new("ProximityPrompt")
@@ -854,7 +854,7 @@ local function dropTip(player: Player, seatCf: CFrame, amount: number)
 		claimed = true
 		EconomyService:AddCoins(player, amount)
 		Fx.coinBurst(tip.Position, 5)
-		Fx.floatText(tip.Position + Vector3.new(0, 1, 0), "+" .. tostring(amount) .. " 🪙")
+		Fx.floatText(tip.Position + Vector3.new(0, 1, 0), "+" .. tostring(amount) .. " coins")
 		if GoalService then
 			GoalService:Bump(player, "collect_tips", 1)
 		end
@@ -1162,7 +1162,7 @@ local function eatMeal(
 
 	if cust.root.Parent ~= nil then
 		cust.bubble.Text = if announcedPay ~= nil
-			then "😊 +" .. tostring(announcedPay) .. " 🪙"
+			then "😊 +" .. tostring(announcedPay) .. " coins"
 			else "😊"
 		task.wait(1)
 		walkTo(cust, streetPos)
@@ -1573,7 +1573,7 @@ function CustomerService.OnOrderResolved(
 		cust.resolvedPay = coinsAwarded
 		cust.resolvedManual = manual == true
 		cust.bubble.Text = if coinsAwarded ~= nil
-			then "😊 +" .. tostring(coinsAwarded) .. " 🪙"
+			then "😊 +" .. tostring(coinsAwarded) .. " coins"
 			else "😊"
 	end
 end
