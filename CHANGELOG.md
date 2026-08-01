@@ -5,6 +5,50 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-01 — C2: you are TOLD when a neighbour hits your café
+Owner: *"when a next door café owner does something bad to you, show a clear
+message"* and *"I like the smell bomb effect — make it visible in all the café you
+attacked."*
+
+**A loud alert banner** (`AlertController`) now slides down from the top edge
+naming the neighbour and what they did — "aloulouba1 hit your café — smell bomb!"
+/ "Your café reeks — 1 customer walked out!". Being robbed is the moment the
+social loop is supposed to land, and a corner toast was far too easy to miss. It
+sits at DisplayOrder 30, above the modals: an attack outranks whatever panel you
+have open. It is pinned to the TOP EDGE, never the centre, and spans the width on
+a phone so the text can't truncate. All three hostile actions use it — theft,
+smell bomb and poaching.
+
+**The smell bomb now fills the whole café it was thrown into.** A single puff read
+as a local effect and could be missed entirely from the far side of the room; new
+`Fx.smellCloud` lays a 3×3 grid of vapour sources across the victim's interior,
+on top of the existing puff under the caster's feet (which is what identifies the
+thrower). The grid is deliberately coarse rather than one source per cell, because
+every emitter replicates to every client.
+
+Verified in Studio (self-bomb temporarily allowed in Studio's in-memory DataModel
+only — disk untouched, reverted after): **10 vapour sources** spawned, spread
+**36 studs in X and 68 in Z** — the whole 72×72 interior — and the banner rendered
+`visible=true` at y=96 with the attacker, action and detail all correct.
+
+### Change — 2026-08-01 — C3: the street leaderboard is bigger and faces the road
+It was a small 8×4 board tucked 16 studs off to one side, facing *across* the
+street — easy to walk past and never read. It is now **20×10 (2.5× the size)**,
+stands **beside the fountain at the plaza centre**, and is turned **90° so its
+faces point along the boulevard**: you read it head-on walking up the street
+instead of edge-on.
+
+**Both faces carry the ranking**, so it reads from either end of the street rather
+than having a blank back — `LeaderboardService` now rewrites every
+`LeaderboardText` it finds instead of just the first.
+
+The 🏆 and 🥇🥈🥉 emoji were rendering as tofu boxes in Roblox's UI font (the same
+bug as the coin in C1), so the medals are now "1st / 2nd / 3rd".
+
+Verified in Studio: board measures 20 × 10 at (217, 7.5, −30) — **13 studs from
+the fountain** at (204, −30) — yaw 90°, spanning z −40→−20 which sits inside the
+road (z −42→−18). Both `SurfaceGui`s show the live ranking.
+
 ### Change — 2026-08-01 — C1: the customisation menus show what you are buying
 Owner feedback: *"the menu is ugly — for floor, window, façade etc don't show only
 a text, show also the photo generated next to each item to show what that item

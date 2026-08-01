@@ -26,6 +26,7 @@ local Remotes = require(Shared.Network.Remotes)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local EconomyConfig = require(Shared.Config.Economy)
 local Recipes = require(Shared.Config.Recipes)
+local World = require(Shared.Config.World)
 local Grid = require(Shared.Utilities.Grid)
 local Log = require(Shared.Utilities.Log)
 
@@ -57,6 +58,20 @@ local METHODS: { [string]: boolean } =
 
 local function tell(player: Player, kind: string, text: string?)
 	Remotes.event("Notify"):FireClient(player, { kind = kind, text = text })
+end
+
+-- Tell a VICTIM they were just hit, loudly (owner request 2026-08-01: "when a
+-- neighbour café owner does something bad to you, show a CLEAR message"). A
+-- toast was too easy to miss — being robbed is the moment the social loop is
+-- supposed to land, so it gets its own alert banner on the client, naming who
+-- did it and what they did.
+local function attacked(victim: Player, attacker: Player, action: string, detail: string)
+	Remotes.event("Notify"):FireClient(victim, {
+		kind = "attacked",
+		attacker = attacker.DisplayName,
+		action = action,
+		text = detail,
+	})
 end
 
 -- Proximity: 0 while inside the café, grows outside (copied from SocialService so
@@ -200,22 +215,31 @@ local function handleSmellBomb(player: Player, p: any)
 	data.smellBombs = math.max(0, (tonumber(data.smellBombs) or 1) - 1)
 	DataService:Push(player)
 
-	-- Under the CASTER, not the café: the offset cancels Fx's own +1.5 lift so the
-	-- vapour billows around the thrower's feet.
+	-- Under the CASTER, so it is obvious who threw it: the offset cancels Fx's
+	-- own +1.5 lift so the vapour billows around the thrower's feet.
 	local character = player.Character
 	local hrp = character and character:FindFirstChild("HumanoidRootPart")
 	local at = if hrp and hrp:IsA("BasePart")
 		then hrp.Position - Vector3.new(0, 3, 0)
 		else origin.Position
 	Fx.smellVapour(at, Mischief.bombVapourSeconds)
+	-- ...and through the WHOLE victim's café, so the attack is unmissable from
+	-- anywhere in the room rather than one puff by the door (owner request).
+	local ownerData = DataService:GetProfile(owner)
+	local tier = if ownerData
+		then math.max(0, math.floor(tonumber(ownerData.expansionTier) or 0))
+		else 0
+	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+	Fx.smellCloud(
+		origin,
+		Grid.PLOT_WIDTH * Grid.CELL_SIZE,
+		depthCells * Grid.CELL_SIZE,
+		Mischief.bombVapourSeconds
+	)
 
 	local many = if fled == 1 then "1 customer" else tostring(fled) .. " customers"
-	tell(player, "mischief_done", "💨 Smell bomb! " .. many .. " fled their café.")
-	tell(
-		owner,
-		"mischief_hit",
-		player.DisplayName .. " set off a smell bomb — your café emptied! 💨"
-	)
+	tell(player, "mischief_done", "Smell bomb! " .. many .. " fled their café.")
+	attacked(owner, player, "smell bomb", "Your café reeks - " .. many .. " walked out!")
 	if AnalyticsService then
 		AnalyticsService:Track(player, "smell_bomb_used", { owner = ownerUserId, fled = fled })
 	end
@@ -298,8 +322,8 @@ local function handleLure(player: Player, p: any, method: string)
 	noteStolen(ownerUserId)
 	Fx.smellVapour(origin.Position, Mischief.vapourSeconds)
 
-	tell(player, "mischief_done", "You charmed a customer over to your café! 😈")
-	tell(owner, "mischief_hit", player.DisplayName .. " lured a customer away! 💨")
+	tell(player, "mischief_done", "You charmed a customer over to your café!")
+	attacked(owner, player, "poaching", "They charmed one of your customers away!")
 	if AnalyticsService then
 		AnalyticsService:Track(player, "mischief_lure", { method = method, owner = ownerUserId })
 	end
@@ -414,14 +438,10 @@ local function handleSteal(player: Player, p: any)
 	tell(
 		player,
 		"steal_done",
-		"You pocketed " .. dish .. " from " .. hit.owner.DisplayName .. "'s café! 🫳"
+		"You pocketed " .. dish .. " from " .. hit.owner.DisplayName .. "'s café!"
 	)
 	-- The victim is told WHO — naming the thief is the point of the mechanic.
-	tell(
-		hit.owner,
-		"steal_hit",
-		player.DisplayName .. " stole " .. dish .. " from your café! 😾"
-	)
+	attacked(hit.owner, player, "theft", "They took " .. dish .. " straight off your shelf!")
 	if AnalyticsService then
 		AnalyticsService:Track(
 			player,

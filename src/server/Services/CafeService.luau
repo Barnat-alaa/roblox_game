@@ -1195,45 +1195,59 @@ local function buildPlaza(parent: Instance)
 		bush.Shape = Enum.PartType.Ball
 	end
 
+	-- THE STREET LEADERBOARD (owner request 2026-08-01: "make it bigger and change
+	-- its direction, put it in front of / at the back of the fountain, in the
+	-- middle of the road"). It was a small 8×4 board tucked 16 studs off to one
+	-- side, facing across the street — easy to walk past and never read.
+	--
+	-- Now it is 2.5× the size, stands right beside the fountain at the plaza
+	-- centre (so it IS in the middle of the road), and is turned 90° so its faces
+	-- point ALONG the boulevard: you read it head-on as you walk up the street
+	-- instead of edge-on. Both faces carry the ranking, so it reads from either
+	-- end of the street rather than having a blank back.
+	local BOARD_W, BOARD_H = 20, 10
+	local boardX = midX + 13 -- just past the fountain; the plaza disc is r=15
+	local legTop = 2.5
 	local board = makePart(
 		"NeighbourhoodBoard",
-		Vector3.new(8, 4, 0.4),
-		CFrame.new(midX, 3.4, plazaZ - 16) * CFrame.Angles(0, math.rad(180), 0),
+		Vector3.new(BOARD_W, BOARD_H, 0.6),
+		CFrame.new(boardX, legTop + BOARD_H / 2, plazaZ) * CFrame.Angles(0, math.rad(90), 0),
 		Color3.fromRGB(120, 90, 70),
 		folder,
 		Enum.Material.Wood
 	)
-	makePart(
-		"BoardLegL",
-		Vector3.new(0.5, 3.4, 0.5),
-		CFrame.new(midX - 3.5, 1.7, plazaZ - 16),
-		Color3.fromRGB(100, 75, 58),
-		folder,
-		Enum.Material.Wood
-	)
-	makePart(
-		"BoardLegR",
-		Vector3.new(0.5, 3.4, 0.5),
-		CFrame.new(midX + 3.5, 1.7, plazaZ - 16),
-		Color3.fromRGB(100, 75, 58),
-		folder,
-		Enum.Material.Wood
-	)
-	local gui = Instance.new("SurfaceGui")
-	gui.Face = Enum.NormalId.Front
-	gui.CanvasSize = Vector2.new(800, 400)
-	gui.Parent = board
-	local text = Instance.new("TextLabel")
-	text.Name = "LeaderboardText" -- LeaderboardService rewrites this with the live ranking
-	text.Size = UDim2.fromScale(1, 1)
-	text.BackgroundTransparency = 1
-	text.Font = Enum.Font.GothamBold
-	text.TextScaled = true
-	text.TextColor3 = Color3.fromRGB(255, 246, 232)
-	text.TextYAlignment = Enum.TextYAlignment.Top
-	text.Text = "🏆 CAFÉ LEADERBOARD\nRanking the street by Buzz…"
-	text.TextWrapped = true
-	text.Parent = gui
+	-- Rotated 90°, the board's width runs along world Z, so the legs sit either
+	-- side of the plaza centre on that axis.
+	for _, legZ in { plazaZ - BOARD_W / 2 + 2, plazaZ + BOARD_W / 2 - 2 } do
+		makePart(
+			"BoardLeg",
+			Vector3.new(0.8, legTop, 0.8),
+			CFrame.new(boardX, legTop / 2, legZ),
+			Color3.fromRGB(100, 75, 58),
+			folder,
+			Enum.Material.Wood
+		)
+	end
+
+	-- One ranking per face. LeaderboardService rewrites every LeaderboardText it
+	-- finds, so adding the second face needs no change there beyond the loop.
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = face
+		gui.CanvasSize = Vector2.new(1000, 500)
+		gui.Parent = board
+		local text = Instance.new("TextLabel")
+		text.Name = "LeaderboardText"
+		text.Size = UDim2.fromScale(1, 1)
+		text.BackgroundTransparency = 1
+		text.Font = Enum.Font.GothamBold
+		text.TextScaled = true
+		text.TextColor3 = Color3.fromRGB(255, 246, 232)
+		text.TextYAlignment = Enum.TextYAlignment.Top
+		text.Text = "CAFÉ LEADERBOARD\nRanking the street by Buzz…"
+		text.TextWrapped = true
+		text.Parent = gui
+	end
 
 	-- Clients read this to detect "player reached the plaza" (tutorial).
 	workspace:SetAttribute("PlazaCenter", centre)
