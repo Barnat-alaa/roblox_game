@@ -306,8 +306,9 @@ local function updateDock()
 		ui.dock.Size = UDim2.fromOffset(math.clamp(132 + #active * 62, 226, 344), 56)
 	end
 	local slotCount = math.max(1, #active)
+	local maxSlots = if phone then Theme.Hud.StockDockPhone.Slots else #dockSlots
 	for index, slot in dockSlots do
-		local id = active[index]
+		local id = if index <= maxSlots then active[index] else nil
 		slot.frame.Visible = id ~= nil
 		slot.frame.Size = if phone
 			then UDim2.new(1, 0, 0, Theme.Hud.StockDockPhone.SlotHeight - 4)
@@ -844,9 +845,23 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	ui.slotsLayout.FillDirection = if phone
 		then Enum.FillDirection.Vertical
 		else Enum.FillDirection.Horizontal
-	ui.dockHeader.Size = UDim2.new(1, -8, 0, if compact then 18 else 25)
-	ui.slots.Position = UDim2.fromOffset(5, if compact then 20 else 30)
-	ui.slots.Size = UDim2.new(1, -10, 1, if compact then -24 else -35)
+	local spec = Theme.Hud.StockDockPhone
+	if phone then
+		-- Two rows: the status line, then a full-width PANTRY button under it.
+		ui.dockHeader.Size = UDim2.new(1, -8, 0, 18)
+		ui.pantryButton.Size = UDim2.new(1, -10, 0, 22)
+		ui.pantryButton.Position = UDim2.fromOffset(5, 20)
+		ui.pantryButton.TextSize = 11
+		ui.slots.Position = UDim2.fromOffset(5, spec.Header)
+		ui.slots.Size = UDim2.new(1, -10, 1, -spec.Header - 4)
+	else
+		ui.dockHeader.Size = UDim2.new(1, -8, 0, if compact then 18 else 25)
+		ui.pantryButton.Size = UDim2.fromOffset(82, 22)
+		ui.pantryButton.Position = UDim2.new(1, -84, 0, 0)
+		ui.pantryButton.TextSize = 9
+		ui.slots.Position = UDim2.fromOffset(5, if compact then 20 else 30)
+		ui.slots.Size = UDim2.new(1, -10, 1, if compact then -24 else -35)
+	end
 	for _, slot in dockSlots do
 		slot.state.Visible = not compact
 		slot.name.TextSize = if compact then 9 else 10
@@ -930,6 +945,9 @@ function InventoryController.Start(_self: any)
 	)
 	pantry.Position = UDim2.new(1, -84, 0, 0)
 	pantry.TextSize = 9
+	pantry.Parent = dock -- its own row on a phone; applyResponsive places it
+	pantry.ZIndex = 4
+	ui.pantryButton = pantry
 	pantry.Activated:Connect(function()
 		openDrawer()
 	end)

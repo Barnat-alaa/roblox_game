@@ -102,8 +102,9 @@ local function buildTouchControls()
 	end)
 	gui.Parent = player:WaitForChild("PlayerGui")
 
-	-- Touch only: a mouse has Q/E and the scroll wheel already.
-	local touchOnly = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+	-- Always visible now (owner 2026-08-01: "make the arrows that control the
+	-- camera always visible"). They were touch-only, which meant they vanished on
+	-- anything with a mouse — including, confusingly, Studio playtests.
 
 	-- A chevron drawn from two bars rather than a glyph, so it can never land on
 	-- a font without the character (the coin-emoji lesson).
@@ -112,8 +113,6 @@ local function buildTouchControls()
 		button.Name = name
 		button.Text = ""
 		button.AutoButtonColor = false
-		button.Visible = touchOnly
-		button.AnchorPoint = Vector2.new(if onLeft then 0 else 1, 0.5)
 		button.BackgroundColor3 = Theme.Colors.Espresso
 		button.BackgroundTransparency = 0.55 -- transparent, as asked
 		button.Size = UDim2.fromOffset(Theme.Hud.TouchTarget, Theme.Hud.TouchTarget)
@@ -145,12 +144,52 @@ local function buildTouchControls()
 		rotate(-1)
 	end)
 
-	ResponsiveLayout.watch(function(_mode, viewport)
-		-- Extreme edges, at thumb height: a touch below centre, where a hand
-		-- holding a phone actually rests.
-		local y = math.floor(viewport.Y * 0.62)
-		left.Position = UDim2.new(0, Theme.Hud.EdgeMargin, 0, y)
-		right.Position = UDim2.new(1, -Theme.Hud.EdgeMargin, 0, y)
+	ResponsiveLayout.watch(function(mode, viewport)
+		-- FLANKING THE ACTION DOCK, at its own height.
+		--
+		-- On a phone the left edge is full from top to bottom — tutorial card,
+		-- stat pills, then the pantry — so there is no free band there, and an
+		-- earlier attempt to hug the left edge put the arrow straight on top of
+		-- the pantry. The one strip guaranteed to be clear is the bottom band
+		-- either side of the action dock: hudLayout has already positioned that
+		-- dock clear of the pantry on one side and the rail on the other, so
+		-- deriving the arrows from it inherits both clearances for free.
+		local layout = ResponsiveLayout.hudLayout(mode, viewport)
+		local size = Theme.Hud.TouchTarget
+		local dockLeft = (viewport.X - layout.dockWidth) / 2 + layout.dockOffsetX
+		local dockRight = dockLeft + layout.dockWidth
+		local y = viewport.Y - layout.dockBottom - layout.dockPlate / 2
+
+		-- The left arrow wants the gap between the pantry and the dock, the right
+		-- one the gap between the dock and the rail. Measure both before placing
+		-- either: on a small screen one or other gap is narrower than a touch
+		-- target (560 wide leaves 44px on the right, gone once you allow a
+		-- margin), and half a pair beside the dock looks like a bug.
+		local pantryRight = Theme.Hud.EdgeMargin + layout.stockWidth
+		local railLeft = viewport.X - Theme.Hud.EdgeMargin - layout.railPlate
+		local fitsLeft = dockLeft - 8 - size >= pantryRight + 4
+		local fitsRight = dockRight + 8 + size <= railLeft - 4
+
+		left.AnchorPoint = Vector2.new(1, 0.5)
+		right.AnchorPoint = Vector2.new(0, 0.5)
+		if fitsLeft and fitsRight then
+			left.Position = UDim2.new(0, dockLeft - 8, 0, math.floor(y))
+			right.Position = UDim2.new(0, dockRight + 8, 0, math.floor(y))
+		else
+			-- No room either side. Move the pair into the band directly ABOVE the
+			-- dock, starting from the dock's own left edge: that x is already clear
+			-- of the pantry (hudLayout guarantees it) and nowhere near the rail,
+			-- and the band is empty on every viewport because the dock is the
+			-- bottom-most thing on screen.
+			-- On a portrait phone the dock is wider than the space beside the
+			-- pantry and starts underneath it, so take whichever edge is further
+			-- right rather than trusting the dock alone.
+			local ax = math.floor(math.max(dockLeft, pantryRight + 4))
+			local ay = math.floor(y - layout.dockPlate / 2 - 6 - size / 2)
+			left.AnchorPoint = Vector2.new(0, 0.5)
+			left.Position = UDim2.new(0, ax, 0, ay)
+			right.Position = UDim2.new(0, ax + size + 8, 0, ay)
+		end
 	end)
 end
 

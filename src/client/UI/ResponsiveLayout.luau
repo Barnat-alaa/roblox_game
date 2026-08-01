@@ -49,7 +49,7 @@ function ResponsiveLayout.stockDockSize(mode: Mode, viewport: Vector2): (number,
 		-- only 56 tall, which is what pinned the action dock up off the bottom
 		-- edge and left it floating in the middle of the screen.
 		local spec = Theme.Hud.StockDockPhone
-		return spec.Width, spec.Header + 4 * spec.SlotHeight
+		return spec.Width, spec.Header + spec.Slots * spec.SlotHeight
 	elseif mode == "Compact" then
 		return math.min(344, viewport.X - 120), Theme.Hud.StockDockHeight.Compact
 	end

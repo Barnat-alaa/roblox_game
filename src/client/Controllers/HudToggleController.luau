@@ -111,10 +111,22 @@ function HudToggleController.Start(_self: any)
 		applyState()
 	end)
 
-	-- Sits on the right edge, ABOVE the rail's vertical run so it never covers a
-	-- rail button; the rail is centred, so the upper third is clear.
-	ResponsiveLayout.watch(function(_mode, viewport)
-		button.Position = UDim2.new(1, -Theme.Hud.EdgeMargin, 0, math.floor(viewport.Y * 0.2))
+	-- Right edge, BELOW the gift and VIP pills that own the extreme top-right and
+	-- ABOVE the rail's vertical run, so it covers neither. 20% of the height put
+	-- it straight through the pills.
+	ResponsiveLayout.watch(function(mode, viewport)
+		local layout = ResponsiveLayout.hudLayout(mode, viewport)
+		local pillsBottom = 36 + 32 + 8 -- VIP pill top + its height + a gap
+		local railTop = layout.railTopFromTop or (viewport.Y - layout.railHeight) / 2
+		-- On a short screen the rail starts ABOVE where the pills end, so there is
+		-- no gap between them and clamping to [pillsBottom, railTop] would invert
+		-- its bounds — math.clamp ERRORS when max < min. Fall back to sitting
+		-- directly under the pills, which is always on-screen.
+		local lo = pillsBottom + 22
+		local hi = railTop - 22
+		local y = if hi >= lo then math.clamp((pillsBottom + railTop) / 2, lo, hi) else lo
+		button.Position =
+			UDim2.new(1, -Theme.Hud.EdgeMargin, 0, math.floor(math.min(y, viewport.Y - 30)))
 	end)
 
 	-- Re-assert on respawn: these ScreenGuis have ResetOnSpawn = false, but the
