@@ -36,7 +36,9 @@ purely from what was visible in the image.
 
 ## 3. State — everything below is MERGED to `main`, CI-green
 
-**22 PRs merged this session (#45–#66).** Headlines:
+**Every PR from #45 onward shipped this session** (a running count goes stale
+the moment you open another one — `gh pr list --state merged` is the truth).
+Headlines:
 
 | Area | What shipped |
 | --- | --- |
@@ -49,7 +51,7 @@ purely from what was visible in the image.
 
 ## 4. ⚠️ NOT PUBLISHED — this is the biggest gap
 
-**None of the 22 PRs are live.** The DEV place still runs pre-session code. The
+**None of it is live.** The DEV place still runs pre-session code. The
 owner runs `./scripts/publish.ps1` with their own Open Cloud key — **never handle
 that key yourself**. Until then:
 
