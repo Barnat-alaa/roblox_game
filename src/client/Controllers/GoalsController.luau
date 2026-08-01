@@ -98,19 +98,15 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	if not panel then
 		return
 	end
-	if mode == "Phone" then
-		panel.AnchorPoint = Vector2.new(0.5, 1)
-		panel.Position = UDim2.new(0.5, 0, 1, -8)
-		panel.Size = UDim2.new(1, -16, 0.72, 0)
-	elseif mode == "Compact" then
-		panel.AnchorPoint = Vector2.new(1, 0.5)
-		panel.Position = UDim2.new(1, -8, 0.5, 0)
-		panel.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.41, 316, 350), viewport.Y - 16)
-	else
-		panel.AnchorPoint = Vector2.new(0.5, 0.5)
-		panel.Position = UDim2.fromScale(0.5, 0.5)
-		panel.Size = UDim2.fromOffset(430, 420)
-	end
+	ResponsiveLayout.dockPanel(panel, mode, viewport, {
+		side = "right",
+		desktopWidth = 430,
+		desktopHeight = 420,
+		compactFraction = 0.41,
+		compactMin = 316,
+		compactMax = 350,
+		phoneHeightScale = 0.72,
+	})
 end
 
 function GoalsController.Start(_self: any)

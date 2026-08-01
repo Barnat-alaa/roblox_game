@@ -68,19 +68,15 @@ local function buildPicker()
 	ui.list = list
 
 	ResponsiveLayout.watch(function(mode, viewport)
-		if mode == "Phone" then
-			panel.AnchorPoint = Vector2.new(0.5, 1)
-			panel.Position = UDim2.new(0.5, 0, 1, -8)
-			panel.Size = UDim2.new(1, -16, 0.68, 0)
-		elseif mode == "Compact" then
-			panel.AnchorPoint = Vector2.new(1, 0.5)
-			panel.Position = UDim2.new(1, -8, 0.5, 0)
-			panel.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.43, 326, 360), viewport.Y - 16)
-		else
-			panel.AnchorPoint = Vector2.new(0.5, 0.5)
-			panel.Position = UDim2.fromScale(0.5, 0.5)
-			panel.Size = UDim2.fromOffset(440, 480)
-		end
+		ResponsiveLayout.dockPanel(panel, mode, viewport, {
+			side = "right",
+			desktopWidth = 440,
+			desktopHeight = 480,
+			compactFraction = 0.43,
+			compactMin = 326,
+			compactMax = 360,
+			phoneHeightScale = 0.68,
+		})
 	end)
 end
 

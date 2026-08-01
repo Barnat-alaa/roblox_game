@@ -4,7 +4,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Graphics = require(ReplicatedStorage.Shared.Config.Graphics)
+local UserInputService = game:GetService("UserInputService")
+
 local Theme = require(script.Parent.Theme)
+
+-- Resolved once: a phone/tablet has no mouse, and that is what decides whether
+-- buttons need the bigger finger-sized minimum.
+local TOUCH_ONLY = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 
 local Components = {}
 
@@ -152,7 +158,16 @@ function Components.Button(
 ): TextButton
 	local button = Instance.new("TextButton")
 	button.AutoButtonColor = false
-	button.Size = size or UDim2.fromOffset(120, 44)
+	-- Touch-target floor. On a touch device every button is lifted to at least
+	-- Theme.Hud.TouchTarget tall (44px — the size Apple and Google both publish
+	-- as the floor for a reliable finger press). Doing it here rather than in
+	-- forty call sites means no button can ship under the minimum, and desktop
+	-- keeps its tighter, denser layout untouched.
+	local requested = size or UDim2.fromOffset(120, 44)
+	if TOUCH_ONLY and requested.Y.Scale == 0 and requested.Y.Offset < Theme.Hud.TouchTarget then
+		requested = UDim2.new(requested.X.Scale, requested.X.Offset, 0, Theme.Hud.TouchTarget)
+	end
+	button.Size = requested
 	button.BackgroundColor3 = color
 	button.TextColor3 = Theme.Colors.White
 	button.Font = Theme.Font.Bold

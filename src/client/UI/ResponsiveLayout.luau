@@ -212,36 +212,68 @@ function ResponsiveLayout.topInset(): number
 	return if ok and inset then math.max(inset.Y, 36) else 36
 end
 
-function ResponsiveLayout.panelSize(desktopWidth: number, desktopHeight: number): UDim2
-	if ResponsiveLayout.isPhone() then
-		-- A bottom sheet, not a full-screen takeover: leaving the top third of
-		-- the screen showing the café is what keeps a phone playable while a
-		-- panel is open.
-		return UDim2.new(1, -2 * Theme.Hud.EdgeMargin, 0.62, 0)
+-- ————— panel docking —————
+--
+-- Every modal used to carry its own three-branch layout, and every one of them
+-- ended the same way: centred on Desktop (`fromScale(0.5, 0.5)`). That is what
+-- put the menus in the middle of the screen. One helper now owns all three
+-- breakpoints so a panel cannot drift back to the centre, and so a fix here
+-- reaches all of them.
+--
+--   Phone   — bottom sheet. It leaves the top of the screen showing the café,
+--             which is what keeps the game playable one-handed while a panel is
+--             open, and it puts the content under the thumb.
+--   Compact — a full-height column on `side`.
+--   Desktop — the SAME column, just at the panel's natural width. This is the
+--             behaviour change: the café stays visible beside the panel instead
+--             of being covered by it.
+--
+-- `side` keeps each panel where players already expect it: Build has always
+-- opened on the left, everything else on the right.
+export type DockOptions = {
+	side: ("left" | "right")?,
+	desktopWidth: number,
+	desktopHeight: number,
+	compactFraction: number?,
+	compactMin: number?,
+	compactMax: number?,
+	phoneHeightScale: number?,
+}
+
+function ResponsiveLayout.dockPanel(
+	panel: GuiObject,
+	mode: Mode,
+	viewport: Vector2,
+	opts: DockOptions
+)
+	local margin = Theme.Hud.EdgeMargin
+	local onLeft = opts.side == "left"
+
+	if mode == "Phone" then
+		panel.AnchorPoint = Vector2.new(0.5, 1)
+		panel.Position = UDim2.new(0.5, 0, 1, -margin)
+		panel.Size = UDim2.new(1, -2 * margin, opts.phoneHeightScale or 0.68, 0)
+		return
 	end
-	local viewport = ResponsiveLayout.viewport()
-	return UDim2.fromOffset(
-		math.min(desktopWidth, viewport.X - 24),
-		math.min(desktopHeight, viewport.Y - ResponsiveLayout.topInset() - 24)
+
+	-- Full-height column, kept clear of Roblox's own topbar at the top.
+	local inset = ResponsiveLayout.topInset()
+	local height = math.max(200, viewport.Y - inset - 2 * margin)
+	local width = if mode == "Compact"
+		then math.clamp(
+			viewport.X * (opts.compactFraction or 0.44),
+			opts.compactMin or 320,
+			opts.compactMax or 400
+		)
+		else math.min(opts.desktopWidth, viewport.X - 2 * margin)
+
+	panel.AnchorPoint = Vector2.new(if onLeft then 0 else 1, 0)
+	panel.Position =
+		UDim2.new(if onLeft then 0 else 1, if onLeft then margin else -margin, 0, inset + margin)
+	panel.Size = UDim2.fromOffset(
+		width,
+		math.min(if mode == "Compact" then height else opts.desktopHeight, height)
 	)
-end
-
--- Panels dock to an EDGE rather than the middle of the screen (owner rule
--- 2026-08-01: "be sure every item is in the extreme top, bottom and left so they
--- are not in the center of the screen"). Phone gets a bottom sheet; anything
--- larger gets a left-hand column, which also leaves the café itself visible
--- beside the panel instead of behind it.
-function ResponsiveLayout.panelPosition(_desktopX: number?): UDim2
-	if ResponsiveLayout.isPhone() then
-		return UDim2.new(0.5, 0, 1, -Theme.Hud.EdgeMargin)
-	end
-	return UDim2.new(0, Theme.Hud.EdgeMargin, 0, ResponsiveLayout.topInset() + Theme.Hud.EdgeMargin)
-end
-
--- The anchor that goes with panelPosition, so callers cannot pair a left-edge
--- position with a centred anchor and land the panel half off-screen.
-function ResponsiveLayout.panelAnchor(): Vector2
-	return if ResponsiveLayout.isPhone() then Vector2.new(0.5, 1) else Vector2.new(0, 0)
 end
 
 function ResponsiveLayout.watch(callback: (Mode, Vector2) -> ()): RBXScriptConnection?
