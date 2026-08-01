@@ -137,6 +137,11 @@ local Theme = {
 			ValueTextSize = { Desktop = 15, Phone = 13 },
 		},
 		StockDockHeight = { Desktop = 78, Compact = 56 },
+		-- On a phone the stock dock turns VERTICAL: a narrow column of stacked
+		-- dish slots instead of a wide, short strip (owner 2026-08-01: "make the
+		-- pantry and production less wide and more length"). Narrow is the point —
+		-- it frees the whole bottom edge for the six menu buttons.
+		StockDockPhone = { Width = 132, SlotHeight = 34, Header = 26 },
 		EdgeMargin = 10,
 	},
 	-- Catalogue item pictures (shop rows, build rows, cookbook cards).

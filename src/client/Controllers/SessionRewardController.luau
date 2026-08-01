@@ -53,7 +53,7 @@ local function build()
 	frame.Name = "GiftTimer"
 	frame.AnchorPoint = Vector2.new(1, 0)
 	frame.Position = UDim2.new(1, -10, 0, 8)
-	frame.Size = UDim2.fromOffset(196, 38)
+	frame.Size = UDim2.fromOffset(132, 28)
 	frame.BackgroundColor3 = Theme.Colors.Honey
 	frame.BackgroundTransparency = 0.06
 	frame.Visible = false
@@ -64,13 +64,13 @@ local function build()
 	local text = Instance.new("TextLabel")
 	text.Name = "TimerLabel"
 	text.BackgroundTransparency = 1
-	text.Size = UDim2.new(1, -16, 1, 0)
-	text.Position = UDim2.fromOffset(12, 0)
+	text.Size = UDim2.new(1, -12, 1, 0)
+	text.Position = UDim2.fromOffset(9, 0)
 	text.TextXAlignment = Enum.TextXAlignment.Left
 	text.Font = Theme.Font.Bold
-	text.TextSize = 15
+	text.TextSize = 12
 	text.TextColor3 = Theme.Colors.Espresso
-	text.Text = "🎁  Next gift"
+	text.Text = "Next gift"
 	text.Parent = frame
 
 	pill = frame
@@ -88,12 +88,12 @@ local function celebrate()
 	local grow = TweenService:Create(
 		frame,
 		TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Size = UDim2.fromOffset(214, 42) }
+		{ Size = UDim2.fromOffset(146, 32) }
 	)
 	grow:Play()
 	grow.Completed:Once(function()
 		if pill == frame then
-			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(196, 38) })
+			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(132, 28) })
 				:Play()
 		end
 	end)
@@ -129,9 +129,9 @@ function SessionRewardController.Start(_self: any)
 			if nextAt and label then
 				local remaining = (nextAt :: number) - workspace:GetServerTimeNow()
 				if remaining > 0.5 then
-					(label :: TextLabel).Text = "🎁  Next gift · " .. fmt(remaining)
+					(label :: TextLabel).Text = "Gift " .. fmt(remaining)
 				else
-					(label :: TextLabel).Text = "🎁  Gift incoming…"
+					(label :: TextLabel).Text = "Gift ready!"
 				end
 			end
 			task.wait(0.25)
