@@ -20,6 +20,7 @@ local Mastery = require(Shared.Utilities.Mastery)
 local InventoryMath = require(Shared.Utilities.InventoryMath)
 local IngredientMath = require(Shared.Utilities.IngredientMath)
 local Grid = require(Shared.Utilities.Grid)
+local World = require(Shared.Config.World)
 local Remotes = require(Shared.Network.Remotes)
 local Log = require(Shared.Utilities.Log)
 local Types = require(Shared.Types)
@@ -644,20 +645,91 @@ end
 -- re-labels the counts. Shelves live in the furniture folder so they persist across
 -- stock changes and rebuild for the next owner on claim.
 
-local SHELF_WALL_X = Grid.PLOT_WIDTH * Grid.CELL_SIZE -- far interior wall (local X)
-local SHELF_COLS = 7 -- shelves per row before a second row stacks above
-local SHELF_START_Z = 22 -- first column sits just behind the front kitchen
-local SHELF_STEP_Z = 10 -- stud gap between columns along the wall (bigger shelves)
+local SHELF_START_Z = 22 -- first shelf sits just behind the front kitchen
+local SHELF_STEP = 10 -- stud gap between shelf centres along a wall
+local SHELF_WIDTH = 4.4 -- a shelf's footprint ALONG the wall (the ledge's long axis)
+local SHELF_CORNER = 6 -- keep this much clear of each corner
 local SHELF_ROW_Y = { 3.4, 7.6 } -- lower + upper row heights (ceiling is 12)
 local SHELF_DEPTH = 3.0 -- how far the ledge reaches out from the wall
 local SHELF_PROP_SCALE = 1.8 -- enlarge the dish prop so the food reads clearly
 
-local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: number): Model
-	local col = slot % SHELF_COLS
-	local row = math.floor(slot / SHELF_COLS)
-	local y = SHELF_ROW_Y[math.min(row + 1, #SHELF_ROW_Y)]
-	local z = SHELF_START_Z + col * SHELF_STEP_Z
-	local ledgeX = SHELF_WALL_X - SHELF_DEPTH / 2 - 0.5
+-- A place a shelf may stand: a CFrame ON the wall surface whose +X points INTO
+-- the room, plus the row height. Building every shelf relative to this is what
+-- lets the same code hang one on a wall running along Z and one running along X.
+type ShelfSlot = { cf: CFrame, y: number }
+
+-- Every legal shelf position, in fill order.
+--
+-- This used to be a flat `slot % 7` down one wall, which walked straight through
+-- the back wall and out into the garden once a café had six or more dishes
+-- (owner screenshot, 2026-08-02: "when I have a lot of items the shelves are
+-- shown outside the cafe"). Seven columns at a 10-stud step reach z=82, and the
+-- starting interior is only 72 deep — the count was a guess that never consulted
+-- the room. Now the room decides: shelves are laid out until the wall runs out,
+-- then continue on the next wall ("if the first wall isn't enough use other wall,
+-- the back door").
+--
+-- Fill order is the whole LOWER row across both walls before anything goes up
+-- high, so a café with a handful of dishes reads at eye height.
+local function shelfSlots(origin: CFrame, width: number, depth: number): { ShelfSlot }
+	local walls: { CFrame } = {}
+
+	-- Wall 1 — the right-hand interior wall, from just behind the front kitchen
+	-- to the back corner. Rotated 180° so +X faces back across the room.
+	local z = SHELF_START_Z
+	while z <= depth - SHELF_CORNER do
+		table.insert(walls, origin * CFrame.new(width, 0, z) * CFrame.Angles(0, math.pi, 0))
+		z += SHELF_STEP
+	end
+
+	-- Wall 2 — the back wall, the one with the garden gate. Its gate gap and its
+	-- two windows are skipped rather than buried: a shelf over a window would
+	-- look like a bug even though it is inside the café.
+	local blocked = {
+		{ width / 2 - World.gateWidth / 2, width / 2 + World.gateWidth / 2 },
+		{ width * 0.22 - 2.5, width * 0.22 + 2.5 },
+		{ width * 0.78 - 2.5, width * 0.78 + 2.5 },
+	}
+	local x = SHELF_CORNER
+	while x <= width - SHELF_CORNER do
+		local clear = true
+		for _, span in blocked do
+			if x + SHELF_WIDTH / 2 > span[1] and x - SHELF_WIDTH / 2 < span[2] then
+				clear = false
+				break
+			end
+		end
+		if clear then
+			table.insert(walls, origin * CFrame.new(x, 0, depth) * CFrame.Angles(0, math.pi / 2, 0))
+		end
+		x += SHELF_STEP
+	end
+
+	local slots: { ShelfSlot } = {}
+	for _, rowY in SHELF_ROW_Y do
+		for _, cf in walls do
+			table.insert(slots, { cf = cf, y = rowY })
+		end
+	end
+	return slots
+end
+
+-- Identifies WHERE a shelf currently stands, so a refresh can tell that the
+-- layout moved (an expansion, or a café still holding the old off-the-wall
+-- positions) and rebuild it there instead of leaving it outside.
+local function shelfKey(slot: ShelfSlot): string
+	local p = (slot.cf * CFrame.new(0, slot.y, 0)).Position
+	local _, ry = slot.cf:ToOrientation()
+	return string.format("%.1f|%.1f|%.1f|%.2f", p.X, p.Y, p.Z, ry)
+end
+
+local function buildShelf(recipe: Types.RecipeDefinition, slot: ShelfSlot): Model
+	-- Everything below is expressed in the SLOT's frame (+X into the room, +Z
+	-- along the wall), so one body of code serves both walls; the anchor's
+	-- rotation turns the parts to face the room.
+	local base = slot.cf
+	local y = slot.y
+	local ledgeOut = SHELF_DEPTH / 2 + 0.5
 
 	local shelf = Instance.new("Model")
 	shelf.Name = "Shelf_" .. recipe.id
@@ -672,7 +744,7 @@ local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: 
 	back.CanTouch = false
 	back.Color = Color3.fromRGB(224, 206, 176)
 	back.Material = Enum.Material.SmoothPlastic
-	back.CFrame = origin * CFrame.new(SHELF_WALL_X - 0.25, y + 1.4, z)
+	back.CFrame = base * CFrame.new(0.25, y + 1.4, 0)
 	back.Parent = shelf
 
 	local ledge = Instance.new("Part")
@@ -684,11 +756,11 @@ local function buildShelf(recipe: Types.RecipeDefinition, origin: CFrame, slot: 
 	ledge.CanTouch = false
 	ledge.Color = Color3.fromRGB(212, 151, 76)
 	ledge.Material = Enum.Material.Wood
-	ledge.CFrame = origin * CFrame.new(ledgeX, y, z)
+	ledge.CFrame = base * CFrame.new(ledgeOut, y, 0)
 	ledge.Parent = shelf
 
 	-- Permanent food "photo": the dish prop (enlarged), bottom-aligned on the ledge.
-	placeFoodMarker(shelf, origin * CFrame.new(ledgeX, y + 0.2, z), recipe, SHELF_PROP_SCALE)
+	placeFoodMarker(shelf, base * CFrame.new(ledgeOut, y + 0.2, 0), recipe, SHELF_PROP_SCALE)
 
 	-- Big, always-on-top label so the dish + quantity read clearly across the room.
 	local billboard = Instance.new("BillboardGui")
@@ -764,12 +836,36 @@ refreshFoodShelves = function(player: Player)
 		return a.id < b.id
 	end)
 
-	for _, recipe in unlocked do
+	-- The room the shelves have to fit inside, at this café's CURRENT expansion.
+	local tier = tonumber(data.expansionTier) or 0
+	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+	local slots = shelfSlots(origin, Grid.PLOT_WIDTH * Grid.CELL_SIZE, depthCells * Grid.CELL_SIZE)
+	if #unlocked > #slots then
+		-- Never silently place one outside: two dishes share the last slot and
+		-- this says so, rather than the wall quietly growing into the garden.
+		Log.warn(
+			string.format(
+				"[Kitchen] %d unlocked recipes but only %d shelf slots - add a wall or shrink the step",
+				#unlocked,
+				#slots
+			)
+		)
+	end
+
+	for index, recipe in unlocked do
+		local slot = slots[math.min(index, #slots)]
+		local key = shelfKey(slot)
 		local shelf = rack:FindFirstChild("Shelf_" .. recipe.id)
+		-- Rebuild if the layout moved under it. That is what heals a café still
+		-- holding shelves from the old fixed grid, and what re-flows them when
+		-- buying land pushes the back wall further out.
+		if shelf and shelf:GetAttribute("anchor") ~= key then
+			shelf:Destroy()
+			shelf = nil
+		end
 		if not shelf then
-			-- Slot = shelves already placed, so a new unlock takes the next free
-			-- spot and never shifts the existing ones.
-			shelf = buildShelf(recipe, origin, #rack:GetChildren())
+			shelf = buildShelf(recipe, slot)
+			shelf:SetAttribute("anchor", key)
 			shelf.Parent = rack
 		end
 		local count = math.floor(tonumber(kitchen.stock[recipe.id]) or 0)

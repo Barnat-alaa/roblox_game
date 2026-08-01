@@ -128,6 +128,7 @@ between the interior depth and `TOTAL_DEPTH`, then catalogue rows + a Garden tab
 | — | Dock overlapped the pantry on narrow screens | The "does it fit beside?" test used a looser threshold than the shift acting on it |
 | — | HUD toggle would ERROR on short screens | `math.clamp` with max < min, when the rail starts above where the pills end |
 | — | Appliances could never be moved | The move guard reused `IsCooking`, and the auto-production loop keeps a job on every appliance |
+| — | Wall shelves stood outside the café | Laid out `slot % 7` at a 10-stud step from z=22, reaching z=82 in a 72-deep room; the column count never consulted the room |
 | — | Camera arrows were invisible | They were touch-gated, so anything reporting a mouse (Studio, a laptop) hid them entirely |
 | — | Arrow fallback ran off a 560px screen | The narrow-screen branch offset from the dock without re-checking the rail or the screen edge |
 | — | Gift/VIP pills covered a rail button | The only two HUDs that never set `ScreenInsets`, so Roblox's default pushed them a topbar's height down the screen |

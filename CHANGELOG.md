@@ -5,6 +5,38 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-02 — wall shelves no longer run out of the café
+Owner screenshot: *"when I have a lot of items the shelves are shown outside the
+cafe… if the first wall isn't enough use other wall, the back door."*
+
+Shelves were laid out as `slot % 7` down one wall at a 10-stud step starting at
+z=22, so the seventh column sat at **z=82 in a room only 72 studs deep**. The
+column count was a guess that never consulted the room, so once a café unlocked
+six dishes the last two columns — four shelves across both rows — stood out in
+the garden.
+
+The room decides now. `shelfSlots` walks the right-hand wall until it runs out,
+then **continues along the back wall**, skipping the garden gate and both
+windows rather than burying them. The whole lower row fills across both walls
+before anything goes up high, so a café with a few dishes reads at eye height.
+Each shelf is built relative to its slot's CFrame (+X into the room) instead of
+absolute offsets, which is what lets one body of code hang a shelf on a wall
+running along Z and one running along X.
+
+Shelves also **rebuild when the layout moves under them**, keyed on an `anchor`
+attribute. That heals cafés still holding the old off-the-wall positions and
+re-flows everything when buying land pushes the back wall out.
+
+Capacity, measured against the real configs: **18 slots at the starting tier**
+(10 on the right wall, 8 on the back) for 14 recipes, 22 at tier 2, 28 at tier 3.
+If recipes ever outgrow that it now warns instead of silently walking outside.
+
+Verified live with all 14 recipes unlocked: every shelf inside the interior
+(x 68.5–71.5 on the right wall, z 68.5–71.5 on the back), every one facing into
+the room, **0 of 14 outside** — and clear of the gate, both back windows, and
+the trophy shelf.
+
+
 ### Fix — 2026-08-01 — the gift and VIP pills really are in the top-right now
 Owner, from the phone: *"the VIP and gift message, make it more at the top
 right — now it hides some parameters button."*
