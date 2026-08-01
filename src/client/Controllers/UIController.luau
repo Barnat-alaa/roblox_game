@@ -774,7 +774,6 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	if not ui.dock then
 		return
 	end
-	local phone = mode == "Phone"
 	local compact = mode ~= "Desktop"
 	local margin = Theme.Hud.EdgeMargin
 	local layout = ResponsiveLayout.hudLayout(mode :: ResponsiveLayout.Mode, viewport)
@@ -810,20 +809,15 @@ local function applyResponsive(mode: string, viewport: Vector2)
 		ui.rail.AnchorPoint = Vector2.new(1, 0.5)
 		ui.rail.Position = UDim2.new(1, -margin, 0.5, 0)
 	end
-	local shop = ui.shopPanel
-	if phone then
-		shop.AnchorPoint = Vector2.new(0.5, 1)
-		shop.Position = UDim2.new(0.5, 0, 1, -8)
-		shop.Size = UDim2.new(1, -16, 0.74, 0)
-	elseif compact then
-		shop.AnchorPoint = Vector2.new(1, 0.5)
-		shop.Position = UDim2.new(1, -8, 0.5, 0)
-		shop.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.43, 326, 360), viewport.Y - 16)
-	else
-		shop.AnchorPoint = Vector2.new(0.5, 0.5)
-		shop.Position = UDim2.new(1, -238, 0.5, 0)
-		shop.Size = UDim2.fromOffset(450, math.min(540, viewport.Y - 24))
-	end
+	ResponsiveLayout.dockPanel(ui.shopPanel, mode, viewport, {
+		side = "right",
+		desktopWidth = 450,
+		desktopHeight = 540,
+		compactFraction = 0.43,
+		compactMin = 326,
+		compactMax = 360,
+		phoneHeightScale = 0.74,
+	})
 	ui.serve.Size = if compact
 		then UDim2.fromOffset(142, layout.serveHeight)
 		else UDim2.fromOffset(170, layout.serveHeight)

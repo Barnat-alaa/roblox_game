@@ -821,7 +821,6 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	if not ui.dock then
 		return
 	end
-	local phone = mode == "Phone"
 	local compact = mode ~= "Desktop"
 	-- Shared formula: UIController stacks the stat pills directly above this
 	-- dock and lifts the centre action dock over it when they would collide.
@@ -849,20 +848,15 @@ local function applyResponsive(mode: string, viewport: Vector2)
 			row.priority.Position = UDim2.new(1, -60, 0, 70)
 		end
 	end
-	local drawer = ui.drawer
-	if phone then
-		drawer.AnchorPoint = Vector2.new(0.5, 1)
-		drawer.Position = UDim2.new(0.5, 0, 1, -8)
-		drawer.Size = UDim2.new(1, -16, 0.72, 0)
-	elseif compact then
-		drawer.AnchorPoint = Vector2.new(1, 0.5)
-		drawer.Position = UDim2.new(1, -8, 0.5, 0)
-		drawer.Size = UDim2.fromOffset(math.clamp(viewport.X * 0.44, 336, 368), viewport.Y - 16)
-	else
-		drawer.AnchorPoint = Vector2.new(0.5, 0.5)
-		drawer.Position = UDim2.new(1, -263, 0.5, 0)
-		drawer.Size = UDim2.fromOffset(500, math.min(590, viewport.Y - 24))
-	end
+	ResponsiveLayout.dockPanel(ui.drawer, mode, viewport, {
+		side = "right",
+		desktopWidth = 500,
+		desktopHeight = 590,
+		compactFraction = 0.44,
+		compactMin = 336,
+		compactMax = 368,
+		phoneHeightScale = 0.72,
+	})
 	if profile then
 		updateDock()
 	end

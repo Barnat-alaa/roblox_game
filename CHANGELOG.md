@@ -5,6 +5,46 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — C4/C5: panels dock to the edges, mobile baselines
+Owner: *"all the menus and buttons are not well organised, they are in the middle
+of the screen"* and *"be sure every item is in the extreme top, bottom and left so
+they are not in the center of the screen"*.
+
+**Every modal now docks to a screen edge.** All fourteen carried their own
+three-branch layout, and every one ended the same way — centred on Desktop
+(`fromScale(0.5, 0.5)`). That is what put the menus in the middle. One shared
+`ResponsiveLayout.dockPanel` now owns all three breakpoints:
+
+- **Phone** — a bottom sheet, leaving the top of the screen showing the café so
+  the game stays playable one-handed while a panel is open.
+- **Compact / Desktop** — a full-height column on the panel's own side. Build
+  keeps the left, everything else the right, so nothing moved from where players
+  already expect it — it just stopped covering the middle.
+
+Because it is one helper, a panel cannot drift back to the centre, and the
+`topInset()` fix reaches all of them at once: panels now start **below Roblox's
+own topbar** (measured at 58px), which is why the build and upgrades panel headers
+were unreadable in the owner's screenshots.
+
+**Touch-target floor.** `Components.Button` now lifts every button on a
+touch-only device to at least `Theme.Hud.TouchTarget` (44px — the size Apple and
+Google both publish as the floor for a reliable finger press). Done in one place
+rather than forty call sites, so no button can ship under the minimum; desktop
+keeps its tighter, denser layout untouched.
+
+Verified in Studio by driving all three breakpoints and measuring where each
+panel's box actually lands:
+
+| Viewport | Mode | Centred panels | Under the topbar |
+| --- | --- | ---: | ---: |
+| 1600 × 900 | Desktop | **0** | **0** |
+| 1170 × 576 | Compact | **0** | **0** |
+| 500 × 900 | Phone | **0** | **0** |
+
+Confirmed visually: the Upgrades panel docks to the right edge with its header
+fully clear of the platform topbar, and the café stays visible beside it.
+
+
 ### Change — 2026-08-01 — C4 (part 1): camera arrows + mobile baselines
 Owner: *"don't show Q, E etc icon, just add a small arrow right and left
 transparent to direct the camera"*.

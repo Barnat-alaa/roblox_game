@@ -133,6 +133,18 @@ local function buildStealPanel()
 
 	ui.stealPanel = panel
 	ui.stealList = list
+	-- Docked like every other modal instead of sitting in the middle of the view.
+	ResponsiveLayout.watch(function(mode, viewport)
+		ResponsiveLayout.dockPanel(panel, mode, viewport, {
+			side = "right",
+			desktopWidth = 320,
+			desktopHeight = 400,
+			compactFraction = 0.4,
+			compactMin = 300,
+			compactMax = 340,
+			phoneHeightScale = 0.6,
+		})
+	end)
 end
 
 local function openStealPicker()

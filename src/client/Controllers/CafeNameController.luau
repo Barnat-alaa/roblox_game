@@ -13,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
+local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local UIController = require(script.Parent.UIController)
 
@@ -26,8 +27,17 @@ local ui: { [string]: any } = {}
 local function buildPanel()
 	local panel = Components.Panel(UIController.modalRoot(), "CafeNamePanel")
 	panel.Size = UDim2.fromOffset(380, 240)
-	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.AnchorPoint = Vector2.new(0.5, 0.5)
+	ResponsiveLayout.watch(function(mode, viewport)
+		ResponsiveLayout.dockPanel(panel, mode, viewport, {
+			side = "right",
+			desktopWidth = 380,
+			desktopHeight = 240,
+			compactFraction = 0.4,
+			compactMin = 300,
+			compactMax = 380,
+			phoneHeightScale = 0.4,
+		})
+	end)
 	panel.Visible = false
 	local _, close = Components.PanelHeader(
 		panel,
