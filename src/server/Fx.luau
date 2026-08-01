@@ -147,6 +147,29 @@ function Fx.smellVapour(position: Vector3, seconds: number?)
 	end)
 end
 
+-- The smell bomb, felt across the WHOLE café it was thrown into (owner request
+-- 2026-08-01: "make it visible in all the café you attacked"). A single puff read
+-- as a local effect; the victim could miss it entirely from the far side of the
+-- room. This lays a grid of vapour sources over the interior so the place is
+-- visibly, obviously stinking.
+--
+-- `origin` is the plot CFrame; width/depth are the interior in studs. The grid is
+-- deliberately coarse — 3×3 sources, not one per cell — because every emitter
+-- replicates to every client, and nine cover a 72-stud room convincingly.
+function Fx.smellCloud(origin: CFrame, width: number, depth: number, seconds: number?)
+	local duration = seconds or 6
+	local steps = 3
+	for ix = 1, steps do
+		for iz = 1, steps do
+			local x = width * (ix / (steps + 1))
+			local z = depth * (iz / (steps + 1))
+			-- Slightly above head height so it hangs in the room rather than
+			-- pooling at the floor.
+			Fx.smellVapour((origin * CFrame.new(x, 1.5, z)).Position, duration)
+		end
+	end
+end
+
 -- A quick shower of little gold coins.
 function Fx.coinBurst(position: Vector3, count: number?)
 	for _ = 1, math.clamp(count or 6, 1, 10) do

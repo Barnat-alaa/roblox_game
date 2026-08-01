@@ -22,16 +22,27 @@ local KitchenService: any
 local REFRESH_SECONDS = 5
 local MAX_ROWS = 10 -- one per plot; the street holds World.plotCount
 
--- The plaza board's label (CafeService builds it as workspace.Plaza.<board>.<gui>).
-local function boardLabel(): TextLabel?
+-- EVERY label on the plaza board (CafeService builds it as
+-- workspace.Plaza.NeighbourhoodBoard.<gui>.LeaderboardText). The board is
+-- double-sided since 2026-08-01, so there is one label per face and both are
+-- rewritten together — a blank back would defeat the point of turning it to face
+-- along the street.
+local function boardLabels(): { TextLabel }
+	local labels: { TextLabel } = {}
 	local plaza = workspace:FindFirstChild("Plaza")
 	local board = plaza and plaza:FindFirstChild("NeighbourhoodBoard")
-	local gui = board and board:FindFirstChildOfClass("SurfaceGui")
-	local label = gui and gui:FindFirstChild("LeaderboardText")
-	if label and label:IsA("TextLabel") then
-		return label
+	if not board then
+		return labels
 	end
-	return nil
+	for _, gui in board:GetChildren() do
+		if gui:IsA("SurfaceGui") then
+			local label = gui:FindFirstChild("LeaderboardText")
+			if label and label:IsA("TextLabel") then
+				table.insert(labels, label)
+			end
+		end
+	end
+	return labels
 end
 
 local function ranking(): string
@@ -55,8 +66,8 @@ local function ranking(): string
 		return a.buzz > b.buzz
 	end)
 
-	local medals = { "🥇", "🥈", "🥉" }
-	local lines = { "🏆 CAFÉ LEADERBOARD — by Buzz" }
+	local medals = { "1st", "2nd", "3rd" }
+	local lines = { "CAFÉ LEADERBOARD — by Buzz" }
 	for i, r in rows do
 		if i > MAX_ROWS then
 			break
@@ -75,11 +86,13 @@ end
 function LeaderboardService.Start(_self: any)
 	task.spawn(function()
 		while true do
-			local label = boardLabel()
-			if label then
+			local labels = boardLabels()
+			if #labels > 0 then
 				local ok, text = pcall(ranking)
 				if ok then
-					label.Text = text
+					for _, label in labels do
+						label.Text = text
+					end
 				end
 			end
 			task.wait(REFRESH_SECONDS)
