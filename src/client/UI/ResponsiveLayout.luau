@@ -40,8 +40,16 @@ end
 -- centre action dock can lift above it instead of overlapping (phones make it
 -- nearly full-width). One formula, one place.
 function ResponsiveLayout.stockDockSize(mode: Mode, viewport: Vector2): (number, number)
-	if mode == "Phone" then
-		return math.max(260, viewport.X - 82), Theme.Hud.StockDockHeight.Compact
+	-- A landscape phone reports "Compact", not "Phone" (this module is
+	-- landscape-first), so the narrow column keys off the SHORT axis as well —
+	-- the same rule the rest of hudLayout uses. Without this, the device class
+	-- the owner actually plays on kept the wide strip.
+	if mode == "Phone" or viewport.Y < Theme.Hud.ShortViewport then
+		-- Narrow column, four slots tall. Was nearly the full screen width and
+		-- only 56 tall, which is what pinned the action dock up off the bottom
+		-- edge and left it floating in the middle of the screen.
+		local spec = Theme.Hud.StockDockPhone
+		return spec.Width, spec.Header + 4 * spec.SlotHeight
 	elseif mode == "Compact" then
 		return math.min(344, viewport.X - 120), Theme.Hud.StockDockHeight.Compact
 	end
@@ -103,7 +111,10 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	local chipsHeight = 3 * chipHeight + 2 * chipSpec.Gap
 
 	local dockPlate = if phoneSized then hud.DockPlate.Phone else hud.DockPlate.Desktop
-	local dockWidth = 5 * dockPlate + 4 * hud.DockGap
+	-- Six dock buttons (Build, Cookbook, Staff, Upgrades, Shop, Market). This
+	-- said 5 and was under-measuring the dock by a whole plate, which is part of
+	-- why it kept colliding with the left column.
+	local dockWidth = 6 * dockPlate + 5 * hud.DockGap
 	local dockLeft = (viewport.X - dockWidth) / 2
 
 	-- The bottom-left corner belongs to the always-visible stock dock, with the
@@ -111,9 +122,28 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	-- the bottom edge only when it clears that column; otherwise it floats just
 	-- above the stock dock.
 	local chipsBottom = margin + stockHeight + 8
-	local dockBottom = margin + labelBand
-	if dockLeft < margin + math.max(stockWidth, chipWidth) + 8 then
-		dockBottom = margin + stockHeight + 8 + labelBand
+	-- The caption band under each button is gone (names flash on tap now), so the
+	-- action dock can sit on the EXTREME bottom edge, which is where the owner
+	-- wants it and where a thumb naturally lands.
+	local dockBottom = if phoneSized then margin else margin + labelBand
+	local leftColumn = margin + math.max(stockWidth, chipWidth) + 8
+	-- Hoisted: the "can the dock sit beside the left column?" test and the shift
+	-- that acts on it MUST use the same threshold. They did not, so on a very
+	-- narrow screen the dock was told it fitted, then refused to shift, and ended
+	-- up overlapping the pantry.
+	local railGutter = viewport.X
+		- margin
+		- (if phoneSized then hud.RailPlate.Phone else hud.RailPlate.Desktop)
+	local fitsBesideColumn = leftColumn + dockWidth <= railGutter - 8
+	if dockLeft < leftColumn then
+		-- The left column is in the way. On a phone the stock dock is now a NARROW
+		-- tall strip, so sliding the dock right of it almost always works and is
+		-- much better than lifting it — lifting is what put the buttons in the
+		-- middle of the screen. Only stack vertically if the dock genuinely cannot
+		-- fit beside the column.
+		if not (phoneSized and fitsBesideColumn) then
+			dockBottom = margin + stockHeight + 8 + labelBand
+		end
 	end
 
 	-- If the dock still clips the pill column, slide it right out of the way
@@ -121,10 +151,10 @@ function ResponsiveLayout.hudLayout(mode: Mode, viewport: Vector2): HudLayout
 	-- often only a few pixels, and nudging the dock costs far less than
 	-- restacking the whole left column. Only when it cannot fit between the
 	-- pills and the rail do the pills move above the dock band instead.
-	local chipsRight = margin + chipWidth
-	local railGutter = viewport.X
-		- margin
-		- (if phoneSized then hud.RailPlate.Phone else hud.RailPlate.Desktop)
+	-- Clear the WHOLE left column, not just the pills. Since the phone stock dock
+	-- became a tall narrow strip it is the wider of the two, and measuring against
+	-- the pills alone left the dock overlapping it by ~20px.
+	local chipsRight = leftColumn
 	local dockOffsetX = 0
 	if dockLeft < chipsRight + 8 then
 		local shifted = chipsRight + 8

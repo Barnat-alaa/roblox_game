@@ -5,6 +5,45 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-01 — mobile HUD rearranged around a narrow pantry
+Owner, on the phone build: *"make the pantry and production less wide and more
+length… with that you liberate more space at the bottom so you can put at the
+extreme bottom all the 6 menu buttons. The introduction steps, put them on the
+left. And next gift and VIP information are ugly and too big."*
+
+**The pantry is now a narrow vertical column** on phones and any short viewport:
+132 wide with its dish slots stacked, instead of a strip spanning most of the
+screen. On a 844×390 landscape phone that is **16% of the width, down from 85%**.
+
+**That freed the bottom edge, and the six menu buttons now sit on it.** Two
+things had pinned them up into the middle: the caption band reserved under each
+button (gone — names flash on tap now) and the wide pantry. The dock is also six
+plates wide at last — the width maths said `5 * dockPlate` and had been
+under-measuring by a whole plate ever since Market was added, which is part of why
+it kept colliding with the left column.
+
+**The tutorial card is hard against the left edge.** It was indented 118px on
+touch to clear the old camera pad; that pad became two edge chevrons, so the
+indent was just wasted screen. It is also narrower and taller now, so it reads as
+a left-hand column rather than a banner across the top.
+
+**The gift and VIP pills are much smaller**: 196×38 → **132×28** and 196×44 →
+**132×32**, text 15 → 12, VIP portrait 34 → 24, and the labels trimmed to
+"Gift 14:33" / "VIP 4:47".
+
+Two ordering bugs surfaced while measuring and are fixed: the "can the dock sit
+beside the left column?" test used a looser threshold than the shift that acts on
+it, so on a narrow screen the dock was told it fitted, refused to shift, and
+overlapped the pantry; and the shift measured against the stat pills rather than
+the whole left column, which the taller pantry now dominates.
+
+Verified in Studio across real device classes — every phone and tablet-landscape
+size puts the dock on the **extreme bottom** with the pantry at **14–20%** of the
+width, and **0 of 5 layouts** have the dock clashing with the pantry, the rail, or
+the screen edge. Desktop keeps its wide pantry and lifted dock, where there is
+room for both.
+
+
 ### Change — 2026-08-01 — HUD declutter + a tap-to-hide tab (phone)
 Owner, with a phone screenshot: *"I still don't like all the menus and buttons,
 they take a lot of the screen… make smart decisions so the central screen stays

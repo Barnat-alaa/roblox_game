@@ -46,8 +46,8 @@ local function build()
 	local frame = Instance.new("Frame")
 	frame.Name = "VipTimer"
 	frame.AnchorPoint = Vector2.new(1, 0)
-	frame.Position = UDim2.new(1, -10, 0, 54)
-	frame.Size = UDim2.fromOffset(196, 44)
+	frame.Position = UDim2.new(1, -10, 0, 42)
+	frame.Size = UDim2.fromOffset(132, 32)
 	frame.BackgroundColor3 = Theme.Colors.Berry
 	frame.BackgroundTransparency = 0.06
 	frame.Visible = false
@@ -61,8 +61,8 @@ local function build()
 	image.Name = "Portrait"
 	image.BackgroundColor3 = Theme.Colors.White
 	image.BackgroundTransparency = 0.25
-	image.Size = UDim2.fromOffset(34, 34)
-	image.Position = UDim2.fromOffset(5, 5)
+	image.Size = UDim2.fromOffset(24, 24)
+	image.Position = UDim2.fromOffset(4, 4)
 	image.ScaleType = Enum.ScaleType.Fit
 	Components.Corner(image, UDim.new(1, 0))
 	image.Parent = frame
@@ -71,13 +71,13 @@ local function build()
 	local text = Instance.new("TextLabel")
 	text.Name = "TimerLabel"
 	text.BackgroundTransparency = 1
-	text.Size = UDim2.new(1, -52, 1, 0)
-	text.Position = UDim2.fromOffset(46, 0)
+	text.Size = UDim2.new(1, -36, 1, 0)
+	text.Position = UDim2.fromOffset(32, 0)
 	text.TextXAlignment = Enum.TextXAlignment.Left
 	text.Font = Theme.Font.Bold
-	text.TextSize = 15
+	text.TextSize = 12
 	text.TextColor3 = Theme.Colors.White
-	text.Text = "⭐  VIP event"
+	text.Text = "VIP event"
 	text.Parent = frame
 
 	pill = frame
@@ -94,12 +94,12 @@ local function celebrate()
 	local grow = TweenService:Create(
 		frame,
 		TweenInfo.new(0.16, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Size = UDim2.fromOffset(216, 50) }
+		{ Size = UDim2.fromOffset(146, 36) }
 	)
 	grow:Play()
 	grow.Completed:Once(function()
 		if pill == frame then
-			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(196, 44) })
+			TweenService:Create(frame, Theme.Motion.Settle, { Size = UDim2.fromOffset(132, 32) })
 				:Play()
 		end
 	end)
@@ -136,9 +136,9 @@ function VipEventController.Start(_self: any)
 			if nextAt and label then
 				local remaining = (nextAt :: number) - workspace:GetServerTimeNow()
 				if remaining > 0.5 then
-					(label :: TextLabel).Text = "⭐  VIP in " .. fmt(remaining)
+					(label :: TextLabel).Text = "VIP " .. fmt(remaining)
 				else
-					(label :: TextLabel).Text = "⭐  VIP incoming…"
+					(label :: TextLabel).Text = "VIP now!"
 				end
 			end
 			task.wait(0.25)

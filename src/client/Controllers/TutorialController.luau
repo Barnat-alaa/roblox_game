@@ -3,7 +3,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
@@ -117,10 +116,13 @@ function TutorialController.Start(_self: any)
 	-- Top-left (owner request). The camera pad used to own this corner on
 	-- desktop and the health bars sat under it; both have moved, so the card
 	-- gets the corner and the "?" bubble stays somewhere predictable.
-	local touch = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 	local function cardLeft(_mode: string): number
-		-- On touch the camera pad still occupies the left edge.
-		return if touch then 118 else 10
+		-- Hard against the left edge on every platform. This used to be pushed
+		-- 118px right on touch to clear the old camera pad — but that pad is gone
+		-- (the camera is two edge chevrons now), so the indent was just wasted
+		-- screen (owner 2026-08-01: "the introduction steps, put them on the left
+		-- of the screen and rearrange it").
+		return Theme.Hud.EdgeMargin
 	end
 	local function cardTop(_viewport: Vector2): number
 		-- Below Roblox's own top bar. These ScreenGuis span the whole screen
@@ -175,7 +177,7 @@ function TutorialController.Start(_self: any)
 		-- which is only tall enough for the compact height.
 		local short = viewport.Y < Theme.Hud.ShortViewport
 		if mode == "Phone" or short then
-			expandedSize = UDim2.fromOffset(math.min(viewport.X - cardLeft(mode) - 20, 300), 54)
+			expandedSize = UDim2.fromOffset(math.min(viewport.X - cardLeft(mode) - 20, 236), 62)
 			accent.Size = UDim2.fromOffset(7, 38)
 			accent.Position = UDim2.fromOffset(8, 8)
 			step.Position = UDim2.fromOffset(24, 4)

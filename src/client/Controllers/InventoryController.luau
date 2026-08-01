@@ -298,15 +298,20 @@ end
 local function updateDock()
 	local active = activeRecipeIds()
 	local compact = ResponsiveLayout.isCompact()
-	if compact then
+	local phone = ResponsiveLayout.isPhone()
+		or ResponsiveLayout.viewport().Y < Theme.Hud.ShortViewport
+	-- On a phone the dock is a fixed narrow COLUMN (applyResponsive owns its
+	-- size); only the wide horizontal strip re-widths itself with the slot count.
+	if compact and not phone then
 		ui.dock.Size = UDim2.fromOffset(math.clamp(132 + #active * 62, 226, 344), 56)
 	end
 	local slotCount = math.max(1, #active)
 	for index, slot in dockSlots do
 		local id = active[index]
 		slot.frame.Visible = id ~= nil
-		slot.frame.Size = if compact
-			then UDim2.new(1 / slotCount, -5, 1, 0)
+		slot.frame.Size = if phone
+			then UDim2.new(1, 0, 0, Theme.Hud.StockDockPhone.SlotHeight - 4)
+			elseif compact then UDim2.new(1 / slotCount, -5, 1, 0)
 			else UDim2.new(0.25, -5, 1, 0)
 		if id then
 			local recipe = Recipes[id]
@@ -491,6 +496,8 @@ end
 local function makeDockSlot(parent: Instance, order: number)
 	local frame = Instance.new("Frame")
 	frame.Name = "Slot" .. tostring(order)
+	-- Sized by applyResponsive: a quarter-width column when the dock runs
+	-- horizontally (desktop), a full-width row when it runs vertically (phone).
 	frame.Size = UDim2.new(0.25, -5, 1, 0)
 	frame.BackgroundColor3 = Theme.Colors.Paper
 	frame.LayoutOrder = order
@@ -829,6 +836,14 @@ local function applyResponsive(mode: string, viewport: Vector2)
 	ui.dock.Size = UDim2.fromOffset(stockWidth, stockHeight)
 	ui.dock.Position = UDim2.new(0, 10, 1, -10)
 	ui.dock.AnchorPoint = Vector2.new(0, 1)
+	-- Same rule as stockDockSize: a landscape phone reports "Compact", so the
+	-- vertical column keys off the short axis too.
+	local phone = mode == "Phone" or viewport.Y < Theme.Hud.ShortViewport
+	-- Vertical on a phone (a narrow column of stacked dishes), horizontal
+	-- everywhere else (a wide strip).
+	ui.slotsLayout.FillDirection = if phone
+		then Enum.FillDirection.Vertical
+		else Enum.FillDirection.Horizontal
 	ui.dockHeader.Size = UDim2.new(1, -8, 0, if compact then 18 else 25)
 	ui.slots.Position = UDim2.fromOffset(5, if compact then 20 else 30)
 	ui.slots.Size = UDim2.new(1, -10, 1, if compact then -24 else -35)
@@ -931,6 +946,7 @@ function InventoryController.Start(_self: any)
 	slotsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	slotsLayout.Parent = slots
 	ui.slots = slots
+	ui.slotsLayout = slotsLayout
 	for index = 1, 4 do
 		makeDockSlot(slots, index)
 	end
