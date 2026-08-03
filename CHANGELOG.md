@@ -5,6 +5,42 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-03 — demand is capped to the kitchen; Buzz now decays
+Economy fixes #4 and #5 from `docs/ECONOMY_ANALYSIS.md`.
+
+**Demand no longer ignores the kitchen.** A new café produced 15 servings an
+hour against 77 arrivals, so **62 customers stormed out ANGRY every hour** — and
+a fully-maxed café still lost 35/hour. The café was in visible failure from the
+first minute of a save to the last. Demand is now capped at what the production
+plan can actually deliver × `demandHeadroom` (1.2), so there is always slightly
+more custom than you can serve — pressure, not carnage. A floor of 0.35/min
+keeps a café from ever being dead.
+
+**Buzz decays 0.9% per minute.** As a pure accumulator it could only ever be
+"always max" or "always zero": with demand capped, `served − 2×walkouts` is
+positive at any headroom below 2.0, so every café drifts to the cap; at headroom
+2.0 half the room storms out and we are back to the bug. With decay, Buzz
+settles where serving balances the bleed, making it a live readout of throughput.
+
+Simulated over 60 hours of play:
+
+| | Before | After |
+|---|---|---|
+| Angry walkouts, hour 1 | 81 | **21** |
+| Angry walkouts, maxed café | 35 | **14** |
+| Total walkouts over 60h | 2,201 | **752** |
+| Customers served / arrived | 62% | **83%** |
+| Buzz at a maxed café | 31/105 (hard ceiling) | **78/105** |
+
+Buzz now climbs 2 → 17 → 49 → 78 as the café grows, instead of sitting at 0 for
+fourteen hours and then pinning at 31. It stops short of 105 on purpose: the
+production increases in fixes #6/#7 are what should carry it the rest of the way.
+
+Verified live in Studio: decay measured 7.9671 → 7.9135 over 45s against a
+predicted 7.9135. Both behaviours sit behind `Kitchen.useDemandCap` and
+`buzzDecayPerMinute = 0`.
+
+
 ### Change — 2026-08-03 — beach shoreline, open sea and sun on the water
 Owner: *"make the horizon better looking and make the edges of the map look like
 a beach that leads to an infinite sea… add a sun with reflections so the game

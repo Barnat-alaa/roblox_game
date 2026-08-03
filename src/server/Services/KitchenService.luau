@@ -906,6 +906,51 @@ function KitchenService.GetBuzz(_self: any, player: Player): number
 	return if data then (tonumber(data.buzz) or Kitchen.buzzStart) else Kitchen.buzzStart
 end
 
+-- Servings per minute this café can ACTUALLY deliver, from the production plan:
+-- each role's hourly work-minute budget spent on the recipes the player queued,
+-- and only those it can really make (unlocked, on the menu, with an appliance for
+-- them). This is the number demand is capped against — see Config/Kitchen.
+function KitchenService.GetPlannedProductionPerMinute(_self: any, data: Types.PlayerData): number
+	local plan = data.productionPlan
+	if typeof(plan) ~= "table" or not StaffService then
+		return 0
+	end
+	local kitchen = kitchenOf(data)
+	local appliances: { [string]: boolean } = {}
+	for _, placed in data.placedFurniture do
+		appliances[placed.catalogId] = true
+	end
+
+	local servingsPerHour = 0
+	for role, byRecipe in plan do
+		if typeof(byRecipe) == "table" and StaffService:HasRole(data, role) then
+			local budget = StaffService:GetWorkMinutesPerHour(data, role)
+			local used = 0
+			for recipeId, target in byRecipe do
+				local recipe = Recipes[recipeId]
+				local minutes = recipe and tonumber(recipe.productionMinutes)
+				if
+					minutes
+					and minutes > 0
+					and data.unlockedRecipes[recipeId] == true
+					and kitchen.menu[recipeId] == true
+					and appliances[recipe.applianceId] == true
+				then
+					-- The plan is already validated against the budget, but a stale
+					-- plan (a staffer demoted, an appliance sold) can outrun it —
+					-- so clamp to what the remaining budget can really deliver.
+					local wanted = math.max(0, math.floor(tonumber(target) or 0))
+					local affordable =
+						math.max(0, math.min(wanted, math.floor((budget - used) / minutes)))
+					used += affordable * minutes
+					servingsPerHour += affordable
+				end
+			end
+		end
+	end
+	return servingsPerHour / 60
+end
+
 function KitchenService.GetDemandRate(_self: any, player: Player): number
 	local data = DataService:GetProfile(player)
 	if not data then
@@ -926,7 +971,15 @@ function KitchenService.GetDemandRate(_self: any, player: Player): number
 	local capacity = if waiterCount > 0
 		then waiterCount * Kitchen.spawnRatePerWaiterCap
 		else Kitchen.spawnRateNoWaiterCap
-	return math.clamp(rate, 0.2, math.max(0.2, capacity))
+	-- Never invite more custom than the kitchen can serve, plus a little headroom.
+	-- Without this the café is in permanent angry-walkout failure at every stage
+	-- of the game (docs/ECONOMY_ANALYSIS.md §2.6).
+	if Kitchen.useDemandCap then
+		local canServe = KitchenService:GetPlannedProductionPerMinute(data)
+		capacity = math.min(capacity, canServe * Kitchen.demandHeadroom)
+	end
+	local floorRate = if Kitchen.useDemandCap then Kitchen.spawnRateMinPerMinute else 0.2
+	return math.clamp(rate, floorRate, math.max(floorRate, capacity))
 end
 
 -- ————— consumption (CustomerService calls this at the window) —————
@@ -1315,10 +1368,32 @@ end
 
 -- ————— timers loop: keep stove billboards fresh, restore after rejoin —————
 
+-- Buzz bleeds away at a fixed FRACTION per minute, so it settles where the
+-- café's serving rate balances the decay instead of ratcheting to the cap and
+-- staying there. See the long note in Config/Kitchen: without this Buzz is not a
+-- measure of anything. Applied on the 1s tick, hence /60.
+local function decayBuzz(player: Player, data: Types.PlayerData)
+	if Kitchen.buzzDecayPerMinute <= 0 then
+		return
+	end
+	local buzz = tonumber(data.buzz) or Kitchen.buzzStart
+	if buzz <= 0 then
+		return
+	end
+	local after = math.max(0, buzz - buzz * (Kitchen.buzzDecayPerMinute / 60))
+	data.buzz = after
+	-- Only repaint the sign when the DISPLAYED integer moves; this runs every
+	-- second for every player and the sign is a world part.
+	if math.floor(after) ~= math.floor(buzz) then
+		CafeService:SetSignBuzz(player, after)
+	end
+end
+
 local function tickTimers()
 	for _, player in Players:GetPlayers() do
 		local data = DataService:GetProfile(player)
 		if data then
+			decayBuzz(player, data)
 			local kitchen = kitchenOf(data)
 			for instanceId, cook in kitchen.cooks do
 				local recipe = Recipes[cook.recipeId]
