@@ -162,6 +162,17 @@ export type StockPack = {
 	robuxPrice: number,
 }
 
+-- Bulk now actually pays (economy fix #9, docs/ECONOMY_ANALYSIS.md §5.1). Every
+-- SKU used to sit in a 5.4-6.7 coins-per-Robux band, so there was no reason to
+-- pick the 99 R$ pack over three 29 R$ ones — the bulk tiers were decoration.
+-- The Robux PRICES are fixed on the Creator Dashboard, so the AMOUNTS moved
+-- instead: +5 / +12 / +24 makes the top pack ~39% more units per Robux than the
+-- smallest, which is the ordinary reason a player trades up.
+--
+-- ⚠️ OWNER ACTION: rename products 3612636928 and 3612637043 on the dashboard to
+-- "Stock Pack +12" and "Stock Pack +24". The IDs and prices are unchanged so
+-- purchases keep working, but the NATIVE Roblox prompt shows the DASHBOARD name
+-- and would otherwise under-promise what the pack actually grants.
 Products.stockPacks = {
 	{
 		amount = 5,
@@ -173,18 +184,18 @@ Products.stockPacks = {
 		robuxPrice = 29,
 	},
 	{
-		amount = 10,
-		name = "Stock Pack +10",
-		blurb = "Instantly adds 10 of every dish you have unlocked",
+		amount = 12,
+		name = "Stock Pack +12",
+		blurb = "Instantly adds 12 of every dish you have unlocked",
 		icon = "🏭",
 		coinCost = 1700,
 		productId = 3612636928,
 		robuxPrice = 59,
 	},
 	{
-		amount = 20,
-		name = "Stock Pack +20",
-		blurb = "Instantly adds 20 of every dish you have unlocked",
+		amount = 24,
+		name = "Stock Pack +24",
+		blurb = "Instantly adds 24 of every dish you have unlocked",
 		icon = "🚀",
 		coinCost = 3000,
 		productId = 3612637043,

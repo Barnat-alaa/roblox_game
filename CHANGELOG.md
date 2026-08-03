@@ -5,6 +5,43 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-03 — playing now beats idling; bulk packs actually pay
+Economy fixes #8 and #9.
+
+**#8 — session gifts cut from 338 to 110 coins/hour.** They averaged 84.5 coins
+every 15 minutes, which was **half of all lifetime income** and effectively
+*100% of it in the first hour*. A player idling on the plaza earned nearly as
+much as one running a café well — the wrong lesson for a management game. Now
+~27 a gift. Over 60 hours gifts fall from **50% to 16%** of income, and the café
+overtakes them by hour 10.
+
+| Hour | Café/h | Gifts/h | Gifts as % |
+| --- | --- | --- | --- |
+| 5 | 54 | 110 | 67% |
+| 10 | 158 | 110 | 41% |
+| 20 | 487 | 110 | 18% |
+| 40+ | 806 | 110 | **12%** |
+
+Level 10 now lands around hour 25 rather than 18–20, which is the intended
+direction.
+
+**#9 — stock packs re-tiered so bulk is worth buying.** Every SKU sat in a
+5.4–6.7 coins-per-Robux band, so there was no reason to pick the 99 R$ pack over
+three 29 R$ ones. Robux prices are fixed on the Creator Dashboard, so the
+**amounts** moved instead:
+
+| Pack | Robux | Units per R$ | vs the +5 |
+| --- | --- | --- | --- |
+| +5 | 29 | 0.172 | — |
+| **+12** (was +10) | 59 | 0.203 | **+18%** |
+| **+24** (was +20) | 99 | 0.242 | **+41%** |
+
+⚠️ **Owner action:** rename products `3612636928` → "Stock Pack +12" and
+`3612637043` → "Stock Pack +24" on the dashboard. IDs and prices are unchanged
+so purchases keep working, but the native Roblox prompt shows the *dashboard*
+name and would otherwise under-promise what the pack grants.
+
+
 ### Feature — 2026-08-03 — buy a bigger café (economy fix #7)
 The expansion tiers existed in `World.interiorDepthTiers` and were honoured
 everywhere — placement clamps, surface painting, the wall-fade rule — but there
