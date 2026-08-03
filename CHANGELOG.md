@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-03 — the production forecast now models the game that runs
+Economy fix #1 (`docs/ECONOMY_ANALYSIS.md` §2.1/§2.2). `OperationsMath`
+forecast `machines × productionYield × 60 / productionTime` — the LEGACY
+scheduler, disabled since `Kitchen.useProductionPlan` went true. The live path
+makes ONE serving per job costing `productionMinutes` of the role's hourly
+work-minute budget.
+
+| Recipe | Menu said | Truth (L1) | Overstated |
+| --- | --- | --- | --- |
+| Espresso | 180/h | 15/h | 12× |
+| Muffin | 144/h | 6/h | 24× |
+| Quiche | 120/h | 3.8/h | **32×** |
+
+The ingredient line was wrong too: it multiplied a PER-SERVING cost by
+`batchCostMultiplier` and divided by yield, understating Quiche by 62%.
+
+Both are now computed from the plan: each role spends one shared hourly budget
+across the recipes queued to it, and ingredients are read per serving straight
+off the recipe. **That sharing is the biggest thing the old forecast missed — it
+reported every recipe as if it had the whole kitchen to itself.**
+
+Signature unchanged, so all three callers are untouched; `batchCostMultiplier`
+is accepted and ignored (the plan model charges no coins per batch). Tests
+updated to the real numbers plus a new case covering budget sharing — **88
+passed, 1 failed** in Studio, the failure being the pre-existing `Graphics.spec`
+Coin/Coins mismatch.
+
+
 ### Change — 2026-08-03 — demand is capped to the kitchen; Buzz now decays
 Economy fixes #4 and #5 from `docs/ECONOMY_ANALYSIS.md`.
 
