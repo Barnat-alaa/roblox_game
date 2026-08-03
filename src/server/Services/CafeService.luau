@@ -24,6 +24,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
+local Scenery = require(Shared.Config.Scenery)
 local Graphics = require(Shared.Config.Graphics)
 local World = require(Shared.Config.World)
 local Products = require(Shared.Config.Products)
@@ -819,7 +820,9 @@ local function applyLighting()
 	Lighting.ColorShift_Top = Color3.fromRGB(255, 226, 190)
 	Lighting.ColorShift_Bottom = Color3.fromRGB(215, 205, 190)
 	Lighting.EnvironmentDiffuseScale = 0.75
-	Lighting.EnvironmentSpecularScale = 0.75
+	-- Full specular: this is half of "sun with reflections". It is what lets the
+	-- water, glass and polished props pick the sun up instead of staying matte.
+	Lighting.EnvironmentSpecularScale = 1
 
 	-- A real natural sky with a prominent sun. Instance.new("Sky") carries Roblox's
 	-- default cloud cubemap (no external asset id needed); we just keep the
@@ -829,7 +832,7 @@ local function applyLighting()
 		sky = Instance.new("Sky")
 	end
 	sky.CelestialBodiesShown = true
-	sky.SunAngularSize = 19
+	sky.SunAngularSize = Scenery.sunAngularSize
 	sky.MoonAngularSize = 11
 	sky.Parent = Lighting
 
@@ -849,26 +852,41 @@ local function applyLighting()
 	clouds.Color = Color3.fromRGB(255, 251, 244)
 	clouds.Parent = terrain
 
-	-- Light, cool-ish haze — depth without flattening the sky into a golden fog.
+	-- Haze IS the horizon. Without enough of it the sea ends in a hard straight
+	-- line wherever the water part stops; with it, the far water dissolves into
+	-- the sky and the eye reads open ocean.
 	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-	atmo.Density = 0.22
+	atmo.Density = Scenery.atmosphereDensity
 	atmo.Offset = 0.1
-	atmo.Color = Color3.fromRGB(200, 210, 225)
-	atmo.Decay = Color3.fromRGB(150, 145, 140)
-	atmo.Glare = 0.12
-	atmo.Haze = 0.45
+	atmo.Color = Scenery.atmosphereColor
+	atmo.Decay = Scenery.atmosphereDecay
+	atmo.Glare = Scenery.atmosphereGlare
+	atmo.Haze = Scenery.atmosphereHaze
 	atmo.Parent = Lighting
 
 	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
-	bloom.Intensity = 0.5
-	bloom.Size = 30
-	bloom.Threshold = 1.3
+	bloom.Intensity = Scenery.bloomIntensity
+	bloom.Size = Scenery.bloomSize
+	-- A lower threshold lets the highlight ON THE WATER bloom, not just the sun
+	-- disc itself — that glow is what sells the reflection.
+	bloom.Threshold = Scenery.bloomThreshold
 	bloom.Parent = Lighting
 
 	local rays = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
-	rays.Intensity = 0.12
-	rays.Spread = 0.7
+	rays.Intensity = Scenery.sunRaysIntensity
+	rays.Spread = Scenery.sunRaysSpread
 	rays.Parent = Lighting
+
+	-- A light grade for overall vibrancy. Deliberately gentle: heavy saturation
+	-- makes skin and the café's warm woods look radioactive, and the HUD sits on
+	-- top of all of it.
+	local grade = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+		or Instance.new("ColorCorrectionEffect")
+	grade.Saturation = Scenery.saturation
+	grade.Contrast = Scenery.contrast
+	grade.Brightness = 0
+	grade.TintColor = Scenery.tint
+	grade.Parent = Lighting
 end
 
 -- ————— outdoor surface heights —————
@@ -899,6 +917,53 @@ local PAVING_THICKNESS = 0.9
 -- it (owner request 2026-07-26). Land sits a kerb-height below the paving; the
 -- sea lower still, so the street reads as a sunny coastal island under the open
 -- sky.
+-- Lay a flat plane across `Scenery.seaHalfExtent` out of tiles.
+--
+-- A Roblox part is capped at 2048 studs per axis and the engine clamps SILENTLY,
+-- so the sea that was declared 8000 wide had really been a 2048 square with a
+-- hard edge sitting just past the island. Tiles abut exactly — no overlap, which
+-- would double-blend the transparent water, and no gap, which would show a
+-- hairline of sky through it.
+local function tilePlane(
+	folder: Instance,
+	name: string,
+	centreX: number,
+	centreZ: number,
+	y: number,
+	thickness: number,
+	colour: Color3,
+	material: Enum.Material,
+	decorate: (BasePart) -> ()
+)
+	local span = Scenery.seaTileSpan
+	local perAxis = math.ceil((2 * Scenery.seaHalfExtent) / span)
+	-- ODD, always. With an even count the tiles straddle the middle and a seam
+	-- lands exactly on the island — which then runs away from the camera and
+	-- draws a hairline straight to the horizon across the whole sea. It is the
+	-- most visible artifact in the scene and it is purely an off-by-one in the
+	-- tiling. An odd count centres a tile on the island instead, so the nearest
+	-- seam is half a span out, past the shelf and well into the haze.
+	if perAxis % 2 == 0 then
+		perAxis += 1
+	end
+	local first = -((perAxis - 1) / 2) * span
+	for ix = 0, perAxis - 1 do
+		for iz = 0, perAxis - 1 do
+			local part = makePart(
+				name,
+				Vector3.new(span, thickness, span),
+				CFrame.new(centreX + first + ix * span, y, centreZ + first + iz * span),
+				colour,
+				folder,
+				material
+			)
+			part.CanCollide = false
+			part.CanQuery = false
+			decorate(part)
+		end
+	end
+end
+
 local function buildGroundAndSea(parent: Instance)
 	local old = parent:FindFirstChild("Landscape")
 	if old then
@@ -925,17 +990,126 @@ local function buildGroundAndSea(parent: Instance)
 	land.CanCollide = true
 	land.CanQuery = false
 
-	local sea = makePart(
-		"Sea",
-		Vector3.new(8000, 1, 8000),
-		CFrame.new(centreX, -2.6, centreZ),
-		Color3.fromRGB(64, 132, 172),
+	-- ————— shoreline —————
+	-- The island's own edge, turned to sand. Inside the boundary walls, so this
+	-- band is the last thing you can actually walk on before the water. It sits
+	-- 0.06 ABOVE the grass: coplanar would z-fight, and the P1 grass-through-road
+	-- bug is the standing reminder that the ORDER of top faces is what renders.
+	local halfW = land.Size.X / 2
+	local halfD = land.Size.Z / 2
+	if Scenery.beachEnabled then
+		local apron = Scenery.apronWidth
+		local apronTop = GRASS_TOP + 0.06
+		for _, band in
+			{
+				{ Vector3.new(land.Size.X, 1, apron), Vector3.new(0, 0, -halfD + apron / 2) },
+				{ Vector3.new(land.Size.X, 1, apron), Vector3.new(0, 0, halfD - apron / 2) },
+				{
+					Vector3.new(apron, 1, land.Size.Z - 2 * apron),
+					Vector3.new(-halfW + apron / 2, 0, 0),
+				},
+				{
+					Vector3.new(apron, 1, land.Size.Z - 2 * apron),
+					Vector3.new(halfW - apron / 2, 0, 0),
+				},
+			}
+		do
+			local strip = makePart(
+				"BeachApron",
+				band[1],
+				CFrame.new(centreX + band[2].X, apronTop - 0.5, centreZ + band[2].Z),
+				Scenery.sandDry,
+				folder,
+				Enum.Material.Sand
+			)
+			-- The grass underneath carries collision; a 0.06 lip would only make
+			-- the character hitch as it stepped on and off.
+			strip.CanCollide = false
+			strip.CanQuery = false
+		end
+
+		-- Rings stepping down and outward. Both the width and the drop grow, which
+		-- is what gives fine steps in the shallows and a shelf that falls away
+		-- fast further out — see Config/Scenery for the shape.
+		local ringHalfW, ringHalfD = halfW, halfD
+		local top = GRASS_TOP
+		local width, drop = Scenery.firstRingWidth, Scenery.firstRingDrop
+		for _ = 1, Scenery.ringCount do
+			top -= drop
+			local colour = if top > Scenery.seaLevel then Scenery.sandDry else Scenery.sandWet
+			local oW, oD = ringHalfW + width, ringHalfD + width
+			local y = top - Scenery.ringThickness / 2
+			-- North and south span the FULL outer width so each corner is covered
+			-- exactly once; east and west fill only the span between them.
+			for _, piece in
+				{
+					{
+						Vector3.new(2 * oW, Scenery.ringThickness, width),
+						Vector3.new(0, 0, -ringHalfD - width / 2),
+					},
+					{
+						Vector3.new(2 * oW, Scenery.ringThickness, width),
+						Vector3.new(0, 0, ringHalfD + width / 2),
+					},
+					{
+						Vector3.new(width, Scenery.ringThickness, 2 * ringHalfD),
+						Vector3.new(-ringHalfW - width / 2, 0, 0),
+					},
+					{
+						Vector3.new(width, Scenery.ringThickness, 2 * ringHalfD),
+						Vector3.new(ringHalfW + width / 2, 0, 0),
+					},
+				}
+			do
+				local slab = makePart(
+					"Shore",
+					piece[1],
+					CFrame.new(centreX + piece[2].X, y, centreZ + piece[2].Z),
+					colour,
+					folder,
+					Enum.Material.Sand
+				)
+				slab.CanCollide = false
+				slab.CanQuery = false
+			end
+			ringHalfW, ringHalfD = oW, oD
+			width *= Scenery.ringWidthGrowth
+			drop *= Scenery.ringDropGrowth
+		end
+
+		-- The last ring's depth simply continues as the seabed, so the shelf never
+		-- ends in a cliff. Everything beyond is open water reading this colour
+		-- through the surface, which is what makes distance look deep.
+		tilePlane(
+			folder,
+			"Seabed",
+			centreX,
+			centreZ,
+			top - 2,
+			4,
+			Scenery.seabedColor,
+			Enum.Material.Sand,
+			function(_) end
+		)
+	end
+
+	-- See-through on purpose: the sand and seabed beneath are what colour the
+	-- water, so shallows read turquoise and open water reads deep. Reflectance is
+	-- what puts the sun ON the water.
+	tilePlane(
 		folder,
-		Enum.Material.Water
+		"Sea",
+		centreX,
+		centreZ,
+		Scenery.seaLevel,
+		1,
+		Scenery.seaColor,
+		Enum.Material.Water,
+		function(part)
+			part.Transparency = Scenery.seaTransparency
+			part.Reflectance = Scenery.seaReflectance
+		end
 	)
-	sea.CanCollide = false
-	sea.CanQuery = false
-	sea.Transparency = 0.08
 end
 
 -- A real two-lane boulevard with tiled sidewalks. The Store road images are

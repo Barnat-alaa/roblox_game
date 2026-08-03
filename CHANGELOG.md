@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-03 — beach shoreline, open sea and sun on the water
+Owner: *"make the horizon better looking and make the edges of the map look like
+a beach that leads to an infinite sea… add a sun with reflections so the game
+feels more vibrant."*
+
+**The map edge is a beach now.** The island used to stop dead in a 1.9-stud drop
+into a flat water slab. It now ends in a walkable band of sand, then steps down
+and outward under the water in rings that get wider and deeper — 0 to 20 studs
+deep across about 190 studs — so the water grades from turquoise in the shallows
+to blue offshore. The water is semi-transparent on purpose: what you see is the
+sand and seabed underneath, which is where the gradient comes from.
+
+**The sea was never actually infinite.** It was declared 8,000 studs wide, but a
+Roblox part is capped at **2,048 per axis and the engine clamps silently** — so
+it had always been a 2,048 square with a hard edge just past the island. Water
+and seabed are now tiled to 4,000 studs in every direction.
+
+**The sun.** Bigger disc, stronger rays, lower bloom threshold so the highlight
+ON the water blooms and not just the disc, full `EnvironmentSpecularScale`, and
+reflectance on the sea so the surface picks the sun up. Plus a light colour
+grade (saturation +0.14, contrast +0.07) for overall vibrancy.
+
+All of it is tunable from the new `src/shared/Config/Scenery.luau`, including a
+`beachEnabled` switch to drop the whole shoreline in one line if it ever costs
+too much on a phone. No assets were imported — sand and sky are Roblox built-in
+materials, everything else is built from parts.
+
+**Three defects found by screenshotting rather than assuming:**
+- A **hairline running from the island straight to the horizon**, across the
+  whole sea. The tile count came out EVEN, so tiles straddled the middle and a
+  seam landed exactly on the island, then ran away from camera to the vanishing
+  point. Forcing an odd count centres a tile on the island and pushes the
+  nearest seam 1,000 studs out, past the shelf and into the haze.
+- The **shelf was far too wide** (800+ studs), so everything in frame sat over
+  shallow sand and the entire sea was one flat pale turquoise. Shortened to ~190
+  studs, which also confines the nested rectangles' 45° corner staircase to the
+  band hugging the beach where a drop-off contour looks like a real shore.
+- **Haze at 0.85 washed the colour out of the cafés down the street**, not just
+  the sea. Pulled back to 0.55 — the street is where the game is played.
+
+
 ### Fix — 2026-08-03 — café walls stay solid when you are out in the garden
 Owner screenshot: *"once outside in the garden the wall disappear, i can't see
 it."*
