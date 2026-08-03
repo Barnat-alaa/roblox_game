@@ -154,20 +154,21 @@ local function setHudHidden(hidden: boolean)
 	end
 end
 
+-- `blurWanted` is the authority, not the tween. The blur was surviving into the
+-- game because removal could fire while the 0.6s grow tween was still running,
+-- and the grow kept writing Size back up; the tween that "wins" is whichever
+-- finishes last. Now every exit checks this flag and destroys outright, and the
+-- teardown is also hooked to the overlay's own destruction so no dismiss path
+-- can leave the world blurred.
+local blurWanted = false
+
 local function setBackdropBlur(on: boolean)
 	local Lighting = game:GetService("Lighting")
+	blurWanted = on
 	local existing = Lighting:FindFirstChild("IntroBackdropBlur")
 	if not on then
 		if existing then
-			local tween = TweenService:Create(
-				existing,
-				TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-				{ Size = 0 }
-			)
-			tween:Play()
-			tween.Completed:Once(function()
-				existing:Destroy()
-			end)
+			existing:Destroy()
 		end
 		return
 	end
@@ -175,20 +176,37 @@ local function setBackdropBlur(on: boolean)
 	blur.Name = "IntroBackdropBlur"
 	blur.Size = 0
 	blur.Parent = Lighting
-	TweenService:Create(
+	local grow = TweenService:Create(
 		blur,
 		TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{ Size = 24 }
-	):Play()
+	)
+	grow:Play()
+	grow.Completed:Once(function()
+		-- Dismissed while we were still fading in.
+		if not blurWanted and blur.Parent then
+			blur:Destroy()
+		end
+	end)
 end
 
 local function build()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "IntroOverlay"
 	setBackdropBlur(true)
+	-- Belt and braces: whatever tears the overlay down, the world un-blurs.
+	gui.Destroying:Connect(function()
+		setBackdropBlur(false)
+		setHudHidden(false)
+	end)
 	setHudHidden(true)
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
+	-- ABOVE every HUD layer. The backdrop is translucent so the blurred world
+	-- shows through, which also means anything drawn on top of it stays at full
+	-- brightness — the HUD was sitting over the intro and reading as clutter.
+	-- Ordering the overlay above it lets the tint dim the HUD too, so the card is
+	-- the only thing at full contrast.
 	gui.DisplayOrder = 200 -- above absolutely everything, including modals (20)
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
