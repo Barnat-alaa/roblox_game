@@ -48,11 +48,35 @@ local Kitchen = {
 	-- recipes unlock. Set false to fall back to the counter pile.
 	useFoodShelves = true,
 
-	-- Buzz and demand
+	-- ————— Buzz and demand (rebalanced 2026-08-03, docs/ECONOMY_ANALYSIS.md) —————
+	--
+	-- THE PROBLEM THIS FIXES. Demand used to depend only on Buzz and seats, so a
+	-- brand-new café producing 15 servings an hour faced 77 arrivals an hour and
+	-- 62 of them stormed out ANGRY, every hour, forever. No amount of correct play
+	-- fixed it: even a fully-maxed café (70/hour) still lost 35/hour. The café was
+	-- in visible failure from the first minute of a new save to the last.
+	--
+	-- Demand is now capped at what the kitchen can actually deliver, times a
+	-- little headroom, so there is always slightly more custom than you can serve
+	-- — pressure, not carnage. Raise `demandHeadroom` to make the game meaner.
+	useDemandCap = true,
+	demandHeadroom = 1.2,
+	-- A café is never completely dead, even with no production plan set: this many
+	-- walk-ins per minute still arrive to be served by hand.
+	spawnRateMinPerMinute = 0.35,
+
 	buzzStart = 10,
 	buzzMax = 105,
 	buzzPerFedCustomer = 1,
 	buzzPerWalkout = -2,
+	-- Buzz DECAYS. Without this it is not a measure of anything: as a pure
+	-- accumulator, `served - 2 x walkouts` is positive for any headroom below 2.0,
+	-- so every café drifts to the cap and the number stops distinguishing a good
+	-- café from a bad one — while at headroom 2.0 half the room storms out and we
+	-- are back to the bug above. With a decay term Buzz settles where gains
+	-- balance losses, so it becomes a live readout of THROUGHPUT: a bigger, better
+	-- run café holds a higher number. Fraction of current Buzz shed per minute.
+	buzzDecayPerMinute = 0.009,
 	spawnRateBasePerMinute = 1.2,
 	spawnRateBestPerMinute = 2.8,
 	spawnRatePerExtraSeat = 0.04,
