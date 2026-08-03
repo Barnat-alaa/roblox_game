@@ -25,7 +25,7 @@
  },
  "tea": {
   "id": "tea",
-  "price": 12.0,
+  "price": 15.0,
   "lvl": 1,
   "rep": 0,
   "ingcost": 3.0,
@@ -37,7 +37,7 @@
  },
  "croissant": {
   "id": "croissant",
-  "price": 24.0,
+  "price": 30.0,
   "lvl": 3,
   "rep": 80,
   "ingcost": 7.0,
@@ -49,7 +49,7 @@
  },
  "sandwich": {
   "id": "sandwich",
-  "price": 28.0,
+  "price": 30.0,
   "lvl": 2,
   "rep": 40,
   "ingcost": 8.0,
@@ -61,7 +61,7 @@
  },
  "latte": {
   "id": "latte",
-  "price": 24.0,
+  "price": 32.0,
   "lvl": 4,
   "rep": 120,
   "ingcost": 7.0,
@@ -73,7 +73,7 @@
  },
  "muffin": {
   "id": "muffin",
-  "price": 26.0,
+  "price": 37.0,
   "lvl": 4,
   "rep": 140,
   "ingcost": 7.0,
@@ -85,7 +85,7 @@
  },
  "iced_tea": {
   "id": "iced_tea",
-  "price": 18.0,
+  "price": 26.0,
   "lvl": 5,
   "rep": 180,
   "ingcost": 5.0,
@@ -97,7 +97,7 @@
  },
  "fruit_salad": {
   "id": "fruit_salad",
-  "price": 30.0,
+  "price": 32.0,
   "lvl": 5,
   "rep": 220,
   "ingcost": 8.0,
@@ -109,7 +109,7 @@
  },
  "mocha": {
   "id": "mocha",
-  "price": 32.0,
+  "price": 43.0,
   "lvl": 6,
   "rep": 280,
   "ingcost": 9.0,
@@ -121,7 +121,7 @@
  },
  "cinnamon_roll": {
   "id": "cinnamon_roll",
-  "price": 36.0,
+  "price": 57.0,
   "lvl": 6,
   "rep": 320,
   "ingcost": 10.0,
@@ -133,7 +133,7 @@
  },
  "club_sandwich": {
   "id": "club_sandwich",
-  "price": 42.0,
+  "price": 67.0,
   "lvl": 7,
   "rep": 400,
   "ingcost": 12.0,
@@ -157,7 +157,7 @@
  },
  "quiche": {
   "id": "quiche",
-  "price": 48.0,
+  "price": 96.0,
   "lvl": 9,
   "rep": 650,
   "ingcost": 10.0,
