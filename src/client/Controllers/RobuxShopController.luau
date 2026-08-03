@@ -18,9 +18,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Products = require(Shared.Config.Products)
 local Remotes = require(Shared.Network.Remotes)
 
+local World = require(Shared.Config.World)
+local Grid = require(Shared.Utilities.Grid)
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
 local Theme = require(script.Parent.Parent.UI.Theme)
+local StylePreview = require(script.Parent.Parent.UI.StylePreview)
 local UIController = require(script.Parent.UIController)
 
 local RobuxShopController = {}
@@ -114,6 +117,148 @@ local function buildStockPackSection(parent: ScrollingFrame)
 	end
 end
 
+-- ————— café expansion (economy fix #7) —————
+--
+-- A drawn front elevation of the café that gets visibly WIDER at each tier, so
+-- the upgrade reads as "my building grows" rather than as a number. Drawn from
+-- Frames rather than an image: no asset to license, and it recolours with the
+-- theme. `pieces` is the tile count the tier unlocks — the concrete thing the
+-- owner is buying, shown next to every row.
+local function drawHouse(parent: Instance, size: number, fill: number, tone: Color3): Frame
+	local holder = Instance.new("Frame")
+	holder.Name = "HouseIcon"
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.fromOffset(size, size)
+	holder.Parent = parent
+
+	local w = math.floor(size * (0.42 + 0.5 * fill)) -- wider each tier
+	local h = math.floor(size * 0.52)
+	local body = Instance.new("Frame")
+	body.AnchorPoint = Vector2.new(0.5, 1)
+	body.Position = UDim2.new(0.5, 0, 1, -math.floor(size * 0.08))
+	body.Size = UDim2.fromOffset(w, h)
+	body.BackgroundColor3 = Theme.Colors.Cream
+	body.BorderSizePixel = 0
+	Components.Corner(body, 3)
+	body.Parent = holder
+
+	local roof = Instance.new("Frame")
+	roof.AnchorPoint = Vector2.new(0.5, 1)
+	roof.Position = UDim2.new(0.5, 0, 1, -h - math.floor(size * 0.08))
+	roof.Size = UDim2.fromOffset(w + math.floor(size * 0.12), math.floor(size * 0.16))
+	roof.BackgroundColor3 = tone
+	roof.BorderSizePixel = 0
+	Components.Corner(roof, 3)
+	roof.Parent = holder
+
+	-- One window per unlocked "room": the growth is countable, not just wider.
+	local windows = 1 + math.floor(fill * 3 + 0.001)
+	for i = 1, windows do
+		local pane = Instance.new("Frame")
+		pane.AnchorPoint = Vector2.new(0.5, 0)
+		pane.Position = UDim2.new(i / (windows + 1), 0, 0, math.floor(size * 0.1))
+		pane.Size = UDim2.fromOffset(math.max(3, math.floor(size * 0.1)), math.floor(size * 0.13))
+		pane.BackgroundColor3 = tone
+		pane.BorderSizePixel = 0
+		Components.Corner(pane, 2)
+		pane.Parent = body
+	end
+	return holder
+end
+
+local function tilesFor(tierIndex: number): number
+	local cells = World.interiorDepthTiers[math.clamp(tierIndex + 1, 1, #World.interiorDepthTiers)]
+	return Grid.PLOT_WIDTH * cells
+end
+
+local function buildExpansionRows(list: Instance, profile: any, order: number)
+	local tier = math.max(0, math.floor(tonumber(profile and profile.expansionTier) or 0))
+	local coins = tonumber(profile and profile.coins) or 0
+	local last = #World.interiorDepthTiers - 1
+
+	for target = 1, last do
+		local row = Instance.new("Frame")
+		row.Name = "Expansion" .. target
+		row.Size = UDim2.new(1, 0, 0, 74)
+		row.BackgroundColor3 = Theme.Colors.Paper
+		row.BackgroundTransparency = 0.06
+		row.LayoutOrder = order + target
+		Components.Corner(row, Theme.Radius.Medium)
+		Components.Stroke(row, Theme.Colors.Line, 1, 0.4)
+		row.Parent = list
+
+		local owned = tier >= target
+		local icon = drawHouse(row, 58, target / last, Theme.Colors.Honey)
+		icon.Position = UDim2.fromOffset(8, 8)
+
+		local title = Instance.new("TextLabel")
+		title.BackgroundTransparency = 1
+		title.Position = UDim2.fromOffset(74, 8)
+		title.Size = UDim2.new(1, -190, 0, 22)
+		title.Font = Theme.Font.Bold
+		title.TextSize = 15
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextColor3 = Theme.Colors.Ink
+		title.Text = "Bigger Café " .. string.rep("+", target)
+		title.Parent = row
+
+		-- The concrete thing being bought: how many more floor tiles you get.
+		local before, after = tilesFor(target - 1), tilesFor(target)
+		local detail = Instance.new("TextLabel")
+		detail.BackgroundTransparency = 1
+		detail.Position = UDim2.fromOffset(74, 30)
+		detail.Size = UDim2.new(1, -190, 0, 36)
+		detail.Font = Theme.Font.Regular
+		detail.TextSize = 12
+		detail.TextXAlignment = Enum.TextXAlignment.Left
+		detail.TextYAlignment = Enum.TextYAlignment.Top
+		detail.TextWrapped = true
+		detail.TextColor3 = Theme.Colors.Muted
+		detail.Text = string.format(
+			"%d → %d floor pieces  (+%d)  ·  pushes the back wall into the garden",
+			before,
+			after,
+			after - before
+		)
+		detail.Parent = row
+
+		local cost = World.expansionCosts[target] or 0
+		if owned then
+			local done = Instance.new("TextLabel")
+			done.BackgroundTransparency = 1
+			done.AnchorPoint = Vector2.new(1, 0.5)
+			done.Position = UDim2.new(1, -12, 0.5, 0)
+			done.Size = UDim2.fromOffset(96, 30)
+			done.Font = Theme.Font.Bold
+			done.TextSize = 13
+			done.TextColor3 = Theme.Colors.Mint
+			done.Text = "OWNED"
+			done.Parent = row
+		else
+			local locked = tier < target - 1
+			local affordable = not locked and coins >= cost
+			local buy = Components.Button(
+				row,
+				if locked then "LOCKED" else "BUY",
+				if affordable then Theme.Colors.Mint else Theme.Colors.Muted,
+				UDim2.fromOffset(104, 34)
+			)
+			buy.AnchorPoint = Vector2.new(1, 0.5)
+			buy.Position = UDim2.new(1, -12, 0.5, 0)
+			buy.AutoButtonColor = affordable
+			buy.ZIndex = 23
+			buy.Activated:Connect(function()
+				if not locked then
+					Remotes.event("BuyExpansion"):FireServer()
+				end
+			end)
+			if not locked then
+				StylePreview.priceChip(row, cost).Position = UDim2.new(1, -120, 0.5, -10)
+			end
+		end
+	end
+end
+
 local function rebuild()
 	local profile = UIController.getProfile()
 	if not ui.list then
@@ -127,6 +272,7 @@ local function rebuild()
 
 	local owned = (profile and profile.ownedPasses) or {}
 	buildStockPackSection(ui.list)
+	buildExpansionRows(ui.list, profile, 50)
 
 	for order, ref in Products.order do
 		local info = infoFor(ref.id, ref.pass)
