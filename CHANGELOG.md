@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-03 — recipes re-tiered so levelling up is a promotion
+Economy fix #6 (`docs/ECONOMY_ANALYSIS.md` §3.2). Every job costs work-minutes,
+so **coins per work-minute** is the only rate that matters — and on that measure
+the level-1 Espresso beat **six of the eight recipes unlocked after it**.
+Croissant, Latte, Muffin, Iced Tea, Cinnamon Swirl and Terrace Club were all
+economic *downgrades*: the correct play was to ignore them and keep pulling
+espresso. Nine levels of progress bought a 17% rate improvement.
+
+Base prices now sit on a rising curve — 3.0 coins per work-minute at level 1 to
+9.5 at level 9 — so each unlock is a genuine step up:
+
+| Level | Best recipe | Was | Now |
+| --- | --- | --- | --- |
+| 1 | Espresso | 3.00 | 3.00 |
+| 2 | Café Sandwich | 3.00 | 3.50 |
+| 3 | Croissant | 2.50 | 4.00 |
+| 4 | Silky Latte | 2.50 | 4.50 |
+| 5 | Sunrise Fruit Bowl | 4.67 | 5.33 |
+| 6 | Velvet Mocha | 3.50 | 6.00 |
+| 7 | Terrace Club | 3.00 | 7.00 |
+| 9 | Morning Quiche | 3.50 | **9.50** |
+
+Production minutes and ingredient tables are untouched, so the market sink and
+the pantry pressure are unchanged — only what the dish sells for moved.
+Endgame café income rises **389 → 806 coins/hour**. Overnight Roast is left
+alone: it is an appointment cook outside the work-minute budget.
+
+
 ### Fix — 2026-08-03 — the production forecast now models the game that runs
 Economy fix #1 (`docs/ECONOMY_ANALYSIS.md` §2.1/§2.2). `OperationsMath`
 forecast `machines × productionYield × 60 / productionTime` — the LEGACY
