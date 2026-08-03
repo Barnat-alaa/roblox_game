@@ -25,83 +25,6 @@ local ui: { [string]: any } = {}
 local worldReady = false
 local revealed = false
 
-local function setControlsEnabled(enabled: boolean)
-	pcall(function()
-		local scripts = player:WaitForChild("PlayerScripts", 10)
-		local module = scripts and scripts:WaitForChild("PlayerModule", 10)
-		if not module then
-			return
-		end
-		local controls = require(module :: ModuleScript):GetControls()
-		if enabled then
-			controls:Enable()
-		else
-			controls:Disable()
-		end
-	end)
-end
-
-local function markReady()
-	if worldReady then
-		return
-	end
-	worldReady = true
-	if ui.status then
-		ui.status.Text = "Your café is ready — welcome!"
-	end
-	if ui.enter then
-		ui.enter.Text = "Enter my café  ☕"
-		ui.enter.BackgroundColor3 = Theme.Colors.MintDark
-		ui.enter.AutoButtonColor = true
-		ui.enter.Active = true
-	end
-end
-
-local function reveal()
-	if revealed or not worldReady then
-		return
-	end
-	revealed = true
-	setControlsEnabled(true)
-	local overlay = ui.overlay :: Frame?
-	if not overlay then
-		return
-	end
-	local t = TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	for _, d in overlay:GetDescendants() do
-		if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
-			TweenService:Create(d, t, {
-				TextTransparency = 1,
-				BackgroundTransparency = 1,
-				TextStrokeTransparency = 1,
-			}):Play()
-		elseif d:IsA("Frame") or d:IsA("ImageLabel") then
-			TweenService:Create(d, t, { BackgroundTransparency = 1 }):Play()
-		end
-	end
-	TweenService:Create(overlay, t, { BackgroundTransparency = 1 }):Play()
-	setBackdropBlur(false)
-	setHudHidden(false)
-	task.delay(0.7, function()
-		if ui.gui then
-			ui.gui:Destroy()
-		end
-	end)
-end
-
-local function onEnter()
-	if not worldReady then
-		return
-	end
-	local typed = if ui.box then ui.box.Text else ""
-	if typeof(typed) == "string" and #typed:gsub("%s", "") > 0 then
-		Remotes.event("SetCafeName"):FireServer({ name = typed })
-	end
-	reveal()
-end
-
--- Blur the 3D world behind the intro. Removed again when the overlay fades, and
--- named so a leftover from a reload is replaced rather than stacked.
 -- BlurEffect only blurs the 3D WORLD, never GUIs — so with a see-through backdrop
 -- the whole HUD showed through the intro and read as clutter. Hide it while the
 -- card is up; the player has nothing to do with it until they are inside anyway.
@@ -189,6 +112,84 @@ local function setBackdropBlur(on: boolean)
 		end
 	end)
 end
+
+local function setControlsEnabled(enabled: boolean)
+	pcall(function()
+		local scripts = player:WaitForChild("PlayerScripts", 10)
+		local module = scripts and scripts:WaitForChild("PlayerModule", 10)
+		if not module then
+			return
+		end
+		local controls = require(module :: ModuleScript):GetControls()
+		if enabled then
+			controls:Enable()
+		else
+			controls:Disable()
+		end
+	end)
+end
+
+local function markReady()
+	if worldReady then
+		return
+	end
+	worldReady = true
+	if ui.status then
+		ui.status.Text = "Your café is ready — welcome!"
+	end
+	if ui.enter then
+		ui.enter.Text = "Enter my café  ☕"
+		ui.enter.BackgroundColor3 = Theme.Colors.MintDark
+		ui.enter.AutoButtonColor = true
+		ui.enter.Active = true
+	end
+end
+
+local function reveal()
+	if revealed or not worldReady then
+		return
+	end
+	revealed = true
+	setControlsEnabled(true)
+	local overlay = ui.overlay :: Frame?
+	if not overlay then
+		return
+	end
+	local t = TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	for _, d in overlay:GetDescendants() do
+		if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+			TweenService:Create(d, t, {
+				TextTransparency = 1,
+				BackgroundTransparency = 1,
+				TextStrokeTransparency = 1,
+			}):Play()
+		elseif d:IsA("Frame") or d:IsA("ImageLabel") then
+			TweenService:Create(d, t, { BackgroundTransparency = 1 }):Play()
+		end
+	end
+	TweenService:Create(overlay, t, { BackgroundTransparency = 1 }):Play()
+	setBackdropBlur(false)
+	setHudHidden(false)
+	task.delay(0.7, function()
+		if ui.gui then
+			ui.gui:Destroy()
+		end
+	end)
+end
+
+local function onEnter()
+	if not worldReady then
+		return
+	end
+	local typed = if ui.box then ui.box.Text else ""
+	if typeof(typed) == "string" and #typed:gsub("%s", "") > 0 then
+		Remotes.event("SetCafeName"):FireServer({ name = typed })
+	end
+	reveal()
+end
+
+-- Blur the 3D world behind the intro. Removed again when the overlay fades, and
+-- named so a leftover from a reload is replaced rather than stacked.
 
 local function build()
 	local gui = Instance.new("ScreenGui")
