@@ -90,12 +90,26 @@ roughly an **order of magnitude**, always in the optimistic direction.
 
 ### 2.3 Shift capacity is dead code for producers
 
-`Operations.staffCapacityMax`, `productionCapacityPerWorkMinute` and
-`onlineRecoveryPerMinute` are only consumed by the legacy path and by serving.
-`startPlanJob` never calls `TryUseCapacity`. Any "shift" meter shown for a
-Barista or Cook is not connected to anything.
+`startPlanJob` never calls `TryUseCapacity`, so producers spend no capacity
+online — they are limited by work-minutes instead.
+
+**Corrected 2026-08-03:** this section originally claimed a Barista/Cook shift
+meter was on screen doing nothing. It is not — `InventoryController` already
+branches on `Kitchen.useProductionPlan` and shows work-minutes for producers.
+The system is also not dead overall: **Waiter** capacity is charged on every
+serve and **Cleaner** capacity on every clean.
+
+What genuinely remains is narrower, and still worth fixing: the OFFLINE
+settlement (`CafeOperationsService`) still models producers spending
+`productionCapacityPerWorkMinute`, so offline earnings are throttled by a rule
+the online game no longer uses. Every knob is now labelled LIVE or legacy-only
+in `Config/Operations`.
 
 ### 2.4 Satisfaction gates nothing
+
+**Owner decision 2026-08-03: keep it — a consequence is coming later.** It is
+documented as presentational in `Config/Operations` so the numbers are not
+mistaken for balanced.
 
 `satisfaction` is written by a dozen call sites and read by none for any
 decision. It cannot reject a customer, slow a spawn, or change a payout. It is a
