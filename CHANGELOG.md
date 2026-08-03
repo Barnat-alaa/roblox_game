@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-03 — buy a bigger café (economy fix #7)
+The expansion tiers existed in `World.interiorDepthTiers` and were honoured
+everywhere — placement clamps, surface painting, the wall-fade rule — but there
+was **no way to buy one**. So the game had roughly 11,000 coins of sinks in
+total and simply ENDED around hour 20, with coins piling up and nothing left to
+want (73,000+ by hour 120).
+
+`BuyExpansion` is server-authoritative and takes **no payload at all** — the
+client asks, the server reads the current tier, checks the price, spends the
+coins and calls `RefreshTier`. There is nothing to forge. 8,000 and 25,000
+coins, sized against a maxed café's ~800/hour so each tier is a real
+several-hour goal.
+
+Each row shows a **drawn front elevation of the café that gets wider and gains
+windows** at each tier, so the upgrade reads as *my building grows* rather than
+as a number — and the **piece count** sits next to it: `324 → 432 floor pieces
+(+108)`. Drawn from Frames, so there is no asset to license and it recolours
+with the theme.
+
+Verified live: rows build with the house at 38px/2 windows for tier 1 and
+53px/4 windows for tier 2; tier 2 correctly reads LOCKED until tier 1 is owned;
+and firing the remote with 150 coins against an 8,000 price left the tier at 0.
+
+This also unblocks **B5 (garden items)** — the garden becoming placeable is what
+buying land does.
+
+
 ### Change — 2026-08-03 — recipes re-tiered so levelling up is a promotion
 Economy fix #6 (`docs/ECONOMY_ANALYSIS.md` §3.2). Every job costs work-minutes,
 so **coins per work-minute** is the only rate that matters — and on that measure

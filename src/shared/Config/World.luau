@@ -40,6 +40,13 @@ local World = {
 	-- bigger back garden. Buying land (S4) moves the back wall into the garden.
 	interiorDepthTiers = { 18, 24, 30 },
 
+	-- Coins to move the back wall out to the NEXT tier (index 1 buys tier 1, and
+	-- so on). Economy fix #7 (docs/ECONOMY_ANALYSIS.md §3): before this the game
+	-- had ~11,000 coins of sinks in total and simply ENDED around hour 20 with
+	-- coins piling up and nothing to buy. Sized against a maxed café's ~800
+	-- coins/hour so each tier is a real several-hour goal rather than a formality.
+	expansionCosts = { 8000, 25000 },
+
 	-- The front-right corner (from the player's view while entering) is a
 	-- staff-only open kitchen. A low L-shaped service counter keeps dining NPCs
 	-- out while leaving the preparation theatre visible to the room.

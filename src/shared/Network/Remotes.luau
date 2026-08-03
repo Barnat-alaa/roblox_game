@@ -12,6 +12,7 @@ local FOLDER_NAME = "Remotes"
 
 -- client -> server, and server -> client, events
 local EVENTS = {
+	"BuyExpansion", -- c->s: buy the next café expansion tier (no payload)
 	"PlaceFurniture", -- c->s: request a placement
 	"MoveFurniture", -- c->s: move an already-placed item {instanceId, gridX, gridY, rotation}
 	-- c->s: paint a floor tile or wall panel (B3)

@@ -524,6 +524,33 @@ function BuildService.RenderProfile(_self: any, player: Player)
 	end
 end
 
+-- Buy the next expansion tier: pushes the back wall out into the garden, which
+-- is the game's first real coin sink past the staff ladder. Server-authoritative
+-- throughout — the client sends no payload at all, so there is nothing to forge.
+local function handleBuyExpansion(player: Player)
+	local economy = ServiceRegistry.get("EconomyService")
+	local data = DataService and DataService:GetProfile(player)
+	if not data or not economy or not CafeService then
+		return
+	end
+	local tier = math.max(0, math.floor(tonumber(data.expansionTier) or 0))
+	local nextTier = tier + 1
+	if nextTier >= #World.interiorDepthTiers then
+		return -- already at the largest café
+	end
+	local cost = World.expansionCosts[nextTier]
+	if not cost or not economy:TrySpendCoins(player, cost) then
+		return
+	end
+	data.expansionTier = nextTier
+	CafeService:RefreshTier(player)
+	DataService:Push(player)
+	local analytics = ServiceRegistry.get("AnalyticsService")
+	if analytics then
+		analytics:Track(player, "expansion_bought", { tier = nextTier, cost = cost })
+	end
+end
+
 local function handlePlace(player: Player, payload: unknown)
 	if typeof(payload) ~= "table" then
 		return
@@ -687,6 +714,7 @@ function BuildService.Init(_self: any)
 end
 
 function BuildService.Start(_self: any)
+	Remotes.event("BuyExpansion").OnServerEvent:Connect(handleBuyExpansion)
 	Remotes.event("PlaceFurniture").OnServerEvent:Connect(handlePlace)
 	Remotes.event("MoveFurniture").OnServerEvent:Connect(handleMove)
 	Remotes.event("RemoveFurniture").OnServerEvent:Connect(handleRemove)
