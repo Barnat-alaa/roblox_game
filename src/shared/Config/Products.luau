@@ -162,6 +162,13 @@ export type StockPack = {
 	robuxPrice: number,
 }
 
+-- Coin prices are ~2.2x the pack's own market value (economy fix #10). They used
+-- to be ~5x: a +20 pack cost 3,000 coins but held 640 coins of ingredients at
+-- market prices. Favouring Robux is the right DIRECTION, but a five-fold markup
+-- is the kind of thing a player works out and resents, and resentment sells
+-- nothing. At ~2.2x the coin path is a fair-but-slow alternative, which is what
+-- the rails ask for: everything buyable with Robux is also earnable.
+--
 -- Bulk now actually pays (economy fix #9, docs/ECONOMY_ANALYSIS.md §5.1). Every
 -- SKU used to sit in a 5.4-6.7 coins-per-Robux band, so there was no reason to
 -- pick the 99 R$ pack over three 29 R$ ones — the bulk tiers were decoration.
@@ -179,7 +186,7 @@ Products.stockPacks = {
 		name = "Stock Pack +5",
 		blurb = "Instantly adds 5 of every dish you have unlocked",
 		icon = "📦",
-		coinCost = 900,
+		coinCost = 350,
 		productId = 3612636850,
 		robuxPrice = 29,
 	},
@@ -188,7 +195,7 @@ Products.stockPacks = {
 		name = "Stock Pack +12",
 		blurb = "Instantly adds 12 of every dish you have unlocked",
 		icon = "🏭",
-		coinCost = 1700,
+		coinCost = 850,
 		productId = 3612636928,
 		robuxPrice = 59,
 	},
@@ -197,7 +204,7 @@ Products.stockPacks = {
 		name = "Stock Pack +24",
 		blurb = "Instantly adds 24 of every dish you have unlocked",
 		icon = "🚀",
-		coinCost = 3000,
+		coinCost = 1700,
 		productId = 3612637043,
 		robuxPrice = 99,
 	},

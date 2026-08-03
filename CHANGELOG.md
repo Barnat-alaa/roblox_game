@@ -5,6 +5,23 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-03 — pack coin prices halved (fix #10); fix #11 specced
+**#10.** A +20 pack cost 3,000 coins but held 640 coins of ingredients at market
+prices — a **5× markup**. Favouring Robux is the right direction, but a
+five-fold markup is the kind of thing a player works out and resents, and
+resentment sells nothing. Now ~2.2× across the range: **350 / 850 / 1,700** for
++5 / +12 / +24. The coin path is a fair-but-slow alternative, which is what the
+rails ask for.
+
+**#11 is specced, not built** (`docs/ECONOMY_ANALYSIS.md` §5.5). The packs still
+sell relief from a bottleneck players do not have — production is capped by
+work-minutes, not ingredients. The two things worth selling instead, **Double
+Shift — 1 Hour** and **Instant Expansion**, both need Developer Products, and a
+Product ID can only be minted on the Creator Dashboard. §5.5 gives the exact
+products to create and the four-step wiring order, so it is one owner action
+away from executable rather than a guess.
+
+
 ### Change — 2026-08-03 — playing now beats idling; bulk packs actually pay
 Economy fixes #8 and #9.
 

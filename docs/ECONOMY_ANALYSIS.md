@@ -274,6 +274,46 @@ rails (each must also be earnable with coins or levels):
 
 ---
 
+## 5.5 Fix #11 — what to sell instead (SPEC, needs owner action)
+
+Fixes #9 and #10 rebalanced the packs, but the deeper problem in §5.3 stands:
+**the packs sell relief from a bottleneck players do not have.** Production is
+capped by work-minutes; nobody is stopped by an empty pantry unless they forgot
+to shop. The two things a player actually wants cannot be built without new
+Developer Products, because a Product ID can only be minted on the Creator
+Dashboard — so this is the exact spec to create, not a guess.
+
+### Create these two products
+
+| Name | Suggested price | Grants | Already earnable by |
+| --- | --- | --- | --- |
+| **Double Shift — 1 Hour** | 79 R$ | +100% work-minutes for every producer role for 60 min | levelling staff (15 → 60 min/hr) |
+| **Instant Expansion** | 199 R$ | the next café tier immediately | 8,000 / 25,000 coins (fix #7) |
+
+Both stay inside the rails: neither raises a ceiling that coins and levels cannot
+reach, so they sell **time**, not power. Instant Expansion in particular is the
+honest flagship — it is the one thing players will want at hour 20 and it is
+already fully coin-buyable.
+
+### Then wire, in this order
+
+1. `Config/Products.luau` — add both to `developerProducts`. Double Shift uses
+   the existing `kind = "boost"` shape (`boost = "workminutes", seconds = 3600`);
+   Instant Expansion needs `kind = "expansion"`.
+2. `MonetizationService` — grant on receipt. Expansion reuses the fix #7 path:
+   bump `data.expansionTier`, call `CafeService:RefreshTier`, skip the coin
+   charge. **Guard the top tier** or a player can pay for nothing.
+3. `StaffService.GetWorkMinutesPerHour` — the one place the boost has to land, so
+   both `ProductionService.chooseFromPlan` and the forecast pick it up for free.
+4. `tools/economy_sim.py` — re-run. A doubled shift for an hour is worth roughly
+   800 coins at endgame; check that against the Robux price before shipping.
+
+### Retire, once those exist
+
+The pantry packs should become the *small* impulse buy, not the flagship. Do not
+delete them — running dry is a real moment — but they should stop being the
+first thing in the UPGRADES panel.
+
 ## 6. Where to put the purchase prompts
 
 The rails forbid fake urgency, so the rule is: **offer at the moment the player
@@ -338,9 +378,10 @@ Existing: VIP every 30 min, daily goals, session gifts, neighbour mischief.
 
 **Then monetisation:**
 
-9. Make the top Stock Pack ~40% better per Robux than the smallest. (§5.1)
-10. Bring pack coin prices down from 5× to ~2–2.5× market value. (§5.2)
-11. Sell work-minutes and expansion, not ingredients. (§5.3, §5.4)
+9. ~~Make the top Stock Pack ~40% better per Robux.~~ **DONE** — +5/+12/+24.
+10. ~~Bring pack coin prices down to ~2–2.5× market value.~~ **DONE** — ~2.2×.
+11. Sell work-minutes and expansion, not ingredients. **SPEC READY (§5.5)** —
+    blocked on two Developer Products being created on the dashboard.
 12. Add the six contextual offer moments. (§6)
 
 ---
