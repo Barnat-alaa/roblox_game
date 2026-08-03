@@ -381,8 +381,17 @@ end
 
 local function rebuildShell(plot: Plot, tier: number)
 	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
-	local depth = tierDepthCells(tier) * Grid.CELL_SIZE
+	local depthCells = tierDepthCells(tier)
+	local depth = depthCells * Grid.CELL_SIZE
 	local origin = plot.origin
+
+	-- Where the INTERIOR actually ends, published for clients. Anything asking
+	-- "is this position inside the café?" needs this and not Grid.PLOT_DEPTH:
+	-- that constant is the MAXIMUM expansion (32 cells / 128 studs) and so
+	-- swallows the whole garden. The wall-fade rule read it and concluded a
+	-- player standing in their garden was indoors, then faded the back wall away
+	-- from under them (owner screenshot, 2026-08-03).
+	plot.model:SetAttribute("interiorDepthCells", depthCells)
 
 	doors["G" .. plot.index] = nil
 	if plot.shell then

@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-03 — café walls stay solid when you are out in the garden
+Owner screenshot: *"once outside in the garden the wall disappear, i can't see
+it."*
+
+Walls fade to near-invisible when you are INSIDE so the camera can see past
+them. The test for "inside" was `Grid.distanceToPlotRect(origin, position)` with
+no depth argument — which falls back to `Grid.PLOT_DEPTH`, **32 cells / 128
+studs, the MAXIMUM expansion**. A starting café's interior is 18 cells / 72
+studs, so everything from the back wall out to z=128 — the entire garden —
+counted as indoors, and the back wall faded away while the player stood outside
+looking straight at it.
+
+`rebuildShell` now publishes `interiorDepthCells` on the plot model, and the
+fade rule measures against that. Each plot carries its own value, so a
+neighbour's walls behave correctly too, and it updates when buying land moves
+the back wall. If the attribute is ever missing the client falls back to the
+SMALLEST tier: at worst a wall stays solid a few studs too long, rather than
+vanishing outdoors.
+
+Measured on the running client, tier-0 café (interior ends at local z=72):
+
+```
+ local z | OLD rule (PLOT_DEPTH) | NEW rule            | where you are
+      40 | inside -> walls fade  | inside -> walls fade | inside the cafe
+      74 | inside -> WALLS FADE  | outside -> SOLID     | IN THE GARDEN
+     100 | inside -> WALLS FADE  | outside -> SOLID     | IN THE GARDEN
+     120 | inside -> WALLS FADE  | outside -> SOLID     | IN THE GARDEN
+```
+
+Confirmed end-to-end by walking the character to local z=95 and z=115 and
+reading the parts back: `WallBack/WallLeft/WallRight LocalTransparencyModifier =
+0.00` at every garden position, and the inside test still returns true at z=40.
+Only the `enabled` input changed — the camera-facing half of the rule is
+untouched.
+
+The three server proximity checks that also default this argument were left
+alone deliberately: they are "am I near my café?" range tests with a distance
+tolerance, where counting the garden is intended, and narrowing them would
+quietly shorten mischief and social reach.
+
+
 ### Fix — 2026-08-02 — wall shelves no longer run out of the café
 Owner screenshot: *"when I have a lot of items the shelves are shown outside the
 cafe… if the first wall isn't enough use other wall, the back door."*
