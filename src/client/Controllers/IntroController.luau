@@ -80,6 +80,8 @@ local function reveal()
 		end
 	end
 	TweenService:Create(overlay, t, { BackgroundTransparency = 1 }):Play()
+	setBackdropBlur(false)
+	setHudHidden(false)
 	task.delay(0.7, function()
 		if ui.gui then
 			ui.gui:Destroy()
@@ -98,11 +100,113 @@ local function onEnter()
 	reveal()
 end
 
+-- Blur the 3D world behind the intro. Removed again when the overlay fades, and
+-- named so a leftover from a reload is replaced rather than stacked.
+-- BlurEffect only blurs the 3D WORLD, never GUIs — so with a see-through backdrop
+-- the whole HUD showed through the intro and read as clutter. Hide it while the
+-- card is up; the player has nothing to do with it until they are inside anyway.
+local HIDDEN_WHILE_INTRO = {
+	"HUD",
+	"InventoryHUD",
+	"OperationsHUD",
+	"SessionRewardHud",
+	"BoostHud",
+	"VipEventHud",
+	"TutorialHint",
+	"CafeModals",
+	"HudToggleHud",
+	"CameraGui",
+}
+
+local hudWatch: RBXScriptConnection? = nil
+
+local function setHudHidden(hidden: boolean)
+	-- WaitForChild, not FindFirstChild: the intro is built early enough that
+	-- PlayerGui may not have replicated yet, and an early return here would skip
+	-- the ChildAdded watch as well — which is exactly why the HUD kept showing
+	-- through the blurred backdrop.
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui", 10)
+	if not playerGui then
+		return
+	end
+	local function apply(gui: Instance)
+		if gui:IsA("ScreenGui") then
+			for _, name in HIDDEN_WHILE_INTRO do
+				if gui.Name == name then
+					gui.Enabled = not hidden
+					break
+				end
+			end
+		end
+	end
+	for _, gui in playerGui:GetChildren() do
+		apply(gui)
+	end
+	if hudWatch then
+		hudWatch:Disconnect()
+		hudWatch = nil
+	end
+	-- The intro is built BEFORE most HUD controllers have made their ScreenGui,
+	-- so hiding only what exists right now misses nearly all of it. Keep watching
+	-- until the card goes away.
+	if hidden then
+		hudWatch = playerGui.ChildAdded:Connect(apply)
+	end
+end
+
+-- `blurWanted` is the authority, not the tween. The blur was surviving into the
+-- game because removal could fire while the 0.6s grow tween was still running,
+-- and the grow kept writing Size back up; the tween that "wins" is whichever
+-- finishes last. Now every exit checks this flag and destroys outright, and the
+-- teardown is also hooked to the overlay's own destruction so no dismiss path
+-- can leave the world blurred.
+local blurWanted = false
+
+local function setBackdropBlur(on: boolean)
+	local Lighting = game:GetService("Lighting")
+	blurWanted = on
+	local existing = Lighting:FindFirstChild("IntroBackdropBlur")
+	if not on then
+		if existing then
+			existing:Destroy()
+		end
+		return
+	end
+	local blur = existing or Instance.new("BlurEffect")
+	blur.Name = "IntroBackdropBlur"
+	blur.Size = 0
+	blur.Parent = Lighting
+	local grow = TweenService:Create(
+		blur,
+		TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+		{ Size = 24 }
+	)
+	grow:Play()
+	grow.Completed:Once(function()
+		-- Dismissed while we were still fading in.
+		if not blurWanted and blur.Parent then
+			blur:Destroy()
+		end
+	end)
+end
+
 local function build()
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "IntroOverlay"
+	setBackdropBlur(true)
+	-- Belt and braces: whatever tears the overlay down, the world un-blurs.
+	gui.Destroying:Connect(function()
+		setBackdropBlur(false)
+		setHudHidden(false)
+	end)
+	setHudHidden(true)
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
+	-- ABOVE every HUD layer. The backdrop is translucent so the blurred world
+	-- shows through, which also means anything drawn on top of it stays at full
+	-- brightness — the HUD was sitting over the intro and reading as clutter.
+	-- Ordering the overlay above it lets the tint dim the HUD too, so the card is
+	-- the only thing at full contrast.
 	gui.DisplayOrder = 200 -- above absolutely everything, including modals (20)
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = player:WaitForChild("PlayerGui")
@@ -111,8 +215,14 @@ local function build()
 	local overlay = Instance.new("Frame")
 	overlay.Name = "Overlay"
 	overlay.Size = UDim2.fromScale(1, 1)
+	-- The backdrop is deliberately SEE-THROUGH: behind it sits the real café and
+	-- street, blurred by a Lighting BlurEffect (see `setBackdropBlur`). That is a
+	-- live shot of the actual game rather than an uploaded screenshot — nothing to
+	-- license, nothing to re-upload when the art changes, and it is always the
+	-- build you are about to play. The tint keeps the card readable over whatever
+	-- colour happens to be behind it.
 	overlay.BackgroundColor3 = Theme.Colors.Espresso
-	overlay.BackgroundTransparency = 0
+	overlay.BackgroundTransparency = 0.35
 	overlay.BorderSizePixel = 0
 	overlay.Parent = gui
 	Components.Gradient(overlay, Theme.Colors.Espresso, Theme.Colors.Roast, 90)
