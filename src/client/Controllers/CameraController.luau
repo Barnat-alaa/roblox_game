@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Grid = require(ReplicatedStorage:WaitForChild("Shared").Utilities.Grid)
+local World = require(ReplicatedStorage:WaitForChild("Shared").Config.World)
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
 local Theme = require(script.Parent.Parent.UI.Theme)
@@ -58,7 +59,15 @@ local function updateWallFades(cameraPosition: Vector3)
 		local inside = false
 		local origin = plot:GetAttribute("origin")
 		if characterPosition and typeof(origin) == "CFrame" then
-			inside = Grid.distanceToPlotRect(origin, characterPosition) < 0.5
+			-- Measure against THIS café's interior, not Grid.PLOT_DEPTH. That
+			-- constant is the maximum expansion, so the default made the garden
+			-- count as indoors and the back wall faded away while the player was
+			-- standing outside looking at it. Falling back to the smallest tier
+			-- is the safe side of the error: at worst a wall stays solid a few
+			-- studs too long, rather than vanishing when you are outdoors.
+			local depthCells = tonumber(plot:GetAttribute("interiorDepthCells"))
+				or World.interiorDepthTiers[1]
+			inside = Grid.distanceToPlotRect(origin, characterPosition, nil, depthCells) < 0.5
 		end
 		fadeWallsIn(plot, cameraPosition, inside)
 		local shell = plot:FindFirstChild("Shell")
