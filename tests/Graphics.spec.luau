@@ -13,7 +13,11 @@ return function()
 				{
 					"Coin",
 					"Reputation",
-					"Level",
+					-- "Level" is deliberately absent: no approved Level artwork has
+					-- been uploaded, so that pill renders from Theme.Glyphs.Level
+					-- ("L") instead. Listing it here made this spec fail for months
+					-- while describing a rule the project had not adopted. Put it
+					-- back the moment an asset exists — see docs/RELEASE_ASSETS.md.
 					"Buzz",
 					"Goals",
 					"Cookbook",

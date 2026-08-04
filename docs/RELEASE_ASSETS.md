@@ -44,3 +44,10 @@ Maturity") → Start questionnaire. Answer truthfully per our actual content:
 After submitting, the dashboard shows the assigned rating; screenshot it for
 RELEASE_CHECKLIST. If any answer above ever changes (e.g. adding a wine item
 to a menu), the questionnaire MUST be re-done before the next release.
+
+## Missing HUD artwork
+
+- **Level** — no approved image. The Level stat pill renders from
+  `Theme.Glyphs.Level` (`"L"`) instead. `tests/Graphics.spec` excludes it by
+  name; add the key to `Config/Graphics.UI` **and** to the approved allow-list
+  below it, then put `"Level"` back in the spec's required list.
