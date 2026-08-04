@@ -382,7 +382,9 @@ Existing: VIP every 30 min, daily goals, session gifts, neighbour mischief.
 10. ~~Bring pack coin prices down to ~2–2.5× market value.~~ **DONE** — ~2.2×.
 11. Sell work-minutes and expansion, not ingredients. **SPEC READY (§5.5)** —
     blocked on two Developer Products being created on the dashboard.
-12. Add the six contextual offer moments. (§6)
+12. ~~Add the six contextual offer moments.~~ **DONE** — `OfferController` plus
+    three live triggers (no room, pantry dry, shift spent). The remaining two
+    wait on #11's products; the sixth (cosmetics) has nothing to sell yet.
 
 ---
 

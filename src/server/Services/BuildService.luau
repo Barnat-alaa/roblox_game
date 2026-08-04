@@ -527,6 +527,17 @@ end
 -- Buy the next expansion tier: pushes the back wall out into the garden, which
 -- is the game's first real coin sink past the staff ladder. Server-authoritative
 -- throughout — the client sends no payload at all, so there is nothing to forge.
+-- Cost of the next tier, or nil at the largest café — so an offer is never shown
+-- to someone with nothing left to buy.
+local function nextExpansionCost(data: Types.PlayerData): number?
+	local tier = math.max(0, math.floor(tonumber(data.expansionTier) or 0))
+	local nextTier = tier + 1
+	if nextTier >= #World.interiorDepthTiers then
+		return nil
+	end
+	return World.expansionCosts[nextTier]
+end
+
 local function handleBuyExpansion(player: Player)
 	local economy = ServiceRegistry.get("EconomyService")
 	local data = DataService and DataService:GetProfile(player)
@@ -584,6 +595,14 @@ local function handlePlace(player: Player, payload: unknown)
 	local ok, reason = validatePlacement(data, def, gridX, gridY, rotation)
 	if not ok then
 		Remotes.event("Notify"):FireClient(player, { kind = "error", reason = reason })
+		-- Contextual offer (economy fix #12). Running out of floor is the single
+		-- clearest moment to mention a bigger café, and it is the offer players are
+		-- most likely to want — it is also fully coin-buyable, so this is a
+		-- signpost rather than a sales pitch. Only for out-of-bounds: an overlap
+		-- means "put it somewhere else", not "buy more room".
+		if reason == "out_of_bounds" and nextExpansionCost(data) then
+			Remotes.event("Notify"):FireClient(player, { kind = "offer", offer = "no_room" })
+		end
 		return
 	end
 
