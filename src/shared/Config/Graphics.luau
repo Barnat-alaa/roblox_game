@@ -56,6 +56,11 @@ local Graphics = {
 		Pantry = "rbxassetid://114094476715548",
 		-- Spare art from the owner's sheet, not on the HUD yet
 		Coins = "rbxassetid://106117241055513",
+		-- Same asset under the SINGULAR key. Theme.Glyphs calls it `Coin` and the
+		-- HUD resolves icons dynamically via Theme.Images[def.key], so a definition
+		-- keyed "Coin" was silently missing its image and falling back to the "$"
+		-- text glyph. tests/Graphics.spec asserts the singular; both now resolve.
+		Coin = "rbxassetid://106117241055513",
 		Rankings = "rbxassetid://99014737661924",
 		-- Button plates
 		PlateSquare = "rbxassetid://110496594476795",
@@ -81,6 +86,7 @@ local Graphics = {
 		MusicOff = true,
 		Settings = true,
 		Coins = true,
+		Coin = true, -- singular alias; same approved asset
 		Rankings = true,
 	},
 	-- Catalogue rows call this with an AssetManifest id to get the item's own
