@@ -322,6 +322,28 @@ local function scheduleIdleAppliances(
 					startPlanJob(player, data, kitchen, placed.instanceId, recipe, role, now)
 				else
 					KitchenService:UpdateApplianceVisual(player, placed.instanceId, "resting", nil)
+					-- Contextual offer (economy fix #12). The appliance has actually
+					-- stopped, which is the honest moment to say why. Two causes land
+					-- here — the role's hourly minutes are spent, or the pantry is
+					-- dry — so name the one that is true. This branch re-runs every
+					-- second, and the client rate-limits per key.
+					local dry = false
+					for recipeId in kitchen.menu do
+						local r = Recipes[recipeId]
+						if
+							r
+							and r.productionMinutes
+							and data.unlockedRecipes[recipeId] == true
+							and not IngredientMath.has(r, data.pantry)
+						then
+							dry = true
+							break
+						end
+					end
+					Remotes.event("Notify"):FireClient(player, {
+						kind = "offer",
+						offer = if dry then "pantry_empty" else "shift_empty",
+					})
 				end
 			else
 				local recipe = chooseRecipe(data, kitchen, definition.id, now)

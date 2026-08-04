@@ -598,6 +598,18 @@ function UIController.registerAction(id: string, callback: () -> ())
 	actionCallbacks[id] = callback
 end
 
+-- Open a HUD action from elsewhere (contextual offers, economy fix #12). Returns
+-- false when nothing is registered under that id, so a caller can stay quiet
+-- rather than promising a panel that will not appear.
+function UIController.openAction(id: string): boolean
+	local callback = actionCallbacks[id]
+	if not callback then
+		return false
+	end
+	callback()
+	return true
+end
+
 function UIController.setActionActive(id: string, active: boolean)
 	actionActive[id] = active
 	local handle = actionHandles[id]

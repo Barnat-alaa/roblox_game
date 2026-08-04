@@ -5,6 +5,30 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-04 — contextual offers (economy fix #12)
+The store sat in UPGRADES and was never mentioned again, so a player only found
+it by going looking. Offers now appear **at the moment the friction is real**:
+
+| Trigger | Card |
+| --- | --- |
+| Placing furniture out of bounds | "No room left" → a bigger café |
+| Appliance rests with a dry pantry | "Out of ingredients" → Market / Stock Pack |
+| Appliance rests with the shift spent | "Your staff are done for the hour" → Staff |
+
+Deliberately **not** a Robux button on the HUD. There is no countdown, no
+"limited time", and nothing is lost by ignoring a card — everything offered is
+coin-buyable. **NOT NOW** is a first-class button, not a corner cross, and
+refusing buys a longer quiet period (8 min vs 4). The rest-branch re-runs every
+second, so the per-key rate limit is what makes this liveable rather than a
+strobe.
+
+Verified live: an out-of-bounds placement produced the card reading *"No room
+left / Your café is full…"* with **SEE SIZES** and **NOT NOW**.
+
+Two of the six moments in §6 remain, both waiting on #11's products, and the
+cosmetics one has nothing to sell yet.
+
+
 ### Change — 2026-08-03 — pack coin prices halved (fix #10); fix #11 specced
 **#10.** A +20 pack cost 3,000 coins but held 640 coins of ingredients at market
 prices — a **5× markup**. Favouring Robux is the right direction, but a
