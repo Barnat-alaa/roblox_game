@@ -1559,10 +1559,119 @@ function CafeService.GetFurnitureFolder(_self: any, player: Player): Folder?
 end
 
 -- The café sign doubles as the Buzz scoreboard (KitchenService drives it).
+-- The café's NAME on a hanging wooden board over the front (owner request
+-- 2026-08-04: "for the name put it in a nicer way in a wooden thing on top of
+-- the café"). It used to be floating billboard text with nothing behind it,
+-- which read as a debug label rather than a shopfront.
+--
+-- Built from parts so it needs no asset: a plank with darker trim top and bottom,
+-- hung from two short irons, with the name on a SurfaceGui rather than a
+-- BillboardGui — a SurfaceGui lives ON the wood and turns with the building, so
+-- it reads as painted signage instead of a screen overlay.
+local NAME_BOARD_W, NAME_BOARD_H, NAME_BOARD_D = 16, 3.6, 0.5
+
+local function buildNameBoard(plot: Plot)
+	local existing = plot.model:FindFirstChild("NameBoard")
+	if existing then
+		existing:Destroy()
+	end
+	local width = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local board = Instance.new("Model")
+	board.Name = "NameBoard"
+
+	local cx = width * World.doorCenterFrac
+	local y = DOOR_H + 6 -- clear of the shop sign at DOOR_H + 3, up at roof height
+	local z = -1.1 -- proud of the façade so it catches its own shadow
+
+	local plank = makePart(
+		"Plank",
+		Vector3.new(NAME_BOARD_W, NAME_BOARD_H, NAME_BOARD_D),
+		plot.origin * CFrame.new(cx, y, z),
+		Color3.fromRGB(126, 84, 50),
+		board,
+		Enum.Material.Wood
+	)
+	plank.CanCollide = false
+	plank.CanQuery = false
+
+	for _, dy in { NAME_BOARD_H / 2 + 0.18, -NAME_BOARD_H / 2 - 0.18 } do
+		local trim = makePart(
+			"Trim",
+			Vector3.new(NAME_BOARD_W + 0.7, 0.36, NAME_BOARD_D + 0.2),
+			plot.origin * CFrame.new(cx, y + dy, z),
+			Color3.fromRGB(88, 56, 33),
+			board,
+			Enum.Material.Wood
+		)
+		trim.CanCollide = false
+		trim.CanQuery = false
+	end
+
+	for _, dx in { -NAME_BOARD_W / 2 + 1.4, NAME_BOARD_W / 2 - 1.4 } do
+		local iron = makePart(
+			"Hanger",
+			Vector3.new(0.26, 2.2, 0.26),
+			plot.origin * CFrame.new(cx + dx, y + NAME_BOARD_H / 2 + 1.2, z + 0.15),
+			Color3.fromRGB(64, 58, 50),
+			board,
+			Enum.Material.Metal
+		)
+		iron.CanCollide = false
+		iron.CanQuery = false
+	end
+
+	-- Painted onto the wood, front face toward the street (the plot origin already
+	-- carries the row rotation, so an unrotated part's Front is the street side).
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "NamePlate"
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 48
+	gui.LightInfluence = 0.35
+	gui.Parent = plank
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(0.94, 0.86)
+	label.Position = UDim2.fromScale(0.03, 0.07)
+	label.Font = Enum.Font.GothamBlack
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 244, 214)
+	label.TextStrokeColor3 = Color3.fromRGB(58, 34, 18)
+	label.TextStrokeTransparency = 0.35
+	label.Text = "Café"
+	label.Parent = gui
+
+	board.Parent = plot.model
+end
+
+-- The label painted on the board, or nil before it is built.
+local function nameBoardLabel(plot: Plot): TextLabel?
+	local board = plot.model:FindFirstChild("NameBoard")
+	local plank = board and board:FindFirstChild("Plank")
+	local gui = plank and plank:FindFirstChild("NamePlate")
+	local label = gui and gui:FindFirstChild("Label")
+	return if label and label:IsA("TextLabel") then label else nil
+end
+
 function CafeService.SetSignBuzz(_self: any, player: Player, buzz: number)
 	local plot = plotByUser[player.UserId]
 	if plot then
-		plot.ownerLabel.Text = cafeSignName(player) .. "\n🔥 Buzz " .. tostring(buzz)
+		local name = cafeSignName(player)
+		-- The NAME lives on the wooden board now, so the floating label carries
+		-- only the Buzz and the two are not saying the same thing twice. If the
+		-- board is missing for any reason, the label falls back to showing both.
+		-- Buzz became fractional when it started decaying continuously, so it has
+		-- to be floored for display or the sign reads "Buzz 7.977523609650662".
+		local shown = tostring(math.floor(tonumber(buzz) or 0))
+		local label = nameBoardLabel(plot)
+		if label then
+			label.Text = name
+			plot.ownerLabel.Text = "🔥 Buzz " .. shown
+		else
+			plot.ownerLabel.Text = name .. "\n🔥 Buzz " .. shown
+		end
 	end
 end
 
@@ -1781,6 +1890,7 @@ end
 -- Hang the neon "Coffee Cup" sign on the café's exterior facade, above the
 -- door, facing the street. Called from the OnReady redress (the mesh isn't
 -- loaded when the static facade first builds).
+
 local function placeCafeSign(plot: Plot)
 	if not AssetLibraryService then
 		return
@@ -2038,6 +2148,18 @@ function CafeService.Start(_self: any)
 			for _, plot in plots do
 				rebuildShell(plot, math.max(plot.tier, 0))
 				placeCafeSign(plot)
+				buildNameBoard(plot)
+				-- The board is (re)built once the asset library is ready, which is
+				-- AFTER players may already have joined and had their sign painted.
+				-- Repaint it for whoever owns this plot right now, or it keeps the
+				-- placeholder name until their next Buzz change.
+				if plot.ownerUserId then
+					local owner = Players:GetPlayerByUserId(plot.ownerUserId)
+					if owner then
+						local data = DataService:GetProfile(owner)
+						CafeService:SetSignBuzz(owner, (data and tonumber(data.buzz)) or 0)
+					end
+				end
 			end
 		end)
 	end
