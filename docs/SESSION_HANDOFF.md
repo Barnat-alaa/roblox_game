@@ -108,6 +108,22 @@ You **cannot** `require` the running game's service singletons. You **can**:
 **Instance paths use the real player name** (`game.Players.aloulouba1...`), not
 `LocalPlayer`.
 
+You **cannot** drive the running UI by requiring its controller. `require` in the
+isolated VM builds a **second instance** with an empty action registry, so
+`UIController.openAction("Upgrades")` leaves the real panel shut and you measure
+an empty panel and believe it. Drive it the way a player does — the HUD hotkeys
+(Build 1, Cookbook 2, Staff 3, Upgrades 4, Shop 5) via `user_keyboard_input`.
+`VirtualInputManager:SendKeyEvent` is blocked here ("lacking capability
+RobloxScript"). Requiring a controller is still fine for **pure module-load**
+logic, and a server→client remote can be fired from `datamodel_type: "Server"`
+(`Remotes.Notify:FireClient(plr, …)`) to test a client reaction without
+reproducing its trigger.
+
+You can also run the test place in a **second Studio instance** rather than
+closing the owner's: build to a different filename, `Start-Process` the exe with
+the absolute path, then `list_roblox_studios` + `set_active_studio` on the new
+id, and kill only that PID afterwards to discard the in-memory patches.
+
 ### 5.3 Running the test suite
 
 Build `test.project.json`, launch it, Play, then get totals in-process rather
