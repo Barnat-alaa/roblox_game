@@ -210,6 +210,98 @@ Products.stockPacks = {
 	},
 }
 
+-- ————— Time products (economy fix #11, docs/ECONOMY_ANALYSIS.md §5.5) —————
+--
+-- §5.3 found that the packs sell relief from a bottleneck players do not have:
+-- production is capped by work-minutes, so nobody is stopped by an empty pantry
+-- unless they forgot to shop. These two sell the things a player actually wants
+-- at the moment they want them, and both stay inside the rails because neither
+-- raises a ceiling coins and levels cannot reach — they sell TIME, not power.
+--
+--   Double Shift      also earnable by levelling staff (15 → 60 work-min/hour)
+--   Instant Expansion also earnable for 8,000 / 25,000 coins (fix #7)
+--
+-- ⚠️ OWNER ACTION — these two products do not exist on the Creator Dashboard
+-- yet. Create them (names and prices below), then paste each real Product ID
+-- over the `PENDING` marker on its row. That is the ONLY change needed: while a
+-- row is pending it is hidden from the shop, never offered, and can never match
+-- a receipt, so the whole feature ships dark and lights up on those two numbers.
+local PENDING = 0
+
+export type TimeProduct = {
+	key: string,
+	name: string,
+	blurb: string,
+	icon: string,
+	kind: string, -- boost | instant_expansion
+	boost: string?, -- kind == "boost": the data.boosts key
+	seconds: number?, -- kind == "boost": duration
+	earnable: string, -- the free path to the same thing, printed on the card
+	productId: number,
+	robuxPrice: number,
+}
+
+Products.PENDING_PRODUCT_ID = PENDING
+
+-- What a Double Shift multiplies a producer's hourly output by. Read by
+-- Utilities/BoostMath for both the live loop and the offline settlement.
+Products.workBoostMultiplier = 2
+
+Products.timeProducts = {
+	{
+		key = "double_shift",
+		name = "Double Shift — 1 Hour",
+		blurb = "Your baristas and cooks make twice as much for the next 60 minutes",
+		icon = "⏳",
+		kind = "boost",
+		boost = "work",
+		seconds = 3600,
+		earnable = "Also free: level your staff up (15 → 60 work-minutes an hour)",
+		productId = PENDING, -- ⚠️ paste the real Product ID here (79 R$)
+		robuxPrice = 79,
+	},
+	{
+		key = "instant_expansion",
+		name = "Instant Expansion",
+		blurb = "Push the back wall into the garden now — your next café size, unlocked",
+		icon = "🏠",
+		kind = "instant_expansion",
+		earnable = "Also free: buy the same size with coins, just above",
+		productId = PENDING, -- ⚠️ paste the real Product ID here (199 R$)
+		robuxPrice = 199,
+	},
+}
+
+-- A SKU whose Dashboard product has not been created yet. Hidden everywhere.
+function Products.isPending(entry: { productId: number }): boolean
+	return (tonumber(entry.productId) or 0) <= PENDING
+end
+
+-- Is this time product actually purchasable yet? Callers that only want to know
+-- whether to MENTION a SKU (the shop cards, the contextual offers) ask by key.
+function Products.timeProductLive(key: string): TimeProduct?
+	for _, entry in Products.timeProducts do
+		if entry.key == key and not Products.isPending(entry) then
+			return entry
+		end
+	end
+	return nil
+end
+
+-- Look a time product up by its Dashboard Product ID (ProcessReceipt's entry
+-- point). Pending rows are excluded, so an id of 0 can never match one of them.
+function Products.timeProductForProduct(productId: number): TimeProduct?
+	if productId <= PENDING then
+		return nil
+	end
+	for _, entry in Products.timeProducts do
+		if entry.productId == productId then
+			return entry
+		end
+	end
+	return nil
+end
+
 -- Look a pack up by its Dashboard Product ID (ProcessReceipt's entry point).
 function Products.stockPackForProduct(productId: number): StockPack?
 	for _, pack in Products.stockPacks do

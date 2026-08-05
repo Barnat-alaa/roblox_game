@@ -63,6 +63,28 @@ so the eye lands on value:
 | **Auto-Collect** | Finished batches drop straight onto the counter — no walking to collect | **R$149** |
 | **Founder's Pack** (limited-time-of-launch, not FOMO-priced) | A cosmetic café theme + a starter coin boost + a Founder badge | **R$199** |
 
+### D. Time products — Dev Products (economy fix #11, built 2026-08-05)
+Added after `docs/ECONOMY_ANALYSIS.md` §5.3 found that the pantry SKUs above sell
+relief from a bottleneck players do not actually have: production is capped by
+work-minutes, so nobody is stopped by an empty pantry unless they forgot to shop.
+These two sell what a player genuinely wants at the moment they want it.
+
+| Product | What you get | Coin path | **Price** |
+| --- | --- | --- | ---: |
+| **Double Shift — 1 Hour** | Every barista and cook delivers **2×** for 60 min | Level your staff up: 15 → 60 work-minutes an hour | **R$79** |
+| **Instant Expansion** | The next café size immediately | 8,000 / 25,000 coins in the same panel, one row above | **R$199** |
+
+Both are **built and dormant**. `Config/Products.timeProducts` carries
+`productId = PENDING` for each, which hides the card, keeps the SKU out of the
+contextual offers, and makes `Products.timeProductForProduct` refuse to resolve
+it — so no receipt can ever match. Paste the two real ids over `PENDING` and the
+whole feature turns on with no code change. Nothing else is pending.
+
+Rails check: Double Shift multiplies a ceiling that staff levels already reach,
+and Instant Expansion buys a tier that is fully coin-purchasable — both sell
+**time**, not power. Each card prints its own free path in a green line beneath
+the blurb, and the offer copy names the coin route first.
+
 ### Why these prices (the "not too cheap / not too dear" logic)
 - **Minor conveniences** (Instant Delivery R$19, Emergency Restock R$25) are
   impulse-cheap — they save a walk, nothing more.

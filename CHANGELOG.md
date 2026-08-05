@@ -5,6 +5,53 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-05 — Double Shift + Instant Expansion (economy fix #11)
+The last open item in `docs/ECONOMY_ANALYSIS.md` §8. §5.3 found the pantry SKUs
+sell relief from a bottleneck players do not have — production is capped by
+work-minutes, not ingredients — so these two sell what a player actually wants:
+
+| Product | Grants | Also earnable by | Price |
+| --- | --- | --- | ---: |
+| **Double Shift — 1 Hour** | every producer delivers 2× for 60 min | levelling staff (15 → 60 work-min/hr) | 79 R$ |
+| **Instant Expansion** | the next café tier now | 8,000 / 25,000 coins | 199 R$ |
+
+**Ships dark.** A Product ID can only be minted on the Creator Dashboard, so
+both rows carry `productId = PENDING`: the cards are hidden, the offers stay on
+their free-path copy, and `timeProductForProduct` refuses to resolve them, so no
+receipt can match. Pasting the two real ids into `Config/Products` turns the
+whole feature on — there is no second step.
+
+Two decisions worth knowing (both in §5.5):
+
+- **Double Shift doubles the hourly QUOTA as well as the budget.** The literal
+  "+100% work-minutes" delivers nothing, because the plan is already sized to
+  spend the budget exactly — every recipe would still stop at its planned quota.
+  `chooseFromPlan` multiplies both, so output doubles with no re-planning and
+  nothing is left over-allocated when it expires.
+- **Offline settlement pro-rates it.** A 1-hour boost across an 8-hour absence
+  pays 9 hours of output, not 16. Paying nothing cheats the buyer; paying for
+  the whole night cheats the economy.
+
+The plan panel reads **"DOUBLE SHIFT ON — your staff are making 2× right now"**
+while it runs, because the plan numbers themselves do not move and a paying
+player would otherwise have no way to see it working.
+
+`BuildService` gained `GrantNextExpansion`, and the coin path now shares it —
+one place writes `expansionTier`, so the two purchase routes cannot drift. That
+path also now refunds if the tier fails to apply after the coins are taken.
+
+Verified live in the test place (104 passed / 0 failed, up from 89):
+
+- boost data reaches the running loop — a seeded profile gave `multiplier=2`,
+  budget **15 → 30 min/hr**, and an 8h absence paying **9.00 hours**;
+- coin expansion, refactored: **−10 → tier 1, −25 → tier 2**, and a third
+  purchase at the largest café charged **nothing** and changed nothing;
+- with ids patched in, both cards render at LayoutOrder 61/62 directly under the
+  coin expansion ladder, and `instant_expansion` **disappears at max tier**;
+- the offer card rewrote itself to *"Level them up, or run a Double Shift."*
+  with **SEE OPTIONS** and **NOT NOW** intact;
+- with ids left `PENDING`, neither card renders and neither SKU resolves.
+
 ### Feature — 2026-08-04 — contextual offers (economy fix #12)
 The store sat in UPGRADES and was never mentioned again, so a player only found
 it by going looking. Offers now appear **at the moment the friction is real**:
