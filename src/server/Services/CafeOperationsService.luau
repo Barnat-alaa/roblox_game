@@ -10,6 +10,7 @@ local Grid = require(Shared.Utilities.Grid)
 local Operations = require(Shared.Config.Operations)
 local OperationsMath = require(Shared.Utilities.OperationsMath)
 local BoostMath = require(Shared.Utilities.BoostMath)
+local SeatMath = require(Shared.Utilities.SeatMath)
 local IngredientMath = require(Shared.Utilities.IngredientMath)
 local Recipes = require(Shared.Config.Recipes)
 local StaffDefinitions = require(Shared.Config.Staff)
@@ -346,6 +347,18 @@ end
 -- each recipe's share of the planned minutes, capped by pantry ingredients (which
 -- it consumes). Returns coins earned; mutates data.pantry.
 local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number): number
+	-- No chairs, no sales — the same rule the online game already enforces, where
+	-- a diner who cannot claim a seat storms out and pays nothing. Without this an
+	-- unfurnished café earned coins while its owner was away and none while they
+	-- played, which is exactly backwards (owner report, 2026-08-05).
+	--
+	-- Deliberately a GATE, not a seats-per-hour curve: inventing a throughput
+	-- model here would re-tune every small café's income and `Config/Operations`
+	-- requires tools/economy_sim.py to be re-run before that. A furnished café —
+	-- which is every café past the first few minutes — is unaffected.
+	if SeatMath.usableSeats(data) <= 0 then
+		return 0
+	end
 	-- VIP Membership (Robux, A8) extends the offline earning cap 8h → 12h.
 	local passes = (data :: any).ownedPasses
 	local maxHours = if typeof(passes) == "table" and passes.vip == true
