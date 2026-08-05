@@ -77,6 +77,52 @@ merge**.
 
 ---
 
+## ⭐ NEXT — owner priorities (2026-08-05): TESTING
+
+_The build is feature-complete enough to test. `docs/SESSION_HANDOFF.md` §3 is
+the owner's checklist and §5 is how to drive Studio. Test suite: 89/0._
+
+### Blocking a public launch
+
+1. **Do saves persist?** Never verified outside Studio, which runs in-memory.
+2. **Buy one of every product.** Real IDs, but no purchase has ever completed —
+   a broken grant path takes money and gives nothing, silently.
+3. **MaxPlayers → 10** on the Dashboard (boot warns 12 vs 10 cafés).
+4. **Two-player test** of steal / smell bomb / help — the MCP cannot do it.
+5. **Confirm player chat is off** — Roblox's chat window was visible in
+   `PlayerGui`, and the rails forbid free-text between players.
+
+### Blocked on owner
+
+Create **Double Shift — 1 Hour** (79 R$) and **Instant Expansion** (199 R$);
+rename the two stock packs; add product icons; upload Level artwork. Economy #11
+and the last two offer moments wait on these.
+
+### Still open
+
+**B5 garden items** (now unblocked by expansion) · the HUD showing behind the
+intro card · offline settlement still charging producers capacity · **M3** the
+centre-screen café-naming prompt.
+
+### Economy pass — 11 of 12 done (`docs/ECONOMY_ANALYSIS.md` §8)
+
+| # | Fix | Result |
+| --- | --- | --- |
+| 1 | Forecast modelled a disabled scheduler | 12–32× overstatement removed |
+| 2 | Capacity audited | LIVE for Waiter/Cleaner; producers use work-minutes |
+| 3 | Satisfaction | kept, documented as presentational |
+| 4 | Demand capped to the kitchen | walkouts 2,201 → 752 over 60h |
+| 5 | Buzz decays | ceiling 31 → 78 of 105 |
+| 6 | Recipes re-tiered | endgame income 389 → 806/h |
+| 7 | Buy a bigger café | the missing coin sink; game no longer ends at hour 20 |
+| 8 | Session gifts cut | 338 → 110/h; gifts 50% → 16% of income |
+| 9 | Stock packs +5/+12/+24 | top pack 41% better per Robux |
+| 10 | Pack coin prices | 5× market value → 2.2× |
+| 11 | Sell work-minutes + expansion | **SPEC READY** — blocked on products |
+| 12 | Contextual offers | three live moments, rate-limited |
+
+---
+
 ## ⭐ NEXT — owner priorities (2026-08-01): mobile HUD polish
 
 _Everything below came from the owner playing the PHONE build and sending
