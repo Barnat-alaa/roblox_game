@@ -538,28 +538,57 @@ local function nextExpansionCost(data: Types.PlayerData): number?
 	return World.expansionCosts[nextTier]
 end
 
-local function handleBuyExpansion(player: Player)
-	local economy = ServiceRegistry.get("EconomyService")
+-- Raise the player one tier and rebuild the café around it. This is the ONLY
+-- place that writes expansionTier, so the coin path below and the Robux "Instant
+-- Expansion" product (economy fix #11) cannot drift apart. Returns false when
+-- there is nothing left to buy; each caller decides what that means — the coin
+-- path refunds, ProcessReceipt refuses the grant so Roblox never charges for it.
+local function raiseExpansionTier(player: Player, paidWith: string, cost: number?): boolean
 	local data = DataService and DataService:GetProfile(player)
-	if not data or not economy or not CafeService then
-		return
+	if not data or not CafeService then
+		return false
 	end
 	local tier = math.max(0, math.floor(tonumber(data.expansionTier) or 0))
 	local nextTier = tier + 1
 	if nextTier >= #World.interiorDepthTiers then
-		return -- already at the largest café
-	end
-	local cost = World.expansionCosts[nextTier]
-	if not cost or not economy:TrySpendCoins(player, cost) then
-		return
+		return false -- already at the largest café
 	end
 	data.expansionTier = nextTier
 	CafeService:RefreshTier(player)
 	DataService:Push(player)
 	local analytics = ServiceRegistry.get("AnalyticsService")
 	if analytics then
-		analytics:Track(player, "expansion_bought", { tier = nextTier, cost = cost })
+		analytics:Track(
+			player,
+			"expansion_bought",
+			{ tier = nextTier, cost = cost or 0, paidWith = paidWith }
+		)
 	end
+	return true
+end
+
+local function handleBuyExpansion(player: Player)
+	local economy = ServiceRegistry.get("EconomyService")
+	local data = DataService and DataService:GetProfile(player)
+	if not data or not economy then
+		return
+	end
+	-- Check there is a tier left BEFORE spending, so a maxed café is never charged.
+	local cost = nextExpansionCost(data)
+	if not cost or not economy:TrySpendCoins(player, cost) then
+		return
+	end
+	if not raiseExpansionTier(player, "coins", cost) then
+		economy:AddCoins(player, cost) -- nothing applied; hand the coins back
+	end
+end
+
+-- The Robux half of the same purchase (economy fix #11). Every tier it can reach
+-- is also buyable with coins, so this sells TIME, not power (HANDOFF §1).
+-- Returns false at the largest café — MonetizationService turns that into
+-- NotProcessedYet rather than taking Robux for nothing.
+function BuildService.GrantNextExpansion(_self: any, player: Player): boolean
+	return raiseExpansionTier(player, "robux", nil)
 end
 
 local function handlePlace(player: Player, payload: unknown)

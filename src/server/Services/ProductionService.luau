@@ -12,6 +12,7 @@ local Kitchen = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
 local EconomyConfig = require(Shared.Config.Economy)
 local Mastery = require(Shared.Utilities.Mastery)
+local BoostMath = require(Shared.Utilities.BoostMath)
 local IngredientMath = require(Shared.Utilities.IngredientMath)
 local RateLimiter = require(Shared.Utilities.RateLimiter)
 local Remotes = require(Shared.Network.Remotes)
@@ -207,6 +208,13 @@ local function chooseFromPlan(
 	local best: Types.RecipeDefinition? = nil
 	local bestRole: string? = nil
 	local bestRemaining = 0
+	-- Double Shift (economy fix #11) lifts BOTH numbers below, and it has to lift
+	-- both: the plan cap sizes the plan to spend the budget exactly, so doubling
+	-- the budget alone would buy nothing — every recipe would still stop at its
+	-- planned quota for the hour. Doubling the quota too means the player gets
+	-- exactly +100% output with no re-planning, and nothing is left over-allocated
+	-- when the boost runs out.
+	local boost = BoostMath.workMultiplier(data, now)
 	for recipeId, recipe in Recipes do
 		local minutes = tonumber(recipe.productionMinutes)
 		if
@@ -224,10 +232,11 @@ local function chooseFromPlan(
 			if target > 0 then
 				local h = roleHour(player.UserId, role, now)
 				local made = h.produced[recipeId] or 0
-				local workLeft = StaffService:GetWorkMinutesPerHour(data, role) - h.minutesUsed
+				local workLeft = StaffService:GetWorkMinutesPerHour(data, role) * boost
+					- h.minutesUsed
 				local _, available = KitchenService:GetStockCounts(data, recipeId, now)
 				local room = Kitchen.maxStockPerRecipe - available - incomingFor(kitchen, recipeId)
-				local remaining = target - made
+				local remaining = target * boost - made
 				if
 					remaining > bestRemaining
 					and (minutes :: number) <= workLeft + 0.001

@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage.Shared
 local Grid = require(Shared.Utilities.Grid)
 local Operations = require(Shared.Config.Operations)
 local OperationsMath = require(Shared.Utilities.OperationsMath)
+local BoostMath = require(Shared.Utilities.BoostMath)
 local IngredientMath = require(Shared.Utilities.IngredientMath)
 local Recipes = require(Shared.Config.Recipes)
 local StaffDefinitions = require(Shared.Config.Staff)
@@ -351,7 +352,12 @@ local function settlePlanOffline(data: Types.PlayerData, offlineSeconds: number)
 		then 12
 		else Operations.maxOfflineEarningHours
 	local earningSeconds = math.min(offlineSeconds, maxHours * 3600)
-	local hours = earningSeconds / 3600
+	-- A Double Shift (economy fix #11) bought just before logging off still pays,
+	-- but only for the slice of the earning window it actually covered: one boosted
+	-- hour out of an eight-hour absence, never eight. The window starts when the
+	-- player left, so this is exact rather than generous — under-delivering on a
+	-- paid product and over-delivering on one are both bugs.
+	local hours = BoostMath.offlineWorkHours(data, os.time() - offlineSeconds, earningSeconds)
 	local divisor = math.max(1, Operations.offlineTimeMultiplier)
 	local total = 0
 	local plan = (data :: any).productionPlan

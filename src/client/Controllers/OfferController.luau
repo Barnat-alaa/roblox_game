@@ -23,6 +23,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Remotes = require(Shared.Network.Remotes)
+local Products = require(Shared.Config.Products)
 
 local Components = require(script.Parent.Parent.UI.Components)
 local ResponsiveLayout = require(script.Parent.Parent.UI.ResponsiveLayout)
@@ -63,6 +64,22 @@ local OFFERS: { [string]: { title: string, body: string, action: string, cta: st
 		cta = "SEE STAFF",
 	},
 }
+
+-- Economy fix #11 lights two of these up, but only once the products really
+-- exist: an offer for something a player cannot then buy is worse than no offer
+-- at all. Until the owner pastes the IDs into Config/Products, both moments keep
+-- their free-path-only copy. Either way the free path stays in the sentence —
+-- the rails ask for the coin route to be visible wherever Robux is mentioned.
+if Products.timeProductLive("double_shift") then
+	OFFERS.shift_empty.body =
+		"Each role only works so many minutes an hour. Level them up, or run a Double Shift."
+	OFFERS.shift_empty.action = "Upgrades"
+	OFFERS.shift_empty.cta = "SEE OPTIONS"
+end
+if Products.timeProductLive("instant_expansion") then
+	OFFERS.no_room.body =
+		"Your café is full. Buy a bigger one with coins, or expand to it instantly."
+end
 
 local lastShown: { [string]: number } = {}
 local ui: { [string]: any } = {}

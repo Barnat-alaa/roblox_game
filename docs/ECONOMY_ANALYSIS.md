@@ -295,6 +295,39 @@ reach, so they sell **time**, not power. Instant Expansion in particular is the
 honest flagship — it is the one thing players will want at hour 20 and it is
 already fully coin-buyable.
 
+### Built 2026-08-05 — how it actually works
+
+Everything below the dashboard is done (`Config/Products.timeProducts`,
+`Utilities/BoostMath`, `tests/Boosts.spec.luau`). Both SKUs carry
+`productId = PENDING`, which hides them from the shop, keeps them out of the
+offer copy, and makes `timeProductForProduct` refuse to resolve them — so the
+feature is live code that sells nothing until the ids are pasted in.
+
+Two decisions were not obvious from the spec above and are worth recording:
+
+**Double Shift doubles the QUOTA as well as the budget.** The literal reading —
+"+100% work-minutes" — delivers *nothing*, because `handleSetPlan` sizes the
+plan to spend the hourly budget exactly. Doubling only the budget leaves every
+recipe still stopping at its planned quota for the hour, so output is unchanged
+unless the player manually re-plans, and a plan enlarged during the boost is
+left over-allocated when it expires. `chooseFromPlan` therefore multiplies both
+`workLeft` and `remaining`, which gives exactly +100% output, needs no player
+action, and disturbs nothing when it ends. The plan cap itself stays on the base
+budget.
+
+**The offline settlement pro-rates it.** `BoostMath.offlineWorkHours` counts only
+the slice of the earning window the boost actually covered: a 1-hour Double
+Shift bought just before logging off pays for one boosted hour of an eight-hour
+absence — 9 hours of output, not 16. Paying nothing would quietly cheat the
+buyer; paying for the whole night would quietly cheat the economy. Both are
+silent, so both are pinned down by spec.
+
+The plan panel says **"DOUBLE SHIFT ON — your staff are making 2× right now"**
+while it runs. Without that the numbers on screen do not move (the plan is
+unchanged; only delivery doubles) and a paying player has no way to tell the
+product worked — the exact silent-failure mode that makes a broken grant path
+the top monetisation risk.
+
 ### Then wire, in this order
 
 1. `Config/Products.luau` — add both to `developerProducts`. Double Shift uses
@@ -380,11 +413,15 @@ Existing: VIP every 30 min, daily goals, session gifts, neighbour mischief.
 
 9. ~~Make the top Stock Pack ~40% better per Robux.~~ **DONE** — +5/+12/+24.
 10. ~~Bring pack coin prices down to ~2–2.5× market value.~~ **DONE** — ~2.2×.
-11. Sell work-minutes and expansion, not ingredients. **SPEC READY (§5.5)** —
-    blocked on two Developer Products being created on the dashboard.
+11. ~~Sell work-minutes and expansion, not ingredients.~~ **BUILT (§5.5)** —
+    Double Shift + Instant Expansion are implemented end to end and ship DARK:
+    both carry `PENDING` product ids, so they are hidden from the shop, never
+    offered, and can never match a receipt. The owner creating the two products
+    and pasting the ids is now the only remaining step — no code change.
 12. ~~Add the six contextual offer moments.~~ **DONE** — `OfferController` plus
-    three live triggers (no room, pantry dry, shift spent). The remaining two
-    wait on #11's products; the sixth (cosmetics) has nothing to sell yet.
+    three live triggers (no room, pantry dry, shift spent). Two of those three
+    rewrite themselves to mention #11's products the moment the ids exist; the
+    sixth (cosmetics) has nothing to sell yet.
 
 ---
 

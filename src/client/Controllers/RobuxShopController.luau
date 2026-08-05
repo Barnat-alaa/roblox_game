@@ -259,6 +259,86 @@ local function buildExpansionRows(list: Instance, profile: any, order: number)
 	end
 end
 
+-- ————— time products (economy fix #11) —————
+--
+-- Rendered straight after the coin expansion ladder on purpose: Instant
+-- Expansion lands directly under the same sizes priced in coins, which is the
+-- honest side-by-side the rails ask for. Every card carries the free path to the
+-- same thing in its own line.
+--
+-- A product the owner has not created on the Dashboard yet has no ID, and a
+-- Robux button with no ID behind it is a dead end — so pending rows render
+-- nothing at all rather than a button that fails.
+local function buildTimeProducts(list: Instance, profile: any, order: number)
+	local tier = math.max(0, math.floor(tonumber(profile and profile.expansionTier) or 0))
+	local maxedOut = tier + 1 >= #World.interiorDepthTiers
+
+	for index, entry in Products.timeProducts do
+		-- Nothing to sell: no Dashboard product, or a café already at full size.
+		if Products.isPending(entry) or (entry.kind == "instant_expansion" and maxedOut) then
+			continue
+		end
+
+		local card = Instance.new("Frame")
+		card.Name = entry.key
+		card.Size = UDim2.new(1, -6, 0, 96)
+		card.BackgroundColor3 = Theme.Colors.Paper
+		card.LayoutOrder = order + index
+		card.ZIndex = 22
+		Components.Corner(card, Theme.Radius.Medium)
+		Components.Stroke(card, Theme.Colors.Line, 1, 0.4)
+		card.Parent = list
+
+		local thumb = Components.ItemThumbnail(card, {
+			glyph = entry.icon,
+			size = 60,
+			accent = Theme.Colors.Blue,
+		})
+		thumb.root.Position = UDim2.fromOffset(12, 18)
+		thumb.root.ZIndex = 23
+
+		local title = Components.Label(card, entry.name, 15, true)
+		title.Size = UDim2.new(1, -230, 0, 22)
+		title.Position = UDim2.fromOffset(84, 12)
+		title.TextXAlignment = Enum.TextXAlignment.Left
+		title.TextTruncate = Enum.TextTruncate.AtEnd
+		title.TextColor3 = Theme.Colors.Ink
+		title.ZIndex = 23
+
+		local blurb = Components.Label(card, entry.blurb, 11, false)
+		blurb.Size = UDim2.new(1, -230, 0, 30)
+		blurb.Position = UDim2.fromOffset(84, 34)
+		blurb.TextXAlignment = Enum.TextXAlignment.Left
+		blurb.TextYAlignment = Enum.TextYAlignment.Top
+		blurb.TextWrapped = true
+		blurb.TextColor3 = Theme.Colors.Muted
+		blurb.ZIndex = 23
+
+		local free = Components.Label(card, entry.earnable, 10, false)
+		free.Size = UDim2.new(1, -230, 0, 16)
+		free.Position = UDim2.fromOffset(84, 68)
+		free.TextXAlignment = Enum.TextXAlignment.Left
+		free.TextTruncate = Enum.TextTruncate.AtEnd
+		free.TextColor3 = Theme.Colors.Mint
+		free.ZIndex = 23
+
+		local buy = Components.Button(
+			card,
+			string.format("R$ %d", entry.robuxPrice),
+			Theme.Colors.MintDark,
+			UDim2.fromOffset(120, 44)
+		)
+		buy.Position = UDim2.new(1, -132, 0.5, -22)
+		buy.TextColor3 = Theme.Colors.White
+		buy.TextSize = 15
+		buy.ZIndex = 23
+		local pid = entry.productId
+		buy.Activated:Connect(function()
+			MarketplaceService:PromptProductPurchase(player, pid)
+		end)
+	end
+end
+
 local function rebuild()
 	local profile = UIController.getProfile()
 	if not ui.list then
@@ -273,6 +353,7 @@ local function rebuild()
 	local owned = (profile and profile.ownedPasses) or {}
 	buildStockPackSection(ui.list)
 	buildExpansionRows(ui.list, profile, 50)
+	buildTimeProducts(ui.list, profile, 60)
 
 	for order, ref in Products.order do
 		local info = infoFor(ref.id, ref.pass)

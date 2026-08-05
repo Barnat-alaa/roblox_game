@@ -12,6 +12,7 @@ local KitchenConfig = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
 local Tutorial = require(Shared.Config.Tutorial)
 local OperationsMath = require(Shared.Utilities.OperationsMath)
+local BoostMath = require(Shared.Utilities.BoostMath)
 local Remotes = require(Shared.Network.Remotes)
 
 local Components = require(script.Parent.Parent.UI.Components)
@@ -466,8 +467,18 @@ local function updateAll()
 	updateDock()
 	if ui.productionSummary and profile then
 		if KitchenConfig.useProductionPlan then
+			-- A Double Shift (economy fix #11) doubles what the plan DELIVERS without
+			-- changing the plan itself, so the minute counts below stay put and the
+			-- player would otherwise have no way to see the thing they paid for
+			-- working. Say it outright. No countdown: the rails forbid manufactured
+			-- urgency, and a number this panel only refreshes on profile updates
+			-- would go stale anyway.
+			local boosted = BoostMath.workMultiplier(profile, os.time()) > 1
 			ui.productionSummary.Text = string.format(
-				"PRODUCTION PLAN  •  set how many of each your staff make per hour\nBARISTA %s / %s min-per-hr  |  COOK %s / %s min-per-hr",
+				"PRODUCTION PLAN  •  %s\nBARISTA %s / %s min-per-hr  |  COOK %s / %s min-per-hr",
+				if boosted
+					then "DOUBLE SHIFT ON — your staff are making 2× right now"
+					else "set how many of each your staff make per hour",
 				oneDecimal(roleUsedMinutes("Barista")),
 				oneDecimal(roleBudget("Barista")),
 				oneDecimal(roleUsedMinutes("Cook")),

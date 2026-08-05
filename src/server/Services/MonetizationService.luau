@@ -26,6 +26,7 @@ local DataService: any
 local CafeService: any
 local KitchenService: any
 local EconomyService: any
+local BuildService: any
 local AnalyticsService: any
 
 local buyLimiter =
@@ -70,6 +71,13 @@ local function grantProduct(player: Player, entry: any): boolean
 				m.hired = true
 			end
 		end
+	elseif entry.kind == "instant_expansion" then
+		-- Refuse at the largest café so Roblox retries instead of charging for a
+		-- tier that does not exist. The shop hides the card there too, so reaching
+		-- this branch means the player expanded between opening it and buying.
+		if not BuildService:GrantNextExpansion(player) then
+			return false
+		end
 	elseif entry.kind == "stock_pack" then
 		-- A CONSUMABLE restock: top every unlocked dish up by `amount`, once.
 		-- KitchenService owns the per-recipe cap and the save.
@@ -106,7 +114,12 @@ local function processReceipt(receiptInfo: any): Enum.ProductPurchaseDecision
 	if data.grantedReceipts[receiptKey] then
 		return Enum.ProductPurchaseDecision.PurchaseGranted
 	end
-	local entry = Products.developerProducts[receiptInfo.ProductId]
+	local entry: any = Products.developerProducts[receiptInfo.ProductId]
+	if not entry then
+		-- Time products (economy fix #11) live in their own table because their
+		-- Dashboard IDs are filled in later; pending rows are never returned here.
+		entry = Products.timeProductForProduct(receiptInfo.ProductId)
+	end
 	if not entry then
 		-- Stock packs live in their own table (they carry a coin price too), so
 		-- look there before giving up.
@@ -251,6 +264,7 @@ function MonetizationService.Init(_self: any)
 	CafeService = ServiceRegistry.get("CafeService")
 	KitchenService = ServiceRegistry.get("KitchenService")
 	EconomyService = ServiceRegistry.get("EconomyService")
+	BuildService = ServiceRegistry.get("BuildService")
 	AnalyticsService = ServiceRegistry.get("AnalyticsService")
 end
 

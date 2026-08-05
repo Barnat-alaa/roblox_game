@@ -53,13 +53,25 @@ Nothing below has been verified on a real device. In priority order:
 
 ## 4. Owner actions blocking further work
 
-- **Create two Developer Products** — this is all that blocks economy #11, the
-  last open item (`docs/ECONOMY_ANALYSIS.md` §5.5):
+- **Create two Developer Products, then paste their ids.** Economy #11 is now
+  **built and dormant** (`docs/ECONOMY_ANALYSIS.md` §5.5) — the code is done and
+  verified; only the ids are missing, because a Product ID can only be minted on
+  the dashboard.
 
   | Name | Price | Grants |
   | --- | --- | --- |
-  | Double Shift — 1 Hour | 79 R$ | +100% work-minutes for 60 min |
+  | Double Shift — 1 Hour | 79 R$ | every producer delivers 2× for 60 min |
   | Instant Expansion | 199 R$ | the next café tier now |
+
+  Then open `src/shared/Config/Products.luau`, find the two lines reading
+  `productId = PENDING,` in `Products.timeProducts`, and replace `PENDING` with
+  the matching id. That is the whole task — the cards, the grants and the two
+  offer moments switch on by themselves. Until then both SKUs are hidden and no
+  receipt can match them, so shipping as-is is safe.
+
+  When you do turn them on, **glance at the two card icons** (⏳ and 🏠): the
+  Roblox UI font has no glyph for some emoji (§5.6) and these two have not been
+  seen rendered. If either shows a tofu box, swap `icon` in the same table.
 
 - **Rename** `3612636928` → "Stock Pack +12" and `3612637043` → "Stock Pack
   +24". IDs and prices unchanged, but the native prompt shows the dashboard name
@@ -192,10 +204,11 @@ The economy fixes, one line each:
 
 ## 7. Known-open, in priority order
 
-1. **Economy #11** — blocked on §4's two products. Short once they exist, and it
-   unlocks the two remaining offer moments.
+1. ~~**Economy #11**~~ — **built 2026-08-05 and dormant.** Nothing left to code;
+   it needs the two product ids from §4 and turns itself on. `ECONOMY_ANALYSIS`
+   §8 is now fully closed.
 2. **B5 garden items** — unblocked now that expansion exists (buying land is
-   exactly what makes the garden placeable).
+   exactly what makes the garden placeable). **This is the top open item.**
 3. **The HUD shows behind the intro card.** Cosmetic. The overlay is at
    `DisplayOrder 200` so the tint dims it, but hiding those ScreenGuis outright
    never took effect (`HUD.Enabled` stayed true). Needs a proper diagnosis, not
