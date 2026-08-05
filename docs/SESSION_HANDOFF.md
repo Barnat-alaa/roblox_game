@@ -1,4 +1,4 @@
-# Session handoff — Social Café City — 2026-08-01
+# Session handoff — Social Café City — 2026-08-05
 
 _Authoritative pick-up doc. Read this top to bottom, then the docs it points to._
 
@@ -6,120 +6,207 @@ _Authoritative pick-up doc. Read this top to bottom, then the docs it points to.
 
 ## 0. You are
 
-The lead developer of **Social Café City**, a social café-management sim at
-`C:\Users\barna\Desktop\roblox` (git repo, `main`, CI-green). Strict-Luau / Rojo /
+Lead developer of **Social Café City**, a social café-management sim at
+`C:\Users\barna\Desktop\roblox` (git, `main`, CI-green). Strict-Luau / Rojo /
 Rokit / Wally, **server-authoritative**, **data-driven** (all tuning in
 `src/shared/Config`). Published privately as DEV place `85898641225605`,
-universeId `10501568035`. You drive Roblox Studio via the **Studio MCP**.
+universe `10501568035`. You drive Roblox Studio through the **Studio MCP**.
 
 ## 1. Read first, in this order
 
-1. **`HANDOFF.md` §1** — the ethics rails. They are ABSOLUTE: server-authoritative,
-   no loot boxes, no pay-to-win (every Robux SKU is also coin-earnable), no fake
-   urgency, no free-text between players. §2a covers publishing.
-2. **`ROADMAP.md` → "⭐ NEXT — owner priorities (2026-08-01)"** — the ordered
-   to-do (M1–M4, B5), plus a table of every bug fixed this session and why.
+1. **`HANDOFF.md` §1** — the ethics rails. ABSOLUTE: server-authoritative, no
+   loot boxes, no pay-to-win (every Robux SKU also coin-earnable), no fake
+   urgency, no free-text chat between players. §2a covers publishing.
+2. **`docs/ECONOMY_ANALYSIS.md`** — the full economy model, a simulator, and the
+   §8 fix list. **Eleven of twelve items are done**; §5.5 holds the spec for the
+   twelfth.
 3. **`CHANGELOG.md` `[Unreleased]`** — every change with its verification notes.
 4. `docs/GAMEPLAY_DIRECTION.md`, `docs/IMPLEMENTATION_MAP.md`,
    `docs/CORE_LOOP_SPEC.md`, `docs/MONETISATION.md`.
 
-## 2. 📸 THE OWNER WILL SEND SCREENSHOTS — WAIT FOR THEM
+## 2. 📸 THE OWNER TESTS FROM THEIR PHONE — WAIT FOR SCREENSHOTS
 
-**The current work is mobile HUD polish, and the owner drives it from photos of
-their phone.** Every round so far has been: they play, they screenshot, they say
-what is crowded or ugly, you fix and measure.
+Layout and feel work is driven by photos of their phone. **If the task is about
+layout, ask for the screenshot before changing anything.** Guessing has cost
+rounds. Read the shot carefully — several rounds were solvable purely from it.
 
-**So: if the task is about layout, ask for (or wait for) the screenshot before
-changing anything.** Guessing at what "too big" means has already cost a round.
-When they send one, read it carefully — the last three rounds were all solvable
-purely from what was visible in the image.
+## 3. THE OWNER IS ABOUT TO TEST. This is their checklist
 
-## 3. State — everything below is MERGED to `main`, CI-green
+Nothing below has been verified on a real device. In priority order:
 
-**Every PR from #45 onward shipped this session** (a running count goes stale
-the moment you open another one — `gh pr list --state merged` is the truth).
-Headlines:
+1. **Do saves work?** Every test so far ran in Studio, which prints `DataStore
+   unavailable — running IN-MEMORY`. Persistence has **never** been verified on
+   a published place. Publish → play → leave → rejoin → is the café still there?
+2. **Buy one of every product.** The IDs are real but no purchase has gone
+   through end-to-end. A broken grant path takes real money and delivers
+   nothing — it fails **silently**, which is why it is the top risk.
+3. **MaxPlayers → 10** on the Creator Dashboard. Boot warns every time:
+   `MaxPlayers (12) exceeds cafés (10)`.
+4. **Two-player test** of steal / smell bomb / help-by-working. Every guard and
+   every solo half is verified; what is untested is a genuinely different
+   player. **The Studio MCP cannot do this** — it cannot attach to the child
+   processes a multi-client test spawns.
+5. **Is player chat on?** Roblox's chat window was visible in `PlayerGui` during
+   testing. The rails say no free-text chat between players — confirm it is off
+   in the published place's settings.
+6. **Play an hour on a phone.** Twelve economy changes have landed unfelt.
 
-| Area | What shipped |
+## 4. Owner actions blocking further work
+
+- **Create two Developer Products** — this is all that blocks economy #11, the
+  last open item (`docs/ECONOMY_ANALYSIS.md` §5.5):
+
+  | Name | Price | Grants |
+  | --- | --- | --- |
+  | Double Shift — 1 Hour | 79 R$ | +100% work-minutes for 60 min |
+  | Instant Expansion | 199 R$ | the next café tier now |
+
+- **Rename** `3612636928` → "Stock Pack +12" and `3612637043` → "Stock Pack
+  +24". IDs and prices unchanged, but the native prompt shows the dashboard name
+  and currently under-promises what it grants.
+- **Icons** for all five products.
+- **Upload Level artwork** — the only HUD icon with no image; that pill renders
+  from the `"L"` glyph. `tests/Graphics.spec` excludes it by name; put it back
+  when art exists.
+
+## 5. TESTING SKILLS — read this before touching Studio
+
+This is the hard-won part. Every item cost a round to learn.
+
+### 5.1 The relaunch cycle
+
+One `Stop-Process` of `RobloxStudioBeta`, `Start-Sleep 4`, `rojo build`, launch
+the exe with the absolute place path, `Start-Sleep 34`, then
+`list_roblox_studios` + `set_active_studio`. **Never `rojo build` the `.rbxlx`
+while Studio holds it open.** Repeated force-kill relaunches can drop Studio on
+its recovery page — minimise them.
+
+### 5.2 `execute_luau` runs in an ISOLATED VM
+
+You **cannot** `require` the running game's service singletons. You **can**:
+
+- require anything under `ReplicatedStorage.Shared` (config, utilities) — this
+  is how the whole economy was measured;
+- require client modules under `PlayerScripts` — this is how every HUD rectangle
+  was verified;
+- drive the game through remotes (`RequestProfile:InvokeServer()`,
+  `PlaceFurniture:FireServer{...}`);
+- read the DataModel directly (positions, sizes, attributes, `.Enabled`).
+
+**Instance paths use the real player name** (`game.Players.aloulouba1...`), not
+`LocalPlayer`.
+
+### 5.3 Running the test suite
+
+Build `test.project.json`, launch it, Play, then get totals in-process rather
+than scraping the console:
+
+```lua
+local TestEZ = require(game.ReplicatedStorage.DevPackages.TestEZ)
+local r = TestEZ.TestBootstrap:run({ game.ReplicatedStorage.Tests }, TestEZ.Reporters.TextReporterQuiet)
+return string.format("%d passed, %d failed", r.successCount, r.failureCount)
+```
+
+Current state: **89 passed, 0 failed.** Keep it there.
+
+### 5.4 Screenshotting the WORLD
+
+- The intro overlay covers everything. Disable every `ScreenGui` in `PlayerGui`
+  first.
+- **The camera controller re-asserts `CFrame` every frame.** `RenderStepped` and
+  `BindToRenderStep` at `Camera + 10` both lose. What works: create a **new**
+  `Camera`, parent it to workspace, and set `workspace.CurrentCamera` to it —
+  the controller still holds the old one and writes to a detached object.
+- A leftover pin loop keeps overwriting a later camera; `:Destroy()` the probe
+  camera to stop it.
+- The server **teleports strays back to their own plot**, so you cannot walk to
+  the map edge to photograph it.
+
+### 5.5 Testing something the default profile cannot reach
+
+Patch Studio's **in-memory** DataModel only — `ModuleScript.Source` in Edit
+mode. Used this session to unlock all 14 recipes (`requiredLevel`,
+`requiredReputation`) and to reseed `DataService`'s default profile.
+
+- **Never on disk.** Verify with `git status` afterwards; the disk is the truth.
+- Revert by closing Studio **without saving** — the `.rbxlx` is a build artifact.
+- Use plain `string.find(s, needle, 1, true)` + `string.sub` splice. `gsub`
+  treats the needle as a **pattern** and has silently failed here before.
+- The same trick fast-forwards timers (a Config's `.Source`).
+
+### 5.6 Traps that have bitten more than once
+
+- **Lua locals must be defined ABOVE their callers.** Two red builds this
+  session came from inserting helpers below the code that calls them. After
+  moving a function, run `selene` before anything else.
+- **CHECK CI BEFORE MERGING.** One PR was merged while its check read `fail`,
+  breaking `main`. `gh pr checks <branch>` must say **pass**.
+- **A Roblox part is capped at 2048 studs per axis and clamps SILENTLY.** The
+  sea was declared 8000 wide for months and was really a 2048 square.
+- **`Model:GetBoundingBox()` returns PIVOT-oriented extents**, not world-axis
+  ones — it cannot detect world rotation. Project the 8 corners instead.
+- **`math.clamp` errors when max < min.** Guard any clamp whose bounds come from
+  layout.
+- **`AbsolutePosition` is offset by the GUI inset** for `DeviceSafeInsets`
+  ScreenGuis — an element at y=4 reads as `-54`. Compare like with like.
+- **Assert on every programmatic edit.** A silent no-op replace once shipped a
+  missing config key and Studio errored at runtime.
+- **The Roblox UI font has no glyph** for 🪙 (U+1FA99), 🫳, 🏆, 🥇🥈🥉 — they
+  render as tofu. Draw them from Frames (see `UI/StylePreview`).
+
+### 5.7 Gates (identical to CI)
+
+`stylua --check .` + `selene .` (**unpiped**) + `rojo build` of **both**
+`default.project.json` and `test.project.json`. Branch off `main`, one
+deliverable per PR, co-author to `Claude <noreply@anthropic.com>`. **Never merge
+unverified core-loop code.**
+
+## 6. What shipped this session (PRs #70–#85)
+
+| Area | Change |
 | --- | --- |
-| Bug fixes | grass-through-road, onboarding dead-end at step 2/6, the coin glyph rendering as `□`, panels centred on screen, headers under the Roblox topbar |
-| Neighbours | steal from a shelf · smell bomb that clears a café · help by WORKING inside one (the abstract help card is gone) |
-| VIP | scheduled 30-min event, HUD countdown with the brainrot's portrait, NPC nearly doubled |
-| Building | move already-placed furniture · floor + wall painting (8 colours × 5 motifs) · façade personalisation (3 architectures × 8 colours × 6 motifs × 6 door styles × 6 woods × 3 window shapes × 3 glass tints) |
-| Monetisation | Robux store folded into UPGRADES; **consumable Stock Packs** (+5/+10/+20 of every unlocked dish) wired to the owner's real Product IDs |
-| Mobile | panels dock to edges · 44px touch floor · camera chevrons · tap-to-hide HUD tab · narrow vertical pantry · six buttons on the extreme bottom |
+| World | Wall shelves wrap onto the back wall instead of standing in the garden · café walls stay solid from the garden · beach shoreline, tiled open sea, sun on the water · café name on a hanging wooden board |
+| Economy | **Full analysis + simulator** (`tools/economy_sim.py`), then fixes #1–#10 and #12 |
+| Intro | Live blurred world behind the naming card |
+| Tests | Suite green for the first time — 89 passed, 0 failed |
 
-## 4. ⚠️ NOT PUBLISHED — this is the biggest gap
+The economy fixes, one line each:
 
-**None of it is live.** The DEV place still runs pre-session code. The
-owner runs `./scripts/publish.ps1` with their own Open Cloud key — **never handle
-that key yourself**. Until then:
+- **#1** the production forecast modelled a **disabled** scheduler — 12–32×
+  optimistic, ingredients up to 62% understated. Rewritten against the plan.
+- **#2** capacity audited: LIVE for Waiter/Cleaner, work-minutes for producers.
+- **#3** satisfaction kept (owner's call), documented as presentational.
+- **#4** demand capped to what the kitchen can deliver — angry walkouts over 60h
+  fell **2,201 → 752**.
+- **#5** Buzz decays, so it measures throughput. Ceiling **31 → 78** of 105.
+- **#6** recipes re-tiered: a level-1 dish beat six later ones. Endgame income
+  **389 → 806/h**.
+- **#7** **buy a bigger café** — the missing coin sink; the game used to end at
+  hour 20 with coins piling up and nothing to buy.
+- **#8** session gifts **338 → 110/h**, so playing beats idling (50% → 16% of
+  income).
+- **#9** stock packs +5/+12/+24 — the top pack is now 41% better per Robux.
+- **#10** pack coin prices 5× market value → **2.2×**.
+- **#12** contextual offers at three real moments, rate-limited, with a
+  first-class **NOT NOW**.
 
-- nothing has been tested on a real phone;
-- the **vertical pantry** and the **flash-on-tap button names** cannot be verified
-  at all, because both key off "touch device with no mouse" and Studio always
-  reports a mouse.
+## 7. Known-open, in priority order
 
-## 5. Owner actions owed
+1. **Economy #11** — blocked on §4's two products. Short once they exist, and it
+   unlocks the two remaining offer moments.
+2. **B5 garden items** — unblocked now that expansion exists (buying land is
+   exactly what makes the garden placeable).
+3. **The HUD shows behind the intro card.** Cosmetic. The overlay is at
+   `DisplayOrder 200` so the tint dims it, but hiding those ScreenGuis outright
+   never took effect (`HUD.Enabled` stayed true). Needs a proper diagnosis, not
+   another guess.
+4. **Offline settlement still models producers spending capacity** — a rule the
+   online game no longer uses (`docs/ECONOMY_ANALYSIS.md` §2.3).
+5. **M3** — the "Name your café" prompt is a world `ProximityPrompt`, so Roblox
+   renders it dead-centre. Needs a custom prompt style.
 
-1. **Publish** (above).
-2. **Create an icon** for each of the three Stock Pack Developer Products
-   (`3612636850`, `3612636928`, `3612637043` — already wired in `Config/Products`).
-3. **MaxPlayers = 10** on the Creator Dashboard (boot warns it is 12 vs 10 plots).
-4. **Eyeball** the Clouds sky, the VIP's width (~9.4 studs against a 6-stud door —
-   it clips the frame but is never physically blocked), and the new mobile HUD.
-
-## 6. Still owed (testing)
-
-- **A 2-player playtest** of steal / smell-bomb / help-by-working. Every guard
-  ladder and every solo half is verified; what is untested is the other party
-  being a genuinely different player. Studio MCP **cannot** do this — it cannot
-  attach to the child processes a multi-client test spawns.
-- **A live Robux purchase test** (the product IDs are real).
-- **`tests/Graphics.spec`** has one pre-existing failure (Coin/Coins key
-  mismatch). CI only builds, it does not run TestEZ.
-
-## 7. Working rules the owner expects
-
-- **Senior-dev loop, every change:** understand → build cleanly → **TEST IN
-  ROBLOX STUDIO** → commit (conventional message + CHANGELOG entry) → PR → wait
-  for CI green → merge. **Never merge unverified core-loop code.**
-- **Gates = the CI:** `stylua --check .` + `selene .` (**unpiped**) + `rojo build`
-  of BOTH `default.project.json` and `test.project.json`. Co-author commits and
-  PRs to `Claude <noreply@anthropic.com>`. Branch off `main`, one deliverable per
-  PR.
-- **Measure, don't eyeball.** Every layout claim in this session was verified by
-  reading back real geometry. Two bugs were caught that way that no screenshot
-  would have shown (the inverted `math.clamp`, the dock's off-by-one plate).
-- Ship risky changes behind a `Config` flag first.
-
-## 8. Studio workflow (hard-won)
-
-- **Relaunch:** one `Stop-Process` of `RobloxStudioBeta`, `Start-Sleep 4`,
-  `rojo build`, launch the exe with the absolute place path, wait ~32s, then
-  `list_roblox_studios` + `set_active_studio`. Never rebuild the `.rbxlx` while
-  Studio holds it open.
-- **`execute_luau` runs in an ISOLATED VM** — you cannot `require` the running
-  game's singletons. Drive tests through remotes
-  (`RS.Remotes.RequestProfile:InvokeServer()`) and DataModel inspection. Client
-  modules under `PlayerScripts` CAN be required (that is how the layout was
-  measured).
-- **To test a two-player mechanic solo:** patch out the self-target guard in
-  Studio's **in-memory** DataModel (`ModuleScript.Source`, Edit mode only), test,
-  then revert. **Never on disk** — always verify with `grep` afterwards. Use a
-  plain `string.find(..., true)` + `string.sub` splice; `gsub` treats the needle
-  as a PATTERN and has silently failed here before.
-- **Same trick fast-forwards timers** (a Config's `.Source`), which is how the
-  30-minute VIP event and the 900-coin prices were tested.
-- **The intro overlay freezes player input**, so keyboard-driven ProximityPrompt
-  tests silently do nothing until you dismiss it
-  (`LocalPlayer.PlayerGui.IntroOverlay.Overlay.Card.TextButton`).
-- **Ambiguous instance paths**: sibling buttons often share a name
-  (`Frame.TextButton`); give buttons unique `Name`s if you need to click them.
-- **Play-mode camera is LOCKED** to the café — `screen_capture`'s camera
-  arguments are ignored, so visual checks are limited to what that camera sees.
-
-## 9. Exact command to continue
+## 8. Exact command to continue
 
 Open Claude Code in `C:\Users\barna\Desktop\roblox` and say `continue`, or paste
-this file. **If the request is about mobile layout, ask for the screenshot first.**
+this file. **If the request is about mobile layout, ask for the screenshot
+first.** If the owner has created the two products, start with economy #11.
