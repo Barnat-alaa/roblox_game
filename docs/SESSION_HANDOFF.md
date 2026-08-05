@@ -18,8 +18,8 @@ universe `10501568035`. You drive Roblox Studio through the **Studio MCP**.
    loot boxes, no pay-to-win (every Robux SKU also coin-earnable), no fake
    urgency, no free-text chat between players. §2a covers publishing.
 2. **`docs/ECONOMY_ANALYSIS.md`** — the full economy model, a simulator, and the
-   §8 fix list. **Eleven of twelve items are done**; §5.5 holds the spec for the
-   twelfth.
+   §8 fix list. **All twelve items are done**; the twelfth (§5.5) is built but
+   dormant until the owner mints two product ids — see §4.
 3. **`CHANGELOG.md` `[Unreleased]`** — every change with its verification notes.
 4. `docs/GAMEPLAY_DIRECTION.md`, `docs/IMPLEMENTATION_MAP.md`,
    `docs/CORE_LOOP_SPEC.md`, `docs/MONETISATION.md`.
@@ -135,7 +135,7 @@ local r = TestEZ.TestBootstrap:run({ game.ReplicatedStorage.Tests }, TestEZ.Repo
 return string.format("%d passed, %d failed", r.successCount, r.failureCount)
 ```
 
-Current state: **89 passed, 0 failed.** Keep it there.
+Current state: **104 passed, 0 failed.** Keep it there.
 
 ### 5.4 Screenshotting the WORLD
 
