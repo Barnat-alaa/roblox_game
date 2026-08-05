@@ -105,6 +105,16 @@ settlement (`CafeOperationsService`) still models producers spending
 the online game no longer uses. Every knob is now labelled LIVE or legacy-only
 in `Config/Operations`.
 
+**Fixed 2026-08-05 — the offline settlement now respects seating.** A related
+divergence, found by the owner: `settlePlanOffline` paid out the whole production
+plan without ever asking whether a customer could have sat down, while the online
+game turns away every diner who cannot claim a chair. An unfurnished café earned
+while its owner was away and nothing while they played. Both paths now count
+seats through `Utilities/SeatMath`, which mirrors `claimSeat` exactly. It is a
+gate (no seats → no offline earnings), **not** a seats-per-hour curve — a
+throughput model would re-tune every small café and needs `tools/economy_sim.py`
+re-run first.
+
 ### 2.4 Satisfaction gates nothing
 
 **Owner decision 2026-08-03: keep it — a consequence is coming later.** It is

@@ -22,6 +22,8 @@ local World = require(Shared.Config.World)
 local Vip = require(Shared.Config.Vip)
 local Grid = require(Shared.Utilities.Grid)
 local RewardMath = require(Shared.Utilities.RewardMath)
+local SeatMath = require(Shared.Utilities.SeatMath)
+local Remotes = require(Shared.Network.Remotes)
 local Types = require(Shared.Types)
 
 local ServiceRegistry = require(script.Parent.Parent.ServiceRegistry)
@@ -1275,6 +1277,20 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 		stormOut(cust, Kitchen.buzzPerWalkout, "😡 NO EMPTY CHAIR!")
 		KitchenService:AddBuzz(player, Kitchen.buzzPerWalkout)
 		CafeOperationsService:AdjustSatisfaction(player, -Operations.satisfactionNoSeatLoss)
+		-- The one walkout a new player cannot diagnose: the café looks finished,
+		-- but nothing sells because no chair was ever placed. Every other income
+		-- source keeps ticking (session gifts), so the till still moves and the
+		-- cause stays invisible. Point at the fix — which is free — and let the
+		-- client's per-key rate limit stop it becoming a nag.
+		local seatData = DataService:GetProfile(player)
+		if seatData then
+			Remotes.event("Notify"):FireClient(player, {
+				kind = "offer",
+				offer = if SeatMath.seatsInInventory(seatData) > 0
+					then "no_seats"
+					else "no_seats_buy",
+			})
+		end
 		task.wait(1.4)
 		depart(cust, streetExit)
 		return

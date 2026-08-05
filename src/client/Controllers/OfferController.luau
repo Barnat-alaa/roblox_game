@@ -63,6 +63,22 @@ local OFFERS: { [string]: { title: string, body: string, action: string, cta: st
 		action = "Staff",
 		cta = "SEE STAFF",
 	},
+	-- These two sell NOTHING. A café with no chair turns every customer away, but
+	-- session gifts keep the coins ticking up, so the till still moves and a new
+	-- player has no way to work out why the café itself earns nothing. This is the
+	-- card that answers that, and its answer is free.
+	no_seats = {
+		title = "Nobody can sit down",
+		body = "Customers are leaving because there is nowhere to sit. You have chairs waiting in Build.",
+		action = "Build",
+		cta = "PLACE A CHAIR",
+	},
+	no_seats_buy = {
+		title = "Nobody can sit down",
+		body = "Customers are leaving because there is nowhere to sit. Chairs are in the Shop.",
+		action = "Shop",
+		cta = "SEE CHAIRS",
+	},
 }
 
 -- Economy fix #11 lights two of these up, but only once the products really

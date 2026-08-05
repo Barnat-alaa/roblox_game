@@ -5,6 +5,53 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-05 — a café with no chairs is honest about it (owner report)
+
+The owner connected with nothing placed, saw coins going up, and asked why. The
+answer was that **none of it came from the café**: session gifts pay ~110 an hour
+on their own, so the till moves whatever the café does, and the one thing that
+actually needed fixing was invisible behind it.
+
+Two real problems sat underneath, now both fixed.
+
+**Offline settlement paid for customers who could never have sat down.** Online,
+a diner who cannot claim a chair storms out and pays nothing
+(`CustomerService.claimSeat` → `😡 NO EMPTY CHAIR!`). Offline, `settlePlanOffline`
+never asked — it settled the whole production plan regardless. An unfurnished
+café therefore earned while its owner was away and earned nothing while they
+played, which is exactly backwards. Both sides now count seats through one new
+`Utilities/SeatMath`, which mirrors `claimSeat`'s two non-obvious rules: a chair
+inside the staff-only kitchen rectangle does not count, and occupancy is keyed on
+`instanceId`, so one placed item seats one diner whatever its `seatCount` says.
+
+Deliberately a **gate, not a seats-per-hour curve** — inventing a throughput
+model would re-tune every small café's income, and `Config/Operations` requires
+`tools/economy_sim.py` to be re-run first. A furnished café is unaffected.
+
+**Nothing told the player.** A new contextual offer fires on the no-seat walkout,
+in two variants so the advice is never useless: `no_seats` ("You have chairs
+waiting in Build" → Build) when the player owns an unplaced chair, and
+`no_seats_buy` ("Chairs are in the Shop" → Shop) when they do not. These two sell
+**nothing** — the fix they point at is free — which is the kind of offer the
+rails are happiest with. The existing per-key rate limit keeps a walkout that
+repeats every few minutes from becoming a nag.
+
+Verified live in the test place (114 passed / 0 failed, up from 104), on the
+starter profile the owner described — counter and coffee machine placed, four
+chairs still in inventory:
+
+- `usableSeats=0`, `seatsInInventory=4` → offline settles **nothing**, and the
+  nudge correctly selects the *place-a-chair* variant;
+- a real walk-in stormed out and the card appeared reading *"Nobody can sit
+  down / Customers are leaving because there is nowhere to sit. You have chairs
+  waiting in Build."* with **PLACE A CHAIR** and **NOT NOW**;
+- both CTAs route to registered actions (`Build`, `Shop`);
+- placing one chair took `usableSeats` **0 → 1** (offline opens), and the next
+  customer was **served: 0 → 1, +6 coins**;
+- the console showed the cost of the old behaviour plainly — three
+  `production_completed` followed by `stock_spoiled ×3`, and Buzz drained
+  **10 → 2.6** on repeated walkouts.
+
 ### Feature — 2026-08-05 — Double Shift + Instant Expansion (economy fix #11)
 The last open item in `docs/ECONOMY_ANALYSIS.md` §8. §5.3 found the pantry SKUs
 sell relief from a bottleneck players do not have — production is capped by
