@@ -94,6 +94,62 @@ return function()
 		end)
 	end)
 
+	describe("multi-seat sets", function()
+		local function set(catalogId: string, gridX: number, gridY: number): any
+			return {
+				instanceId = catalogId .. "_1",
+				catalogId = catalogId,
+				gridX = gridX,
+				gridY = gridY,
+				rotation = 0,
+			}
+		end
+
+		it("counts every seat on a set, not the set itself", function()
+			-- The whole point of the 2026-08-06 haul: a four-top seats four. Before
+			-- occupancy was keyed on instanceId#slot, a set of any size seated one
+			-- and its other chairs sat visibly empty forever.
+			for _, case in
+				{
+					{ id = "set_cafe_two", seats = 2 },
+					{ id = "set_fancy_two", seats = 2 },
+					{ id = "set_diner_four", seats = 4 },
+				}
+			do
+				expect(Furniture[case.id]).to.be.ok()
+				expect(Furniture[case.id].seatCount).to.equal(case.seats)
+				expect(SeatMath.usableSeats(profile({ set(case.id, DINING_X, DINING_Y) }))).to.equal(
+					case.seats
+				)
+			end
+		end)
+
+		it("adds a set's seats to the loose chairs around it", function()
+			local placed = {
+				set("set_diner_four", DINING_X, DINING_Y),
+				seat(DINING_X + 6, DINING_Y, "loose_a"),
+				seat(DINING_X + 8, DINING_Y, "loose_b"),
+			}
+			expect(SeatMath.usableSeats(profile(placed))).to.equal(6)
+		end)
+
+		it("gives every seating catalogue entry a sane seat count", function()
+			-- A "Seating" piece with a chair in its model but seatCount 0 would look
+			-- sittable and never be sat on, which is the bug this whole file exists
+			-- to prevent. Tables legitimately seat nobody, so only the ceiling is
+			-- asserted here.
+			for id, def in Furniture do
+				local seats = tonumber(def.seatCount) or 0
+				expect(seats >= 0).to.equal(true)
+				expect(seats <= 4).to.equal(true)
+				if seats > 1 then
+					-- A multi-seat piece needs room for its diners to sit apart.
+					expect(def.width * def.depth >= seats).to.equal(true, id)
+				end
+			end
+		end)
+	end)
+
 	describe("SeatMath.seatsInInventory", function()
 		it("counts unplaced chairs, which decides WHICH nudge the player gets", function()
 			expect(SeatMath.seatsInInventory(profile({}, { chair_wood = 4 }))).to.equal(4)

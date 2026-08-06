@@ -8,12 +8,14 @@
 -- unfurnished café earned while its owner was away and earned nothing while they
 -- played. Both sides now count seats through here, so they cannot drift again.
 --
--- The rules mirror `claimSeat` exactly, including its two non-obvious ones:
---   * a seat inside the staff-only kitchen rectangle does not count — diners are
---     kept out of it, so a chair parked there is furniture, not seating;
---   * occupancy is keyed on `instanceId`, so ONE placed item holds ONE diner
---     however large its `seatCount` is. We therefore count INSTANCES, not the
---     sum of `seatCount`, because that is what the game really allows.
+-- The rules mirror `claimSeat` exactly, including the non-obvious one: a seat
+-- inside the staff-only kitchen rectangle does not count, because diners are kept
+-- out of it, so a chair parked there is furniture rather than seating.
+--
+-- Updated 2026-08-06 with the table-and-chairs sets: occupancy is now keyed on
+-- `instanceId#slot`, so a piece really does hold `seatCount` diners and this sums
+-- `seatCount` rather than counting instances. Before the sets existed every piece
+-- seated exactly one, so the two agreed.
 
 local Furniture = require(script.Parent.Parent.Config.Furniture)
 local World = require(script.Parent.Parent.Config.World)
@@ -44,7 +46,7 @@ function SeatMath.usableSeats(data: any): number
 			local seatZ = (tonumber(item.gridY) or 0) + d / 2
 			local inKitchen = seatX < World.kitchenWidthCells and seatZ < World.kitchenDepthCells
 			if not inKitchen then
-				count += 1
+				count += math.max(1, math.floor(tonumber(def.seatCount) or 1))
 			end
 		end
 	end

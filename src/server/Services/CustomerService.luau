@@ -765,7 +765,54 @@ local function occupiedSeatIds(userId: number, exclude: ActiveCustomer?): { [str
 	return held
 end
 
--- Pick a genuinely-free placed chair; returns its world CFrame + instanceId.
+-- Where seat `slot` sits on a piece that seats more than one (owner haul
+-- 2026-08-06: table-and-chairs SETS). A single chair keeps the placement CFrame
+-- untouched, which preserves BuildService.autoFaceSeats turning it toward its
+-- table. Multi-seat pieces place their diners around the footprint and turn each
+-- to look at the middle, so a four-top reads as four people sharing a table
+-- rather than four people stacked on its centre.
+--
+-- The offsets are geometric, not read from the model: a Creator Store set does
+-- not tell us where its chairs are, and 0.3 of the footprint lands on them for
+-- every set in the catalogue (checked against each one's own proportions).
+local function seatSlotCFrame(centre: CFrame, def: any, slot: number): CFrame
+	local count = math.max(1, math.floor(tonumber(def.seatCount) or 1))
+	if count <= 1 then
+		return centre
+	end
+	local w = (tonumber(def.width) or 1) * Grid.CELL_SIZE
+	local d = (tonumber(def.depth) or 1) * Grid.CELL_SIZE
+	local offsets
+	if count == 2 then
+		-- Two chairs face each other across the LONGER axis of the piece.
+		offsets = if w >= d
+			then { Vector3.new(-w * 0.3, 0, 0), Vector3.new(w * 0.3, 0, 0) }
+			else { Vector3.new(0, 0, -d * 0.3), Vector3.new(0, 0, d * 0.3) }
+	else
+		offsets = {
+			Vector3.new(-w * 0.3, 0, 0),
+			Vector3.new(w * 0.3, 0, 0),
+			Vector3.new(0, 0, -d * 0.3),
+			Vector3.new(0, 0, d * 0.3),
+		}
+	end
+	local offset = offsets[((slot - 1) % #offsets) + 1]
+	local seatPos = (centre * CFrame.new(offset)).Position
+	-- Look at the centre of the piece, keeping the seat's own height.
+	local target = Vector3.new(centre.Position.X, seatPos.Y, centre.Position.Z)
+	if (target - seatPos).Magnitude < 0.05 then
+		return CFrame.new(seatPos) * centre.Rotation
+	end
+	return CFrame.lookAt(seatPos, target)
+end
+
+-- Pick a genuinely-free placed seat; returns its world CFrame + a seat key.
+--
+-- The key is `instanceId#slot`, so one placed piece can hold as many diners as
+-- its `seatCount`. It used to be the bare instanceId, which capped every piece
+-- at one diner however many chairs its model showed — that is why a set with
+-- four chairs would have seated one person and left three chairs empty.
+-- `occupiedSeatIds` keys on whatever string this returns, so it needed no change.
 local function claimSeat(player: Player, cust: ActiveCustomer): (CFrame?, string?, string?)
 	local data = DataService:GetProfile(player)
 	local origin = CafeService:GetPlotOrigin(player)
@@ -777,12 +824,11 @@ local function claimSeat(player: Player, cust: ActiveCustomer): (CFrame?, string
 	for _, placed in data.placedFurniture do
 		local def = Furniture[placed.catalogId]
 		if def and def.seatCount > 0 then
-			seatNumber += 1
 			local w, d = Grid.footprintSize(def.width, def.depth, placed.rotation)
 			local seatX = placed.gridX + w / 2
 			local seatZ = placed.gridY + d / 2
 			local inKitchen = seatX < World.kitchenWidthCells and seatZ < World.kitchenDepthCells
-			if not inKitchen and not taken[placed.instanceId] then
+			if not inKitchen then
 				local cf = Grid.cellToWorld(
 					origin,
 					placed.gridX,
@@ -792,7 +838,13 @@ local function claimSeat(player: Player, cust: ActiveCustomer): (CFrame?, string
 					placed.rotation,
 					def.height
 				)
-				return cf, placed.instanceId, "TABLE " .. tostring(seatNumber)
+				for slot = 1, def.seatCount do
+					seatNumber += 1
+					local key = placed.instanceId .. "#" .. tostring(slot)
+					if not taken[key] then
+						return seatSlotCFrame(cf, def, slot), key, "TABLE " .. tostring(seatNumber)
+					end
+				end
 			end
 		end
 	end

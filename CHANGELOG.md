@@ -5,6 +5,49 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-06 — 12 new pieces, and sets that really seat 2 and 4
+
+Owner haul: four paintings, two tables, two chairs, three table-and-chairs SETS
+and a menu board, all from the Creator Store. The catalogue goes **20 → 32**.
+
+**Sets now seat everyone at the table.** This needed real work, not just config.
+`claimSeat` keyed occupancy on the bare `instanceId`, so one placed piece held
+exactly ONE diner however many chairs its model showed — a four-top would have
+seated one customer and left three chairs empty forever. Occupancy is now keyed
+on `instanceId#slot`, and a new `seatSlotCFrame` places each diner around the
+footprint facing the middle. `occupiedSeatIds` needed no change: it keys on
+whatever string the claim returns. `SeatMath` now sums `seatCount` to match.
+
+Single chairs are deliberately untouched by the slot path — they keep their own
+placement CFrame, so `BuildService.autoFaceSeats` still turns them to their table.
+
+**Orientation and fit were measured, not eyeballed.** `Model:GetBoundingBox()`
+reports pivot-oriented extents (HANDOFF §5.6), so every piece was checked by
+projecting its parts into world axes and comparing against the known-good
+`painting_wall`:
+
+- `painting_spirit` imports thin-on-Z where every other painting is thin-on-X, so
+  it takes `yaw = 90` or it hangs edge-on to the wall;
+- the two-seat sets import long-on-Z, which already matches their 2×3 footprint —
+  an initial `yaw = 90` turned them across the 2-cell width and they overhung
+  into the neighbouring table (measured 17.8 and 21.1 studs across an 8-stud
+  span). Dropped, and `maxSpan` now keeps each set near its own footprint:
+  13.0 × 5.9 and 13.0 × 6.9 in 12 × 8, and 14.1 × 12.8 in 12 × 12.
+
+**Everything renders bigger again**: `displayScale` 1.8 → **2.2** (owner asked
+twice). Past roughly 2.5, pieces start visibly overlapping their neighbours,
+since grid footprints deliberately do not scale with it.
+
+Verified live in the test place — 117 passed / 0 failed (up from 114):
+
+- **70 asset templates loaded, 0 fell back** (was 58) — all 12 resolve;
+- all four paintings hang thin-on-X at wall height, matching `painting_wall`;
+- with the spawn rate temporarily flooded, **`set_diner_four` held 4/4 diners and
+  `set_cafe_two` 2/2** at the same moment — 9 customers seated across 5 pieces,
+  where the old rule would have allowed 5 in total;
+- the serve loop ran through them (`stock_consumed` / `staff_served`);
+- console clean.
+
 ### Feature — 2026-08-06 — straight road, bigger pieces, and a furnishable level 1
 
 Three owner requests.
