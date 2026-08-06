@@ -1,15 +1,17 @@
 --!strict
--- Free-text chat is OFF (HANDOFF §1 — an ABSOLUTE rail: "no free-text between
--- players (whitelisted compliments only)"). Found live on 2026-08-05 during the
--- pre-launch pass: the Roblox chat window and bubble chat were both present in
--- PlayerGui, rendering, and nothing in the codebase had ever turned them off.
+-- Optional switch for Roblox's own chat, gated on `Config/Comms.hideRobloxChat`.
 --
--- ⚠️ THIS IS DEFENCE IN DEPTH, NOT THE ENFORCEMENT POINT. Removing the UI stops
+-- OWNER DECISION 2026-08-05: the flag is **false** — chat stays on. The original
+-- plan (HANDOFF §1) called for no free-text chat between players; the owner
+-- reviewed that and chose to keep Roblox chat, which carries Roblox's own text
+-- filter, reporting and parental controls. This controller therefore does
+-- nothing today. It is kept, wired and tested so the decision is one line to
+-- reverse instead of a feature to rebuild.
+--
+-- ⚠️ EVEN WHEN ENABLED THIS IS NOT THE ENFORCEMENT POINT. Removing the UI stops
 -- this client showing or sending chat; it does not stop Roblox routing messages
 -- between players. The authoritative switch is the experience's Communication
--- setting on the Creator Dashboard, which must ALSO be off. This controller
--- exists so a dashboard setting that is missed, reset, or overridden by a future
--- Roblox default cannot silently re-open free text inside the game.
+-- setting on the Creator Dashboard.
 --
 -- Two layers are needed, which the pre-launch pass established by measurement:
 -- `SetCoreGuiEnabled(Chat, false)` flipped the CoreGui flag but left the legacy
@@ -18,8 +20,11 @@
 -- `Visible` stays true underneath it and means nothing on its own.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
 local TextChatService = game:GetService("TextChatService")
+
+local Comms = require(ReplicatedStorage:WaitForChild("Shared").Config.Comms)
 
 local CommsController = {}
 CommsController.Name = "CommsController"
@@ -58,6 +63,11 @@ local function silenceGui(instance: Instance)
 end
 
 function CommsController.Start(_self: any)
+	-- Owner decision 2026-08-05: chat stays on, so this controller does nothing
+	-- unless the flag is flipped. See Config/Comms for the reasoning.
+	if not Comms.hideRobloxChat then
+		return
+	end
 	silenceCoreGui()
 	silenceTextChatService()
 

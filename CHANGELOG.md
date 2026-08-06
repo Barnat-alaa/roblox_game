@@ -5,6 +5,42 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-05 — three owner requests before launch
+
+**Chat stays ON — owner decision, reversing the fix below.** The plan called for
+no free-text chat between players; the owner reviewed it and chose to keep
+Roblox's own chat, which carries Roblox's text filter, reporting and parental
+controls. Rather than delete `CommsController`, the behaviour now hangs off
+`Config/Comms.hideRobloxChat` (**false**), so the decision is written down and is
+one line to reverse. HANDOFF §1's rail has been amended to match reality.
+
+**A named café is no longer asked to name itself again.** The intro card was
+rebuilt on every join as a naming prompt with the old name typed into the box, so
+a returning owner had to re-confirm a decision they had already made — and
+pressing Enter re-sent `SetCafeName`, spending a text-filter round-trip to store
+the identical string. When `WorldReady` carries a name the card now reads
+**"Welcome back to / <name>"**, the text box is removed outright (leaving an
+editable field is what made it read as "confirm again"), and nothing is sent.
+Renaming still lives on the doormat prompt.
+
+**Furniture can be put back into the inventory.** `RemoveFurniture` existed on
+the server, correctly credited `data.inventory`, and had **no client caller
+anywhere** — a placed item could be moved but never taken back. Build mode now
+shows a **↩ PUT AWAY (back to inventory)** button, with `Q` as its shortcut,
+while a piece is being carried. It sits on its own row above ROTATE/DONE and is
+hidden when nothing is held: a third button in the bottom row would leave three
+cramped targets on a phone, and an always-visible control invites tapping it with
+nothing to put away.
+
+Verified live in the shipping build:
+
+- chat back on (`Chat CoreGui = true`, `Chat.Enabled = true`, bubbles on);
+- a first join still asks for a name; a profile seeded with *"The Cosy Bean"*
+  showed **"Welcome back to / The Cosy Bean"** with the box hidden;
+- the PUT AWAY button exists and is hidden while idle, and the round-trip moved
+  a chair **placed 3 → 2, inventory 3 → 4**;
+- 24 controllers, console clean.
+
 ### Fix — 2026-08-05 — turn free-text chat off (pre-launch pass, RAILS)
 
 HANDOFF §1 calls "no free-text chat between players" an **absolute** rail. It was

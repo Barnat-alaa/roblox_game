@@ -183,10 +183,34 @@ local function placedAtCell(gridX: number, gridY: number): any
 	return nil
 end
 
+-- The PUT AWAY button only makes sense while a piece is being carried, so it is
+-- shown and hidden with the carry state rather than sitting there greyed out
+-- (owner request 2026-08-05 — until now `RemoveFurniture` had NO client caller
+-- at all, so a placed item could be moved but never taken back).
+local function refreshPutAway()
+	if ui.putAway then
+		ui.putAway.Visible = movingInstanceId ~= nil
+	end
+end
+
 local function setHint(text: string)
 	if ui.hint then
 		ui.hint.Text = text
 	end
+end
+
+-- Store the carried piece back in the inventory. The server already credited
+-- `data.inventory` on RemoveFurniture; this is simply the caller it never had.
+-- Shared by the panel button and the Q shortcut.
+local function putAwayCarried()
+	if not movingInstanceId then
+		return
+	end
+	Remotes.event("RemoveFurniture"):FireServer(movingInstanceId)
+	movingInstanceId = nil
+	selectedId = nil
+	refreshPutAway()
+	setHint("Put away — it's back in your inventory list.")
 end
 
 -- Which wall segment is under the cursor? Build mode's normal raycast filters to
@@ -283,6 +307,7 @@ local function tryPlace(screenPosition: Vector2)
 		})
 		movingInstanceId = nil
 		selectedId = nil
+		refreshPutAway()
 		setHint("Moved. Tap another placed item to move it.")
 		return
 	end
@@ -305,11 +330,12 @@ local function tryPlace(screenPosition: Vector2)
 		movingInstanceId = placed.instanceId
 		selectedId = placed.catalogId
 		rotation = math.floor(tonumber(placed.rotation) or 0) % 4
+		refreshPutAway()
 		local definition = Furniture[placed.catalogId]
 		setHint(
 			"Moving "
 				.. ((definition and definition.displayName) or placed.catalogId)
-				.. " — tap a new spot (R rotates)."
+				.. " — tap a new spot, or PUT AWAY to store it."
 		)
 	end
 end
@@ -645,6 +671,7 @@ local function leaveBuildMode()
 	active = false
 	selectedId = nil
 	movingInstanceId = nil
+	refreshPutAway()
 	if previewPart then
 		previewPart.Parent = nil
 	end
@@ -670,7 +697,7 @@ local function buildPanel()
 	local _, close = Components.PanelHeader(
 		panel,
 		"BUILD MODE",
-		"Tap a placed item to MOVE it, or pick one below to add",
+		"Tap a placed item to move or PUT AWAY, or pick one below to add",
 		Theme.Colors.Coral
 	)
 	close.Activated:Connect(toggle)
@@ -750,6 +777,23 @@ local function buildPanel()
 	empty.ZIndex = 22
 	ui.empty = empty
 
+	-- Its own row ABOVE rotate/done, and only while carrying: squeezing a third
+	-- button into the bottom row would leave three cramped targets on a phone,
+	-- and a permanently-visible "put away" invites tapping it with nothing held.
+	local putAway = Components.Button(
+		panel,
+		"↩  PUT AWAY (back to inventory)",
+		Theme.Colors.Honey,
+		UDim2.new(1, -20, 0, 40),
+		"Q"
+	)
+	putAway.Position = UDim2.new(0, 10, 1, -100)
+	putAway.TextSize = 13
+	putAway.ZIndex = 22
+	putAway.Visible = false
+	putAway.Activated:Connect(putAwayCarried)
+	ui.putAway = putAway
+
 	local rotateButton =
 		Components.Button(panel, "ROTATE", Theme.Colors.Blue, UDim2.new(0.5, -14, 0, 44), "R")
 	rotateButton.Position = UDim2.new(0, 10, 1, -52)
@@ -809,6 +853,8 @@ function BuildController.Start(_self: any)
 			tryPlace(Vector2.new(input.Position.X + inset.X, input.Position.Y + inset.Y))
 		elseif input.KeyCode == Enum.KeyCode.R then
 			rotation = (rotation + 1) % 4
+		elseif input.KeyCode == Enum.KeyCode.Q then
+			putAwayCarried()
 		end
 	end)
 end
