@@ -46,7 +46,10 @@ local AssetManifest = {
 	-- still matches its neighbours. Grid footprints are NOT scaled — a piece
 	-- may now overhang its cells, which is what makes a set look furnished
 	-- rather than parked on tiles.
-	displayScale = 1.5,
+	-- 1.5 → 1.8 on 2026-08-06 (owner: "make all decoration bigger"). This is the
+	-- single knob for it — every placed piece and the greybox fallback read it, so
+	-- nudge this one number rather than editing per-item heights.
+	displayScale = 1.8,
 
 	-- Furniture: replaces the matching catalogId's procedural builder when the
 	-- template loads. Keys MUST match Config/Furniture catalog ids. Heights are

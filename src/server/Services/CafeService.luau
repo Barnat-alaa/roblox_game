@@ -1114,7 +1114,12 @@ end
 
 -- A real two-lane boulevard with tiled sidewalks. The Store road images are
 -- square modules, so each road tile is rotated as a part to align the painted
--- lane with the long X axis. Turn modules bookend the street.
+-- lane with the long X axis.
+--
+-- Owner request 2026-08-06: STRAIGHT TILES ONLY. The two ends used to use the
+-- Store's turn modules, whose painted lanes curve away from the boulevard — with
+-- nothing to turn into, they read as the road being broken off rather than
+-- continuing past the street.
 local function buildRoadNetwork(parent: Instance)
 	local old = parent:FindFirstChild("RoadNetwork")
 	if old then
@@ -1133,15 +1138,9 @@ local function buildRoadNetwork(parent: Instance)
 	local lastX = streetLength + 48
 	local tileCount = math.floor((lastX - firstX) / tileSize) + 1
 	for index = 0, tileCount - 1 do
-		local image = if index == 0
-			then Graphics.Surfaces.RoadLeft
-			elseif index == tileCount - 1 then Graphics.Surfaces.RoadRight
-			else Graphics.Surfaces.RoadStraight
+		local image = Graphics.Surfaces.RoadStraight
 		local road = makePart(
-			if index == 0
-				then "RoadTurnLeft"
-				elseif index == tileCount - 1 then "RoadTurnRight"
-				else "RoadStraight",
+			"RoadStraight",
 			Vector3.new(tileSize, PAVING_THICKNESS, tileSize),
 			CFrame.new(
 				firstX + index * tileSize,
