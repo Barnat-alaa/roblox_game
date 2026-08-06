@@ -5,6 +5,54 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — furniture stays inside the café, and the ghost tells the truth
+
+Owner report: pieces go outside the restaurant, especially when rotated.
+Reproduced and fixed.
+
+**The bug.** Placement validated the grid FOOTPRINT only. At
+`AssetManifest.displayScale` 2.2 most models deliberately render past their
+footprint — measured, **23 of 32 catalogue pieces overhang, the worst by 5.6
+studs a side**. So a counter placed legally in cell 0 had its model start
+**5.6 studs outside the café wall**, and a rug 4.4 studs outside. Confirmed by
+measurement before the fix: a counter at `gridX = 0` spanned X **−5.6 → 29.6**
+in a café whose interior starts at 0.
+
+**The fix.** `BuildService.validatePlacement` now also requires the piece you can
+SEE to fit inside the interior. `AssetLibraryService` measures each template's
+true world-axis footprint as it loads (projecting its PARTS — `GetBoundingBox()`
+returns pivot-oriented extents and cannot see a model rotated inside its own
+pivot, HANDOFF §5.6) and stores it, yaw-adjusted into placement axes.
+
+The check is **per axis**, which matters: a painting is 0.2 studs thin, so it
+still hangs flush against a wall, while a 35-stud counter cannot. A uniform
+margin would have banned wall art from walls.
+
+Only the boundary tightened. Overlap still works on footprints, so neighbouring
+pieces may still overlap visually — that is the intended furnished look.
+
+**The preview was lying too.** The build ghost coloured itself from
+`Grid.inBounds` alone, so a piece that would poke through a wall, or land on top
+of another, previewed GREEN and was then silently refused — which reads as the
+game ignoring your tap. Render sizes are now replicated to the client as
+attributes (32/32, values identical to the server's), and the ghost goes red on
+bounds, render-overflow AND overlap.
+
+Verified:
+
+- **165,888** (item, rotation, cell, tier) cases swept before the change and
+  **142,560** after — **no item became unplaceable at any rotation or tier**;
+  the tightest is the counter at 144 valid cells, the rug at 169;
+- live enforcement, 8/8: flush-left counter refused (`out_of_bounds`), interior
+  counter accepted, overlapping chair refused (`overlap`), off-grid, negative
+  and rotation-7 all refused;
+- rotation cases: a 6×1 counter turned 90° is refused where its model would
+  overshoot and accepted further in; a rotated four-top is refused in the corner
+  and accepted inside; a non-rotatable rug refuses rotation (`not_rotatable`);
+- after the fix every placed piece measured **inside** the 72×72 interior —
+  **0 outside**, including a painting flush to the wall at X 3.9–4.1;
+- 117 tests pass, console clean.
+
 ### Feature — 2026-08-06 — 12 new pieces, and sets that really seat 2 and 4
 
 Owner haul: four paintings, two tables, two chairs, three table-and-chairs SETS
