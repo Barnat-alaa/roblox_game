@@ -27,8 +27,16 @@ discontinued games are still copyrighted).
 
 **Ethics rails (owner-approved, from the master plan):** spoilage is transparent,
 controllable, and pauses completely while offline; there is no missed-day
-punishment. No loot boxes, pay-to-win, fake urgency, or free-text between
-players (whitelisted compliments only).
+punishment. No loot boxes, pay-to-win, or fake urgency.
+
+> **Amended 2026-08-05 (owner decision): Roblox chat stays ON.** This rail used
+> to read "no free-text between players (whitelisted compliments only)". A
+> pre-launch pass found chat had in fact never been disabled; the owner reviewed
+> it and chose to keep Roblox's own chat, which carries Roblox's text filter,
+> reporting and parental controls. The switch lives in `Config/Comms`
+> (`hideRobloxChat = false`) and the authoritative control is the experience's
+> Communication setting on the Creator Dashboard. The whitelisted-compliment
+> system remains as the *in-game* social gesture, not as a chat replacement.
 
 ## 2. Where everything lives
 

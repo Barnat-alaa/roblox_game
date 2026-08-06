@@ -24,6 +24,9 @@ IntroController.Name = "IntroController"
 local ui: { [string]: any } = {}
 local worldReady = false
 local revealed = false
+-- True once we know this café already has a name, which turns the card from a
+-- naming prompt into a welcome-back (owner request 2026-08-05).
+local returning = false
 
 -- BlurEffect only blurs the 3D WORLD, never GUIs — so with a see-through backdrop
 -- the whole HUD showed through the intro and read as clutter. Hide it while the
@@ -145,6 +148,35 @@ local function markReady()
 	end
 end
 
+-- Turn the naming card into a welcome-back for a café that already has a name
+-- (owner request 2026-08-05). The text box goes away entirely rather than being
+-- pre-filled: leaving an editable field on screen is what made the card read as
+-- "confirm your name again" every single join.
+local function showReturning(name: string)
+	returning = true
+	if ui.subtitle then
+		ui.subtitle.Text = "Welcome back to"
+	end
+	if ui.box then
+		ui.box.Visible = false
+	end
+	if ui.nameHint then
+		-- Say where renaming lives, since the box that used to imply it is gone.
+		ui.nameHint.Text = 'Rename any time at your door — "Name your café".'
+		ui.nameHint.Position = UDim2.fromOffset(24, 186)
+	end
+	if not ui.cafeName then
+		local label = Components.Label(ui.card, "", 26, true)
+		label.Size = UDim2.new(1, -48, 0, 56)
+		label.Position = UDim2.fromOffset(24, 110)
+		label.TextColor3 = Theme.Colors.Espresso
+		label.TextScaled = false
+		label.TextTruncate = Enum.TextTruncate.AtEnd
+		ui.cafeName = label
+	end
+	ui.cafeName.Text = name
+end
+
 local function reveal()
 	if revealed or not worldReady then
 		return
@@ -181,8 +213,11 @@ local function onEnter()
 	if not worldReady then
 		return
 	end
+	-- A returning owner is not naming anything, so nothing is sent: re-submitting
+	-- the existing name would burn a text-filter round-trip to store the string
+	-- the server already has.
 	local typed = if ui.box then ui.box.Text else ""
-	if typeof(typed) == "string" and #typed:gsub("%s", "") > 0 then
+	if not returning and typeof(typed) == "string" and #typed:gsub("%s", "") > 0 then
 		Remotes.event("SetCafeName"):FireServer({ name = typed })
 	end
 	reveal()
@@ -239,6 +274,7 @@ local function build()
 	Components.Corner(card, Theme.Radius.Large)
 	Components.Stroke(card, Theme.Colors.Honey, 2, 0.2)
 	card.Parent = overlay
+	ui.card = card
 
 	local title = Components.Label(card, "☕  Social Café City", 28, true)
 	title.Size = UDim2.new(1, -40, 0, 40)
@@ -249,6 +285,7 @@ local function build()
 	subtitle.Size = UDim2.new(1, -40, 0, 24)
 	subtitle.Position = UDim2.fromOffset(20, 70)
 	subtitle.TextColor3 = Theme.Colors.Muted
+	ui.subtitle = subtitle
 
 	local box = Instance.new("TextBox")
 	box.Name = "NameBox"
@@ -273,6 +310,7 @@ local function build()
 	hint.Position = UDim2.fromOffset(24, 176)
 	hint.TextXAlignment = Enum.TextXAlignment.Left
 	hint.TextColor3 = Theme.Colors.Muted
+	ui.nameHint = hint
 
 	local enter = Components.Button(
 		card,
@@ -305,8 +343,20 @@ end
 
 function IntroController.Start(_self: any)
 	Remotes.event("WorldReady").OnClientEvent:Connect(function(msg: any)
-		if typeof(msg) == "table" and typeof(msg.cafeName) == "string" and ui.box then
-			ui.box.Text = msg.cafeName
+		local existing = if typeof(msg) == "table" and typeof(msg.cafeName) == "string"
+			then msg.cafeName
+			else ""
+		if existing ~= "" then
+			-- Owner request 2026-08-05: once a café has a name, stop asking for it.
+			-- The card used to reappear on every join as a naming prompt with the
+			-- old name typed in, so a returning player had to re-confirm a decision
+			-- they had already made — and pressing Enter re-sent SetCafeName, paying
+			-- for a text filter round-trip to store the identical string. Now it
+			-- simply welcomes them back by name. Renaming still lives on the
+			-- doormat's "Name your café" prompt (CafeNameController).
+			showReturning(existing)
+		elseif ui.box then
+			ui.box.Text = ""
 		end
 		markReady()
 	end)
