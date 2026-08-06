@@ -5,6 +5,24 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — MaxPlayers is pinned to the café count
+
+Every boot warned `MaxPlayers (12) exceeds cafés (10)`, meaning two players per
+server could join with **no café at all**. The project never declared `Players`,
+so the value fell through to a Roblox default — 12 in Studio, and whatever the
+dashboard happened to say on the live place (it was **30** there, so twenty
+players per server would have landed with nothing).
+
+`default.project.json` now sets `Players.MaxPlayers = 10` to match
+`World.plotCount`, so the repo is the source of truth and the two cannot drift.
+
+Verified: `Players.MaxPlayers=10 | World.plotCount=10`, and the boot line changed
+from the warning to `CafeService capacity OK: 10 cafés for up to 10 players`.
+
+The Creator Dashboard's own server-size field should be set to 10 as well — the
+live place reads its configuration from there, and this change guarantees the
+built file agrees rather than silently fighting it.
+
 ### Feature — 2026-08-05 — three owner requests before launch
 
 **Chat stays ON — owner decision, reversing the fix below.** The plan called for
