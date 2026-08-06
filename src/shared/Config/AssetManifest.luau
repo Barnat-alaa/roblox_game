@@ -46,10 +46,12 @@ local AssetManifest = {
 	-- still matches its neighbours. Grid footprints are NOT scaled — a piece
 	-- may now overhang its cells, which is what makes a set look furnished
 	-- rather than parked on tiles.
-	-- 1.5 → 1.8 on 2026-08-06 (owner: "make all decoration bigger"). This is the
-	-- single knob for it — every placed piece and the greybox fallback read it, so
-	-- nudge this one number rather than editing per-item heights.
-	displayScale = 1.8,
+	-- 1.5 → 1.8 → 2.2 on 2026-08-06 (owner asked twice: "put all decoration bigger
+	-- so i can see it well"). This is the single knob for it — every placed piece
+	-- and the greybox fallback read it, so nudge this one number rather than
+	-- editing per-item heights. Past roughly 2.5 pieces start visibly overlapping
+	-- their neighbours, since grid footprints deliberately do NOT scale with it.
+	displayScale = 2.2,
 
 	-- Furniture: replaces the matching catalogId's procedural builder when the
 	-- template loads. Keys MUST match Config/Furniture catalog ids. Heights are
@@ -205,6 +207,95 @@ local AssetManifest = {
 			height = 0.4,
 			maxSpan = 7.6,
 			flat = true,
+		},
+		-- ————— Owner haul 2026-08-06 —————
+		-- Wall art. `liftY` puts them at eye height like painting_wall; `yaw`
+		-- corrects models whose flat face is not on the game's +Z.
+		painting_classic = {
+			assetId = 13018552064,
+			name = "Painting (Creator Store, owner pick)",
+			height = 3.4,
+			maxSpan = 7.4,
+			liftY = 4.6,
+		},
+		painting_spirit = {
+			assetId = 5109258069,
+			name = "Spirit Painting (Creator Store, owner pick)",
+			height = 3.2,
+			maxSpan = 7.4,
+			liftY = 4.6,
+			-- Imports thin-on-Z; painting_wall and the rest are thin-on-X, so turn
+			-- it to match or it hangs edge-on to the wall (measured).
+			yaw = 90,
+		},
+		painting_floppa = {
+			assetId = 9561643580,
+			name = "Floppa Painting (Creator Store, owner pick)",
+			height = 3.4,
+			maxSpan = 7.4,
+			liftY = 4.6,
+		},
+		painting_rock = {
+			assetId = 8778226356,
+			name = "The Rock Painting (Creator Store, owner pick)",
+			height = 3.4,
+			maxSpan = 7.4,
+			liftY = 4.6,
+			-- No yaw: it imports thin-on-X, which is already the pose painting_wall
+			-- hangs in. Turning it would be the thing that puts it edge-on.
+		},
+		menu_cafe = {
+			assetId = 73299412019596,
+			name = "Cafe Menu Decor (Creator Store, owner pick)",
+			height = 4.2,
+			maxSpan = 6.6,
+		},
+		table_bistro = {
+			assetId = 530919922,
+			name = "Table and Chair (Creator Store, owner pick)",
+			height = 3.2,
+			maxSpan = 3.6,
+		},
+		table_cloth = {
+			assetId = 92963919667541,
+			name = "Dining Table Cloth Decor (Creator Store, owner pick)",
+			height = 3.2,
+			maxSpan = 3.6,
+		},
+		chair_metal = {
+			assetId = 12546134258,
+			name = "Metal Chair (Creator Store, owner pick)",
+			height = 3.3,
+			maxSpan = 3.4,
+		},
+		chair_royal = {
+			assetId = 78583546266567,
+			name = "Royal Chair Throne (Creator Store, owner pick)",
+			height = 4.2,
+			maxSpan = 3.6,
+		},
+		-- SETS. These import LONG on Z, which already matches their 2-wide x
+		-- 3-deep footprint, so they take NO yaw — turning them put the run of
+		-- chairs across the 2-cell width and they overhung into the next table
+		-- (measured 17.8 and 21.1 studs across an 8-stud span). maxSpan then
+		-- keeps a set near its own 12-stud footprint.
+		set_cafe_two = {
+			assetId = 126872456798804,
+			name = "Cafe Table Chair Relax (Creator Store, owner pick)",
+			height = 3.4,
+			maxSpan = 5.9,
+		},
+		set_fancy_two = {
+			assetId = 120624052,
+			name = "Fancy Restaurant Table and two Chairs (Creator Store, owner pick)",
+			height = 3.6,
+			maxSpan = 5.9,
+		},
+		set_diner_four = {
+			assetId = 137409419953709,
+			name = "Restaurant Table Set (Creator Store, owner pick)",
+			height = 3.6,
+			maxSpan = 6.4,
 		},
 	} :: { [string]: FurnitureAsset },
 

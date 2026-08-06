@@ -65,6 +65,19 @@ pinned in `Config/AssetManifest.luau` (furniture/world sections):
 | furniture:bar_stool | 127833501873867 | buyable seat |
 | furniture:coat_rack | 18647331589 | buyable decor |
 | furniture:cake_display | 175775615 | buyable display |
+| **Owner haul 2026-08-06 — all Creator Store, verified loading (70/70 templates, 0 fell back)** | | |
+| furniture:painting_classic | 13018552064 | buyable wall art |
+| furniture:painting_spirit | 5109258069 | buyable wall art (yaw 90 — imports thin-on-Z) |
+| furniture:painting_floppa | 9561643580 | buyable wall art |
+| furniture:painting_rock | 8778226356 | buyable wall art |
+| furniture:menu_cafe | 73299412019596 | buyable menu decor |
+| furniture:table_bistro | 530919922 | buyable table (seats 0) |
+| furniture:table_cloth | 92963919667541 | buyable dressed table (seats 0) |
+| furniture:chair_metal | 12546134258 | buyable seat (1) |
+| furniture:chair_royal | 78583546266567 | buyable seat (1) |
+| furniture:set_cafe_two | 126872456798804 | buyable table-and-chairs SET, seats 2 |
+| furniture:set_fancy_two | 120624052 | buyable table-and-chairs SET, seats 2 |
+| furniture:set_diner_four | 137409419953709 | buyable table-and-chairs SET, seats 4 |
 | world:flowers / hedge / garden_bench / lantern | 108093169082433 / 128530453132742 / 111807972344737 / 77070881706017 | automatic garden dressing |
 | world:tree (11 split variants) | 111344033786189 | gardens + street |
 | world:street_lamp / mailbox / hydrant | 96506787384113 / 118252021806923 / 116893320502654 | street furniture |
