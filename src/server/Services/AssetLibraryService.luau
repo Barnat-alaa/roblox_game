@@ -561,6 +561,81 @@ function AssetLibraryService.OnReady(_self: any, fn: () -> ())
 	end
 end
 
+-- Render sizes are replicated as attributes on one folder (attributes replicate
+-- automatically and cost nothing to read), keyed `<catalogId>_x` / `_z`. The
+-- build preview reads them so its ghost is red exactly when the server would
+-- refuse the placement.
+local renderSizeFolder: Folder? = nil
+
+local function publishRenderSize(catalogId: string, rx: number, rz: number)
+	if renderSizeFolder == nil then
+		local existing = ReplicatedStorage:FindFirstChild("RenderSizes")
+		if existing and existing:IsA("Folder") then
+			renderSizeFolder = existing
+		else
+			local folder = Instance.new("Folder")
+			folder.Name = "RenderSizes"
+			folder.Parent = ReplicatedStorage
+			renderSizeFolder = folder
+		end
+	end
+	local folder = renderSizeFolder :: Folder
+	folder:SetAttribute(catalogId .. "_x", rx)
+	folder:SetAttribute(catalogId .. "_z", rz)
+end
+
+-- The model's true world-axis footprint in studs, projected from its PARTS.
+-- `Model:GetBoundingBox()` reports PIVOT-oriented extents (HANDOFF §5.6), so it
+-- cannot see a model that sits rotated inside its own pivot — which is exactly
+-- the case this has to measure correctly.
+function AssetLibraryService.MeasureFootprint(_self: any, model: Model): (number?, number?)
+	local minv: Vector3?, maxv: Vector3? = nil, nil
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			local cf, sz = d.CFrame, d.Size
+			for _, a in { -0.5, 0.5 } do
+				for _, b in { -0.5, 0.5 } do
+					for _, c in { -0.5, 0.5 } do
+						local p = (cf * CFrame.new(sz.X * a, sz.Y * b, sz.Z * c)).Position
+						if minv == nil then
+							minv, maxv = p, p
+						else
+							minv = Vector3.new(
+								math.min((minv :: Vector3).X, p.X),
+								math.min((minv :: Vector3).Y, p.Y),
+								math.min((minv :: Vector3).Z, p.Z)
+							)
+							maxv = Vector3.new(
+								math.max((maxv :: Vector3).X, p.X),
+								math.max((maxv :: Vector3).Y, p.Y),
+								math.max((maxv :: Vector3).Z, p.Z)
+							)
+						end
+					end
+				end
+			end
+		end
+	end
+	if minv == nil or maxv == nil then
+		return nil, nil
+	end
+	local size = (maxv :: Vector3) - (minv :: Vector3)
+	return size.X, size.Z
+end
+
+-- How much floor a placed piece really covers, in studs, or nil when the asset
+-- did not load (the greybox fallback matches its footprint, so nil means "no
+-- extra margin needed"). BuildService uses this to keep models inside the walls.
+function AssetLibraryService.GetRenderFootprint(_self: any, catalogId: string): (number?, number?)
+	local template = cacheFolder and cacheFolder:FindFirstChild("furniture:" .. catalogId)
+	if not template then
+		return nil, nil
+	end
+	local rx = tonumber(template:GetAttribute("renderX"))
+	local rz = tonumber(template:GetAttribute("renderZ"))
+	return rx, rz
+end
+
 function AssetLibraryService.Init(_self: any)
 	cacheFolder = Instance.new("Folder")
 	cacheFolder.Name = "AssetTemplates"
@@ -595,6 +670,28 @@ function AssetLibraryService.Start(_self: any)
 			)
 			if t and entry.liftY then
 				t:SetAttribute("liftY", entry.liftY)
+			end
+			-- Record the model's real footprint on the template so BuildService can
+			-- keep the VISIBLE piece inside the café, not just its grid cells. At
+			-- displayScale 2.2 most pieces render well past their footprint (the
+			-- counter by 5.6 studs a side), so placing one against a wall used to
+			-- push the model straight through it.
+			if t then
+				local rx, rz = AssetLibraryService.MeasureFootprint(nil, t)
+				if rx and rz then
+					-- `yaw` is applied at placement, so store the size in the axes
+					-- the placed piece will actually occupy.
+					if entry.yaw == 90 or entry.yaw == 270 then
+						rx, rz = rz, rx
+					end
+					t:SetAttribute("renderX", rx)
+					t:SetAttribute("renderZ", rz)
+					-- Mirror it to the client so the build ghost can turn RED on the
+					-- same rule the server enforces. Without this the preview reads
+					-- green right up to the wall and the placement is then refused,
+					-- which looks like the game ignoring the tap.
+					publishRenderSize(catalogId, rx, rz)
+				end
 			end
 			cache("furniture:" .. catalogId, t)
 			tally(t ~= nil)

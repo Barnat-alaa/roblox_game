@@ -110,6 +110,69 @@ local function raycastCell(viewportPosition: Vector2): (number?, number?)
 	return Grid.worldToCell(origin, result.Position)
 end
 
+-- Mirrors BuildService's render-footprint rule. The sizes are measured on the
+-- server when the Creator Store models load and replicated as attributes, so
+-- there is no second source of truth to drift — a missing entry (asset still
+-- loading, or a greybox fallback) just means "no extra margin", same as there.
+local function renderFits(
+	definition: any,
+	gridX: number,
+	gridY: number,
+	rot: number,
+	depthCells: number
+): boolean
+	local folder = ReplicatedStorage:FindFirstChild("RenderSizes")
+	if not folder then
+		return true
+	end
+	local rx = tonumber(folder:GetAttribute(definition.id .. "_x"))
+	local rz = tonumber(folder:GetAttribute(definition.id .. "_z"))
+	if not rx or not rz then
+		return true
+	end
+	if rot % 2 == 1 then
+		rx, rz = rz, rx
+	end
+	local w, d = Grid.footprintSize(definition.width, definition.depth, rot)
+	local centreX = (gridX + w / 2) * Grid.CELL_SIZE
+	local centreZ = (gridY + d / 2) * Grid.CELL_SIZE
+	local limitX = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+	local limitZ = depthCells * Grid.CELL_SIZE
+	local slack = 0.05
+	return not (
+		centreX - rx / 2 < -slack
+		or centreZ - rz / 2 < -slack
+		or centreX + rx / 2 > limitX + slack
+		or centreZ + rz / 2 > limitZ + slack
+	)
+end
+
+-- Would this land on top of something already placed? `ignoreId` is the piece
+-- being carried, which must not block its own new spot.
+local function overlapsPlaced(
+	definition: any,
+	gridX: number,
+	gridY: number,
+	rot: number,
+	ignoreId: string?
+): boolean
+	local profile = UIController.getProfile()
+	if not profile then
+		return false
+	end
+	local w, d = Grid.footprintSize(definition.width, definition.depth, rot)
+	for _, placed in profile.placedFurniture or {} do
+		local pdef = Furniture[placed.catalogId]
+		if pdef and placed.instanceId ~= ignoreId then
+			local pw, pd = Grid.footprintSize(pdef.width, pdef.depth, placed.rotation)
+			if Grid.rectsOverlap(gridX, gridY, w, d, placed.gridX, placed.gridY, pw, pd) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 local function updatePreview()
 	if not active or not selectedId then
 		if previewPart then
@@ -152,8 +215,18 @@ local function updatePreview()
 	)
 	local tier = tonumber(player:GetAttribute("ExpansionTier")) or 0
 	local depthCells = World.interiorDepthTiers[math.clamp(tier + 1, 1, #World.interiorDepthTiers)]
+	-- The ghost is red on EVERY rule the server enforces, not just the footprint.
+	-- It used to check bounds alone, so a piece whose model would poke through the
+	-- wall — or one dropped straight onto another — previewed green and was then
+	-- silently refused, which reads as the game ignoring your tap.
 	local fits =
 		Grid.inBounds(gridX, gridY, definition.width, definition.depth, rotation, nil, depthCells)
+	if fits then
+		fits = renderFits(definition, gridX, gridY, rotation, depthCells)
+	end
+	if fits then
+		fits = not overlapsPlaced(definition, gridX, gridY, rotation, movingInstanceId)
+	end
 	preview.Color = if fits then Theme.Colors.Mint else Theme.Colors.Danger
 	preview.Parent = workspace
 end

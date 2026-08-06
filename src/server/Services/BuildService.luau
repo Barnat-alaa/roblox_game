@@ -67,6 +67,39 @@ local function validatePlacement(
 	if not Grid.inBounds(gridX, gridY, def.width, def.depth, rotation, nil, depthCells) then
 		return false, "out_of_bounds"
 	end
+	-- …and the piece you can SEE has to fit too. Grid cells are not the whole
+	-- story: at AssetManifest.displayScale most models render well past their
+	-- footprint on purpose (it is what makes a room look furnished rather than
+	-- parked on tiles), so a footprint-only check let a counter sit legally in
+	-- cell 0 while its model started 5.6 studs OUTSIDE the café wall. Measured
+	-- 2026-08-06: 23 of 32 catalogue pieces overhang, the worst by 5.6 studs.
+	--
+	-- Only the boundary is tightened. Overlap below still works on footprints, so
+	-- neighbouring pieces may still overlap visually — that is the intended look.
+	if AssetLibraryService then
+		local rx, rz = AssetLibraryService:GetRenderFootprint(def.id)
+		if rx and rz then
+			if rotation % 2 == 1 then
+				rx, rz = rz, rx
+			end
+			local w, d = Grid.footprintSize(def.width, def.depth, rotation)
+			local centreX = (gridX + w / 2) * Grid.CELL_SIZE
+			local centreZ = (gridY + d / 2) * Grid.CELL_SIZE
+			local limitX = Grid.PLOT_WIDTH * Grid.CELL_SIZE
+			local limitZ = depthCells * Grid.CELL_SIZE
+			-- A hair of tolerance: these are measured floats, and a piece sitting
+			-- flush with the wall should not be rejected for a rounding error.
+			local slack = 0.05
+			if
+				centreX - rx / 2 < -slack
+				or centreZ - rz / 2 < -slack
+				or centreX + rx / 2 > limitX + slack
+				or centreZ + rz / 2 > limitZ + slack
+			then
+				return false, "out_of_bounds"
+			end
+		end
+	end
 	-- A move re-places an item that is already counted, so the cap only applies to
 	-- genuinely NEW objects.
 	if ignoreInstanceId == nil and #data.placedFurniture >= EconomyConfig.maxPlacedFurniture then
