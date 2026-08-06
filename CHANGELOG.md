@@ -5,6 +5,31 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-05 — turn free-text chat off (pre-launch pass, RAILS)
+
+HANDOFF §1 calls "no free-text chat between players" an **absolute** rail. It was
+never implemented. A pre-launch run of the shipping build found Roblox's `Chat`
+and `BubbleChat` ScreenGuis live in `PlayerGui` and rendering, with nothing
+anywhere in `src/` referencing chat at all.
+
+New `CommsController` turns it off in two layers, because measurement showed one
+was not enough: `SetCoreGuiEnabled(Chat, false)` flipped the CoreGui flag but
+left the legacy `Chat` ScreenGui rendering, so the ScreenGui is disabled too. It
+also catches the GUI on `ChildAdded` (the chat is created *after* our controllers
+start, which is what makes a cold join stick) and re-asserts across the CoreGui
+boot window. `TextChatService`'s configurations are set as well — inert under
+`LegacyChatService`, but they cover a later migration.
+
+⚠️ **This is defence in depth, not the enforcement point.** It stops this client
+showing or sending chat; it does not stop Roblox routing messages between
+players. The experience's **Communication setting on the Creator Dashboard must
+also be off** — that is the authoritative switch.
+
+Verified on a cold join of the shipping build, 12s after load: `Chat CoreGui =
+false`, `Chat.Enabled = false`, `BubbleChat.Enabled = false`, 24 controllers
+booted, no errors. Our NPC speech bubbles are built under each `Head` by
+`NpcAnimator`, not by BubbleChat, so they are unaffected.
+
 ### Fix — 2026-08-05 — a café with no chairs is honest about it (owner report)
 
 The owner connected with nothing placed, saw coins going up, and asked why. The
