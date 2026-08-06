@@ -18,6 +18,13 @@
 			}
 		},
 
+		"Players": {
+			"$className": "Players",
+			"$properties": {
+				"MaxPlayers": 10
+			}
+		},
+
 		"StarterPlayer": {
 			"$className": "StarterPlayer",
 			"StarterPlayerScripts": {
