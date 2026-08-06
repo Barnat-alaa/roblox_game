@@ -5,6 +5,39 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-06 — straight road, bigger pieces, and a furnishable level 1
+
+Three owner requests.
+
+**The road is straight end to end.** The two end tiles used the Creator Store's
+turn modules, whose painted lanes curve away from the boulevard — with nothing to
+turn into they read as the road breaking off rather than continuing past the
+street. All 22 tiles are now `RoadStraight`.
+
+**Everything renders bigger.** `AssetManifest.displayScale` 1.5 → **1.8**. That
+one number drives every placed piece and the greybox fallback, so it is the knob
+to nudge rather than per-item heights. Measured after the change: Wooden Chair
+3.30 → **5.94** studs tall, Potted Plant → 6.12, Floor Lamp → 8.64, each exactly
+`authored × 1.8`. Wide-and-low pieces such as the Round Table grow less because
+the `maxSpan` clamp still keeps them inside their grid cells — by design.
+
+**Level 1 is actually furnishable.** This was the real reason the café felt
+bare: only **6 of 20** catalogue items were buyable at level 1, and just *two* of
+them were seating — one chair and one table. A café sim whose core constraint is
+seating cannot open with a single chair model. Retuned to 12 of 20 at level 1
+(3 seating, 7 decoration), with progression kept for the pieces that deserve to
+be earned:
+
+| Level | Unlocks |
+| --- | --- |
+| 1 | Wooden Chair · Bar Stool · Round Table · Potted Plant · Round Rug · Floor Lamp · Wall Painting · Wall Shelf · Wall Clock · Coat Rack · Coffee Machine · Service Counter |
+| 2 | Stone Oven · Prep Station · Menu Board · Hanging Lamp · Plant Shelf · Window Curtains |
+| 3 | Diner Booth · Cake Display |
+
+Verified live: 22 straight road parts and 0 turn textures, the measured scales
+above, 12 items buyable at level 1, 58 asset templates loaded with 0 fallbacks,
+console clean.
+
 ### Fix — 2026-08-06 — MaxPlayers is pinned to the café count
 
 Every boot warned `MaxPlayers (12) exceeds cafés (10)`, meaning two players per
