@@ -78,12 +78,37 @@ local ICON_GRACE_SECONDS = 12
 local ICON_RETRY_SECONDS = 10
 local ICON_WATCH_SECONDS = 180
 
+-- Is this icon actually being drawn? An ImageLabel only fetches its texture while
+-- it is rendered, so time spent inside a disabled ScreenGui is time in which the
+-- image CANNOT load — counting it against the grace period is what made icons
+-- give up during the intro card and fall back to letters before they ever had a
+-- chance.
+local function isRenderable(icon: ImageLabel): boolean
+	if not icon.Visible then
+		return false
+	end
+	local node: Instance? = icon.Parent
+	while node ~= nil do
+		if node:IsA("ScreenGui") then
+			return node.Enabled
+		end
+		if node:IsA("GuiObject") and not node.Visible then
+			return false
+		end
+		node = node.Parent
+	end
+	return true
+end
+
 -- Poll `IsLoaded` rather than listening for it: `ImageLabel.IsLoaded` does not
 -- reliably raise a property-changed signal, which is why the original restore
 -- never fired and a glyph, once shown, stayed forever.
+--
+-- The clock only runs while the icon is renderable, so a long intro card no
+-- longer burns the grace period an icon needs.
 local function waitForImage(icon: ImageLabel, slot: Instance, seconds: number): boolean
-	local deadline = os.clock() + seconds
-	while os.clock() < deadline do
+	local remaining = seconds
+	while remaining > 0 do
 		if icon.Parent ~= slot then
 			return false
 		end
@@ -91,6 +116,9 @@ local function waitForImage(icon: ImageLabel, slot: Instance, seconds: number): 
 			return true
 		end
 		task.wait(0.4)
+		if isRenderable(icon) then
+			remaining -= 0.4
+		end
 	end
 	return icon.IsLoaded
 end
@@ -190,21 +218,42 @@ function Components.Icon(
 					return
 				end
 			end
-			-- STAGE 3 — genuinely unavailable: show the glyph, but keep watching so
-			-- late artwork still replaces it.
+			-- STAGE 3 — cover it with the glyph, and KEEP WATCHING.
+			--
+			-- ⚠️ THE IMAGE MUST STAY VISIBLE. This is the bug that made the whole
+			-- HUD sit on letters for three rounds, and it is not obvious:
+			--
+			--   A Roblox ImageLabel only fetches its texture while it is actually
+			--   RENDERED. `Visible = false` — or living inside a ScreenGui whose
+			--   `Enabled` is false — means the image is never requested at all.
+			--   Proven on device 2026-08-06: visible → IsLoaded true; Visible=false
+			--   → false forever; inside a disabled ScreenGui → false forever.
+			--
+			-- The old code hid the image before waiting for it, so it could never
+			-- load and the glyph became permanent. Worse, IntroController DISABLES
+			-- the whole "HUD" ScreenGui while the welcome card is up, so every dock
+			-- and rail icon starts life unrenderable — which is exactly why it was
+			-- the bottom row and the right rail that failed, and why it looked like
+			-- the artwork was missing when it was fine all along.
+			--
+			-- So the badge simply DRAWS OVER a still-visible image, and disappears
+			-- the moment the real art arrives.
 			if icon.Parent ~= slot then
 				return
 			end
 			local badge = glyphBadge(slot, glyph, color, px)
-			icon.Visible = false
-			warn(
-				("[SocialCafe] HUD icon never loaded: %s (fell back to '%s')"):format(image, glyph)
-			)
+			badge.ZIndex = icon.ZIndex + 1
+			for _, d in badge:GetDescendants() do
+				if d:IsA("GuiObject") then
+					d.ZIndex = badge.ZIndex + 1
+				end
+			end
 			if waitForImage(icon, slot, ICON_WATCH_SECONDS) then
 				if badge.Parent ~= nil then
 					badge:Destroy()
 				end
-				icon.Visible = true
+			else
+				warn(("[SocialCafe] HUD icon never loaded: %s (showing '%s')"):format(image, glyph))
 			end
 		end)
 	else
