@@ -5,6 +5,50 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-06 — a café with people in it, at every level
+
+Owner: *"i want in every stage to have a cafe more or less always busy"*. Full
+occupancy study across all ten stages in `docs/ECONOMY_ANALYSIS.md` §9.
+
+**The finding.** How full a room looks is `arrivals × visit-length`, and only the
+first had ever been tuned. Arrivals are capped at what the kitchen can serve
+(fix #4) and top out near 2.4/min; a visit lasted about 30 s. So the café held
+**0.5 people at level 1 and 1.2 at level 10 — visibly empty at every one of the
+ten stages, permanently.** And with a seat turning over every 30 s, *one* chair
+served the whole game, which is why seats never mattered.
+
+**The fix.** Visit length, which costs the economy nothing — identical servings
+for identical coins. `diningSeconds` 45 + new `lingerSeconds` 90, on top of the
+~12 s to walk in, sit and be served, makes a visit ~150 s:
+
+| stage | people in café | chairs needed |
+| --- | ---: | ---: |
+| L1 | 2.2 | 2 |
+| L5 | 3.0 | 3 |
+| L8 | 4.8 | 5 |
+| L10 | 6.0 | 6 |
+
+The four starter chairs now carry a player to **level 8**, after which arrivals
+are turned away at 0.3–0.8/min and each walkout costs 2 Buzz. Chairs finally
+scale, and the pressure arrives on its own without inviting custom the kitchen
+cannot feed.
+
+⚠️ **Open**: peak concurrent NPCs rises to roughly 90 on a full server. That
+needs a MicroProfiler pass on a low-end phone before soft launch; it is the one
+cost of this change and it is not yet measured.
+
+### Fix — 2026-08-06 — onboarding step 2, third time
+
+Owner, for the third time: *"i still think the introduction steps are not
+doable"*. It was "brew" (needed a minigame the waiter reached first), then
+"menu" (needed the AUTO PRODUCTION tab). Both taught a mechanism.
+
+Step 2 is now **"Serve your first customer"**, and it completes on
+`customersServed >= 1` — which ticks whether the player carries the plate or Noah
+does, so it cannot dead-end on a waiter being faster. With the welcome rush a
+customer is already in the room when the step appears. The old separate "serve"
+step is folded in: six steps became **five**, and every one has a live condition.
+
 ### Fix — 2026-08-06 — the street is finished before you walk into it
 
 Owner: "it says preparing the café and then I enter but it still is rendering

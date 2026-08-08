@@ -12,28 +12,21 @@ local Tutorial = {
 			text = "👋 Welcome! Tap 🔨 Build and place a table and two chairs.",
 		},
 		{
-			-- Was "brew", and the tutorial DEAD-ENDED here. That step wanted the
-			-- timing minigame, which needs a live order — and a waiter serves
-			-- orders before the player can reach the machine. Cooking by hand is
-			-- no better: the automatic production loop holds a job on the
-			-- appliance, so a manual StartCook answers "stove_busy" (measured).
-			-- The menu IS the player's real lever over the kitchen in a
-			-- cook-ahead game, and it is always available.
-			-- 2026-07-31 (owner: "always stuck in step 2/6"). The step was NOT
-			-- broken — it was unreachable. The only action that satisfied it was
-			-- the AUTO toggle, which lives on the pantry's second tab, and the
-			-- text never said so: you opened the pantry, saw a list of stock
-			-- numbers, and there was nothing to "choose". Fixed on three fronts —
-			-- the text now names the tab, the pantry OPENS on that tab while this
-			-- step is active (InventoryController), and tuning a target or
-			-- priority now counts too (ProductionService fires `kitchen_tuned`).
-			id = "menu",
-			text = "☕ Your kitchen cooks on its own. Open 🥫 PANTRY (bottom-left) → the"
-				.. " AUTO PRODUCTION tab, and switch a dish ON.",
-		},
-		{
+			-- THIRD attempt at this step, and this time it asks for the thing the
+			-- game is actually about. It was "brew" (needed a minigame the waiter
+			-- reached first), then "menu" (needed the AUTO PRODUCTION tab, which
+			-- the owner still could not complete: "i still think the introduction
+			-- steps are not doable"). Both were teaching a mechanism.
+			--
+			-- Serving is the loop. It completes on `customersServed >= 1`, which
+			-- ticks whether the player carries the plate themselves OR Noah does
+			-- it — so it cannot dead-end on a waiter being faster, and with the
+			-- welcome rush a customer is already in the room when this step
+			-- appears. The old separate "serve" step is folded into this one;
+			-- six steps became five.
 			id = "serve",
-			text = "🤝 When a customer orders, pick the plate up at the kitchen pass and carry it to their table.",
+			text = "🤝 Serve your first customer — carry the plate to their table, or let"
+				.. " your waiter do it. Either counts!",
 		},
 		{
 			id = "buy",

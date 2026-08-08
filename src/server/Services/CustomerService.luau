@@ -1231,6 +1231,21 @@ local function eatMeal(
 					end
 				end
 			end
+			-- Sit on after the plate is cleared. This is the half of a visit that
+			-- actually FILLS the room (Kitchen.lingerSeconds — the study lives in
+			-- that config). Without it a seat turned over every 30 seconds and the
+			-- café measured as empty at every one of the ten stages.
+			local linger = math.max(0, tonumber(Kitchen.lingerSeconds) or 0)
+			if linger > 0 then
+				cust.bubble.Text = "☕"
+				local leaveAt = os.clock() + linger
+				while os.clock() < leaveAt do
+					if cust.leaving or cust.root.Parent == nil then
+						break
+					end
+					task.wait(0.5)
+				end
+			end
 			if cust.anim then
 				cust.anim.setSeated(false)
 			end

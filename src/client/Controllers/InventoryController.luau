@@ -10,7 +10,6 @@ local Recipes = require(Shared.Config.Recipes)
 local Staff = require(Shared.Config.Staff)
 local KitchenConfig = require(Shared.Config.Kitchen)
 local Operations = require(Shared.Config.Operations)
-local Tutorial = require(Shared.Config.Tutorial)
 local OperationsMath = require(Shared.Utilities.OperationsMath)
 local BoostMath = require(Shared.Utilities.BoostMath)
 local Remotes = require(Shared.Network.Remotes)
@@ -249,21 +248,12 @@ local function updateFilters()
 	end
 end
 
--- Open the pantry, landing on the tab the player actually needs. During the
--- onboarding "menu" step that is AUTO PRODUCTION: the step asks you to choose
--- what the kitchen makes, and the only control that does so lives on that second
--- tab. Opening on FRESH STOCK — a list of numbers with nothing to choose — is
--- what left players stranded on step 2 (owner report, 2026-07-31).
+-- Open the pantry. This used to force the AUTO PRODUCTION tab during the
+-- onboarding "menu" step; that step no longer exists — it was replaced by
+-- "serve your first customer" on 2026-08-06 after a third report of the
+-- onboarding being undoable — so the drawer just opens on whichever tab the
+-- player last used.
 local function openDrawer()
-	local step = profile and profile.stats and (tonumber(profile.stats.tutorialStep) or 0)
-	local onMenuStep = step ~= nil
-		and profile.stats.tutorialCompleted ~= true
-		and Tutorial.steps[step + 1] ~= nil
-		and Tutorial.steps[step + 1].id == "menu"
-	if onMenuStep and selectedTab ~= "Production" then
-		selectedTab = "Production"
-		updateFilters()
-	end
 	UIController.togglePanel(ui.drawer)
 end
 
