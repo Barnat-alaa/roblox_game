@@ -146,7 +146,11 @@ local Theme = {
 		-- `Slots` CAPS how many dishes the dock shows: it is a glance widget, not
 		-- the inventory, and reserving four slots left a block of empty black
 		-- whenever fewer were active (owner 2026-08-01: "make it less lengthy").
-		StockDockPhone = { Width = 132, SlotHeight = 32, Header = 46, Slots = 2 },
+		-- Shrunk 2026-08-06 (owner: the bottom-left is where a thumb naturally puts
+		-- the joystick, and the dock was sitting on it). 132x110 -> 104x84, which
+		-- is a quarter off each axis and hands the corner back to the stick.
+		-- It can also be collapsed outright now — see HudToggleController.
+		StockDockPhone = { Width = 104, SlotHeight = 26, Header = 32, Slots = 2 },
 		-- The extreme top-right is ONE column, in this order: gift pill, VIP pill,
 		-- order ticket, rail. It is declared here rather than inside each
 		-- controller because those four pieces live in four different files, and

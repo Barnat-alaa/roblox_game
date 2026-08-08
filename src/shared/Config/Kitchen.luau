@@ -63,7 +63,22 @@ local Kitchen = {
 	demandHeadroom = 1.2,
 	-- A café is never completely dead, even with no production plan set: this many
 	-- walk-ins per minute still arrive to be served by hand.
-	spawnRateMinPerMinute = 0.35,
+	-- 0.35 -> 0.9 on 2026-08-06. Measured against the live formula, a starter café
+	-- saw ONE customer every 171 seconds, because the production cap (economy fix
+	-- #4) clamps arrivals to what the kitchen can serve and a level-1 Barista makes
+	-- 0.25 servings a minute. The café read as deserted for the whole first hour.
+	-- 0.9 is one arrival a minute or so, which is a room with someone in it,
+	-- without lifting the ceiling that protects the economy.
+	spawnRateMinPerMinute = 0.9,
+
+	-- WELCOME RUSH (owner 2026-08-06: "when a player connects make an instant rush
+	-- so many clients go to him"). The first `welcomeRushCount` arrivals after a
+	-- player joins come every `welcomeRushIntervalSeconds` instead of waiting on
+	-- the demand rate, so a café is busy the moment you walk in — and, because
+	-- they arrive faster than one can eat and leave, it is the moment a player
+	-- discovers they need more chairs.
+	welcomeRushCount = 5,
+	welcomeRushIntervalSeconds = 3.5,
 
 	buzzStart = 10,
 	buzzMax = 105,

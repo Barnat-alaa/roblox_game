@@ -48,7 +48,11 @@ local AnalyticsService: any
 local SocialService: any
 
 local MAX_QUEUE = 3
-local QUEUE_SPACING = 4 -- studs between line slots
+-- Studs between line slots. 4 was less than a customer is WIDE once
+-- AssetManifest.displayScale grew everything, so the three queuers stood inside
+-- one another and read as a single person (owner 2026-08-06: "they all stay in
+-- the same positions").
+local QUEUE_SPACING = 7
 local WALK_SPEED = 9
 local WALK_TIMEOUT = 12 -- stuck recovery: teleport to goal
 local PATIENCE_SECONDS = 120 -- waiting cap AT THE WINDOW before leaving angry
@@ -208,17 +212,39 @@ local function bumpCombo(player: Player, position: Vector3)
 	end
 end
 
-local function pickUnlockedRecipe(data: Types.PlayerData): string?
-	local pool: { string } = {}
+-- What this diner asks for. Prefers the menu, but NEVER comes up empty while the
+-- player has unlocked anything at all (owner 2026-08-06: "every time they enter
+-- they should order").
+--
+-- The menu is derived from the production plan — `ProductionService` sets
+-- `kitchen.menu[id] = count > 0` — so a player who zeroes their plan empties the
+-- menu without realising it. This used to return nil, and the customer then sat
+-- down, ordered nothing and walked back out: the single most confusing thing the
+-- café could do, because it looked like the game had forgotten them. Falling back
+-- to any unlocked dish means the order is always placed. If nothing is stocked it
+-- goes unserved and costs Buzz, which is the honest signal that the café has
+-- nothing for sale — and `menuIsEmpty` below turns that into a plain-English
+-- toast rather than leaving the player to guess.
+local function pickUnlockedRecipe(data: Types.PlayerData): (string?, boolean)
+	local onMenu: { string } = {}
+	local anyUnlocked: { string } = {}
 	for recipeId, unlocked in data.unlockedRecipes do
-		if unlocked and KitchenService:IsOnMenu(data, recipeId) then
-			table.insert(pool, recipeId)
+		if unlocked then
+			table.insert(anyUnlocked, recipeId)
+			if KitchenService:IsOnMenu(data, recipeId) then
+				table.insert(onMenu, recipeId)
+			end
 		end
 	end
+	local menuIsEmpty = #onMenu == 0
+	local pool = if menuIsEmpty then anyUnlocked else onMenu
 	if #pool == 0 then
-		return nil
+		return nil, menuIsEmpty
 	end
-	return pool[rng:NextInteger(1, #pool)]
+	-- Stable order before the roll: pairs() over a map is not deterministic, and
+	-- an unstable pool makes "why did they order that" impossible to reason about.
+	table.sort(pool)
+	return pool[rng:NextInteger(1, #pool)], menuIsEmpty
 end
 
 local function pickCustomer(): Types.CustomerDefinition
@@ -1296,6 +1322,13 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 			lastSlot = slot
 			cust.bubble.Text = "⏳ Waiting in line"
 			walkTo(cust, slotPosition(origin, slot))
+			-- Come to a full stop on the mark. Without this the humanoid keeps the
+			-- last move vector and drifts off its slot, so a queue that was spaced
+			-- correctly on arrival slowly collapses back into a huddle.
+			cust.humanoid:Move(Vector3.zero)
+			if cust.anim then
+				cust.anim.setSeated(false)
+			end
 		end
 		setMood(cust, 1 - (os.clock() - cust.spawnClock) / LINE_PATIENCE_SECONDS)
 		if os.clock() - cust.spawnClock > LINE_PATIENCE_SECONDS then
@@ -1365,7 +1398,17 @@ local function runActiveVisit(player: Player, cust: ActiveCustomer, origin: CFra
 	end
 
 	local data = DataService:GetProfile(player)
-	local recipeId = if data then pickUnlockedRecipe(data) else nil
+	local recipeId, menuIsEmpty = nil, false
+	if data then
+		recipeId, menuIsEmpty = pickUnlockedRecipe(data)
+	end
+	if menuIsEmpty then
+		-- Say it once per arrival rather than silently serving nothing.
+		Remotes.event("Notify"):FireClient(player, {
+			kind = "error",
+			text = "Nothing is on your menu — set a dish in PANTRY → AUTO PRODUCTION.",
+		})
+	end
 	if cust.favourite and data and KitchenService:IsOnMenu(data, cust.favourite) then
 		recipeId = cust.favourite
 	end
@@ -1667,6 +1710,23 @@ function CustomerService.Start(_self: any)
 
 	-- Buzz drives the crowd: high-Buzz cafés get customers every few seconds.
 	local nextSpawnAt: { [number]: number } = {}
+	-- Arrivals still owed to a player's WELCOME RUSH. Seeded on join and counted
+	-- down here, so the burst uses the same spawn path as everything else — one
+	-- queue, one cap, one lifecycle.
+	local rushLeft: { [number]: number } = {}
+	local function armRush(player: Player)
+		rushLeft[player.UserId] = math.max(0, math.floor(Kitchen.welcomeRushCount or 0))
+		nextSpawnAt[player.UserId] = 0 -- first one lands immediately
+	end
+	for _, player in Players:GetPlayers() do
+		armRush(player)
+	end
+	Players.PlayerAdded:Connect(armRush)
+	Players.PlayerRemoving:Connect(function(player)
+		rushLeft[player.UserId] = nil
+		nextSpawnAt[player.UserId] = nil
+	end)
+
 	task.spawn(function()
 		while true do
 			task.wait(1)
@@ -1680,8 +1740,15 @@ function CustomerService.Start(_self: any)
 					local origin = CafeService:GetPlotOrigin(player)
 					local due = os.clock() >= (nextSpawnAt[player.UserId] or 0)
 					if origin and #q < MAX_QUEUE and due then
-						local demandPerMinute = KitchenService:GetDemandRate(player)
-						local interval = 60 / math.max(0.2, demandPerMinute)
+						local owed = rushLeft[player.UserId] or 0
+						local interval
+						if owed > 0 then
+							rushLeft[player.UserId] = owed - 1
+							interval = Kitchen.welcomeRushIntervalSeconds or 3.5
+						else
+							local demandPerMinute = KitchenService:GetDemandRate(player)
+							interval = 60 / math.max(0.2, demandPerMinute)
+						end
 						nextSpawnAt[player.UserId] = os.clock() + interval
 						spawnWalkIn(player, origin)
 					end
