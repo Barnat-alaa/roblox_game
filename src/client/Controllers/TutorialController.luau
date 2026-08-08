@@ -39,9 +39,6 @@ local CONDITIONS: { [string]: () -> boolean } = {
 	place_furniture = function()
 		return latestProfile ~= nil and #latestProfile.placedFurniture >= 5
 	end,
-	menu = function()
-		return flags.cooked
-	end,
 	serve = function()
 		return latestProfile ~= nil and latestProfile.stats.customersServed >= 1
 	end,

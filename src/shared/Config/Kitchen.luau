@@ -80,17 +80,29 @@ local Kitchen = {
 	welcomeRushCount = 5,
 	welcomeRushIntervalSeconds = 3.5,
 
-	-- How long a diner stays at the table once the food arrives. Measured
-	-- 2026-08-06: this was 6.6s, so ONE chair turned over roughly four customers a
-	-- minute while arrivals peak at 2.4 — which is why no café ever needed a
-	-- second chair, at any level. Seats were not a constraint the game could
-	-- express. At 18s the welcome rush (5 arrivals in 18s) genuinely overlaps, so
-	-- a 4-chair café turns someone away and the shortage becomes visible.
+	-- HOW LONG A VISIT LASTS. Together with the ~12s it takes to walk in, sit and
+	-- be served, these make a table occupied for about 150 seconds.
 	--
-	-- This does NOT change the economy: the same servings are sold for the same
-	-- coins. It only changes how long a seat is held, which is exactly the knob
-	-- that makes chairs matter.
-	diningSeconds = 18,
+	-- This is the knob that decides whether the café looks BUSY, and it was the
+	-- whole problem. Full study 2026-08-06 across all ten stages: a visit lasted
+	-- 30s, so the room held 0.5 people at level 1 and 1.2 at level 10 — visibly
+	-- EMPTY at every single stage of the game, forever. Arrivals cannot fix that
+	-- on their own: they are capped at what the kitchen can serve (economy fix
+	-- #4), which tops out near 2.4/minute.
+	--
+	-- At a 150s visit the same arrivals fill the room instead: 2.2 people at
+	-- level 1 rising to 6.0 at level 10 — and because concurrency now scales with
+	-- level, CHAIRS finally scale too, from 2 to 6. Four free chairs carry a
+	-- player to level 8, after which arrivals start being turned away and the
+	-- shortage is real. That is the pressure to furnish, and it arrives on its own.
+	--
+	-- No economy change: identical servings for identical coins. Only the time a
+	-- seat is held moves.
+	diningSeconds = 45,
+	-- Sitting on after the plate is cleared — the part of a café visit that is not
+	-- eating. Kept separate from `diningSeconds` so the eating ANIMATION stays a
+	-- sensible length while the visit gets its real duration.
+	lingerSeconds = 90,
 
 	buzzStart = 10,
 	buzzMax = 105,

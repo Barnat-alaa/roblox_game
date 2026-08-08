@@ -437,3 +437,59 @@ Existing: VIP every 30 min, daily goals, session gifts, neighbour mischief.
 
 _Simulator: `scratchpad/sim.py`. Re-run after any config change to regenerate
 these tables._
+
+---
+
+## 9. Occupancy study — why the café looked empty at every level (2026-08-06)
+
+Owner: *"i want in every stage to have a cafe more or less always busy"*.
+
+**How many people are in the room** is `arrivals × visit-length`, and the two
+were being tuned as if only the first mattered. Arrivals are capped at what the
+kitchen can serve (§2.6, fix #4) and top out near **2.4/min**. A visit lasted
+about **30 s**. So the room held:
+
+| stage | prod/min | arrivals/min | gap | people in café | verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| L1 | 0.25 | 0.90 | 67 s | 0.5 | EMPTY |
+| L3 | 0.67 | 0.90 | 67 s | 0.5 | EMPTY |
+| L5 | 1.00 | 1.20 | 50 s | 0.6 | EMPTY |
+| L7 | 1.33 | 1.60 | 38 s | 0.8 | EMPTY |
+| L10 | 2.00 | 2.39 | 25 s | 1.2 | EMPTY |
+
+**Empty at every one of the ten stages, permanently.** And because a chair
+turned over every 30 s, ONE chair served the entire game — seats were not a
+constraint the game could express, which is why nobody ever needed to buy a
+second one.
+
+Raising arrivals cannot fix it without undoing fix #4. Visit length can, and it
+costs the economy nothing — the same servings sell for the same coins:
+
+| visit | L1 | L5 | L10 | chairs L1→L10 | peak NPCs/server |
+| ---: | ---: | ---: | ---: | --- | ---: |
+| 30 s (was) | 0.5 | 0.6 | 1.2 | 1 → 1 | 40 |
+| 75 s | 1.1 | 1.5 | 3.0 | 1 → 3 | 60 |
+| 120 s | 1.8 | 2.4 | 4.8 | 2 → 5 | 80 |
+| **150 s (chosen)** | **2.2** | **3.0** | **6.0** | **2 → 6** | **90** |
+| 200 s | 3.0 | 4.0 | 8.0 | 3 → 8 | 110 |
+
+**150 s** was taken: busy from level 1, genuinely full late, and seats finally
+scale. Implemented as `Kitchen.diningSeconds` 45 + `lingerSeconds` 90, on top of
+the ~12 s it takes to walk in, sit and be served.
+
+### Chairs × level — arrivals turned away per minute
+
+| chairs | L1 | L3 | L5 | L7 | L8 | L9 | L10 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.50 | 0.50 | 0.80 | 1.20 | 1.50 | 1.80 | 1.99 |
+| 2 | 0.10 | 0.10 | 0.40 | 0.80 | 1.10 | 1.40 | 1.59 |
+| 4 (free) | – | – | – | – | 0.30 | 0.60 | 0.79 |
+| 6 | – | – | – | – | – | – | – |
+
+The four starter chairs now carry a player to **level 8**, after which arrivals
+are refused and each walkout costs 2 Buzz. That is the pressure to furnish, and
+it appears on its own without inviting custom the kitchen cannot feed.
+
+⚠️ **Open**: peak concurrent NPCs rises to roughly 90 per full server. That needs
+a MicroProfiler pass on a low-end phone before soft launch — it is the one cost
+of this change and it has not been measured.
