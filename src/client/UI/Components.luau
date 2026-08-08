@@ -70,6 +70,13 @@ function Components.Label(parent: Instance, text: string, size: number, bold: bo
 	return label
 end
 
+-- How long an icon may take to arrive before the glyph badge covers it, and how
+-- long we keep watching for the real artwork afterwards. The grace is generous
+-- on purpose: covering early is far more damaging than a moment of empty slot,
+-- because a HUD that has fallen back to letters looks broken rather than loading.
+local ICON_GRACE_SECONDS = 15
+local ICON_WATCH_SECONDS = 180
+
 local function glyphBadge(parent: Instance, glyph: string, color: Color3?, px: number): Frame
 	local badge = Instance.new("Frame")
 	badge.Name = "IconFallback"
@@ -126,19 +133,40 @@ function Components.Icon(
 			icon.ImageColor3 = imageTint
 		end
 		icon.Parent = slot
-		-- Cover a slow image with the glyph badge rather than replacing it: a
-		-- cold content queue can take far longer than this on join, and an
-		-- image that eventually arrives should still be the one you see.
-		task.delay(6, function()
+		-- Cover a slow image with the glyph badge rather than replacing it: a cold
+		-- content queue can take far longer than this on join, and an image that
+		-- eventually arrives should still be the one you see.
+		--
+		-- FIXED 2026-08-06 (owner: "you deleted all the foto icons" — nothing was
+		-- deleted; every id was still in Config/Graphics). Two things made the
+		-- cover permanent on a phone, so the whole HUD sat on text glyphs forever:
+		--
+		--   1. Six seconds is not long enough for a cold mobile content queue on a
+		--      first join. Every icon tripped the timer at once.
+		--   2. The restore hung off `GetPropertyChangedSignal("IsLoaded")`, and
+		--      `IsLoaded` does not raise that signal — so once the badge appeared
+		--      nothing ever took it away, even after the image had arrived.
+		--
+		-- Now: a longer grace before covering, and a POLL rather than a signal, so
+		-- the artwork replaces the glyph the moment it lands.
+		task.delay(ICON_GRACE_SECONDS, function()
 			if icon.Parent ~= slot or icon.IsLoaded then
 				return
 			end
 			local badge = glyphBadge(slot, glyph, color, px)
 			icon.Visible = false
-			icon:GetPropertyChangedSignal("IsLoaded"):Once(function()
-				if icon.IsLoaded then
-					badge:Destroy()
-					icon.Visible = true
+			task.spawn(function()
+				local deadline = os.clock() + ICON_WATCH_SECONDS
+				while os.clock() < deadline do
+					if icon.Parent ~= slot or badge.Parent == nil then
+						return
+					end
+					if icon.IsLoaded then
+						badge:Destroy()
+						icon.Visible = true
+						return
+					end
+					task.wait(0.5)
 				end
 			end)
 		end)

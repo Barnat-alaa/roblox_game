@@ -5,6 +5,34 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — the HUD icons come back (owner: "you deleted all the foto icons")
+
+Nothing was deleted. All twenty ids were still in `Config/Graphics.UI` and
+untouched by any recent commit — the artwork was simply never arriving, and the
+text-glyph fallback had become permanent.
+
+Two causes, both in the loading path:
+
+1. **`Components.Icon` covered a slow image after 6 seconds**, which a cold
+   mobile content queue beats easily on a first join — so every icon tripped the
+   timer at the same moment and the whole HUD dropped to letters at once.
+2. **The restore never fired.** It hung off
+   `GetPropertyChangedSignal("IsLoaded")`, and `IsLoaded` does not raise that
+   signal, so once the badge appeared nothing ever removed it — not even after
+   the image had finished downloading.
+
+Now the grace is 15s and the restore is a **poll** (every 0.5s for 3 minutes), so
+the artwork replaces the glyph the moment it lands instead of never.
+
+The deeper cause was queue order: `UIController` preloaded furniture thumbnails
+and dish icons — about **eighty-five** requests — but not the HUD art, so the
+twenty images you actually see first were last in line. HUD art now preloads in
+its own pass **before** the catalogue.
+
+The glyph fallback itself is unchanged and still correct for an image that is
+genuinely moderated or missing; it just no longer fires on a slow connection and
+stick.
+
 ### Feature — 2026-08-06 — HUD out of the joystick's way, and a café with people in it
 
 Six owner requests plus a demand study.
