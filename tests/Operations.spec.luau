@@ -24,9 +24,11 @@ return function()
 				priorities = { espresso = 1 },
 			},
 			-- The plan is what drives production now (Kitchen.useProductionPlan).
-			-- A Barista at level 1 gets workMinutesBase = 15 work-minutes an hour
-			-- and Espresso costs 1 of them, so 20 asked for is trimmed to 15.
-			productionPlan = { Barista = { espresso = 20 } },
+			-- Deliberately far more than any budget: the point of these tests is
+			-- that the ROLE'S hourly work-minutes trim the plan, so the ask has to
+			-- exceed them. Asserting against a literal broke the moment
+			-- workMinutesBase was retuned (15 → 40 on 2026-08-06).
+			productionPlan = { Barista = { espresso = 999 } },
 		}
 	end
 
@@ -41,10 +43,11 @@ return function()
 				Kitchen.servingPayoutFraction,
 				Operations.offlineEarningsDivisor
 			)
-			-- 15 work-minutes an hour / 1 minute per Espresso = 15 an hour.
+			-- A level-1 Barista's whole hourly budget / 1 minute per Espresso.
 			-- The old forecast claimed 3 A MINUTE (180/h) by modelling the
 			-- disabled legacy scheduler — twelve times the truth.
-			expect(rates.products.espresso.productionPerMinute).to.equal(15 / 60)
+			local budget = Kitchen.workMinutesBase
+			expect(rates.products.espresso.productionPerMinute).to.equal(budget / 60)
 			expect(rates.products.espresso.serviceCapacityPerMinute).to.equal(2.5)
 			-- One waiter covers 0.25 servings a minute easily, so the kitchen is
 			-- the limit now, not the floor.
@@ -89,11 +92,13 @@ return function()
 			local data = profile()
 			data.unlockedRecipes.cappuccino = true
 			data.kitchen.menu.cappuccino = true
-			-- Both are Barista work off the SAME 15 minutes. Cappuccino sorts
-			-- first and costs 1.5 each, so 8 of them eat 12 minutes and leave 3
-			-- for Espresso. The old forecast reported each recipe as if it had the
-			-- whole kitchen to itself.
-			data.productionPlan = { Barista = { cappuccino = 8, espresso = 20 } }
+			-- Both are Barista, working off the SAME hourly budget. Cappuccino
+			-- sorts first and costs 1.5 minutes each; Espresso then gets whatever
+			-- minutes are left, NOT a budget of its own. The old forecast reported
+			-- each recipe as if it had the whole kitchen to itself.
+			local budget = Kitchen.workMinutesBase
+			local cappuccinos = math.floor(budget / 3) -- eats about half the hour
+			data.productionPlan = { Barista = { cappuccino = cappuccinos, espresso = 999 } }
 			local rates = OperationsMath.calculate(
 				data,
 				Recipes,
@@ -103,8 +108,11 @@ return function()
 				Kitchen.servingPayoutFraction,
 				Operations.offlineEarningsDivisor
 			)
-			expect(rates.products.cappuccino.productionPerMinute).to.equal(8 / 60)
-			expect(rates.products.espresso.productionPerMinute).to.equal(3 / 60)
+			local leftover = math.floor(budget - cappuccinos * 1.5)
+			expect(rates.products.cappuccino.productionPerMinute).to.equal(cappuccinos / 60)
+			expect(rates.products.espresso.productionPerMinute).to.equal(leftover / 60)
+			-- The whole point: the two together never exceed the one budget.
+			expect(cappuccinos * 1.5 + leftover <= budget).to.equal(true)
 		end)
 	end)
 end

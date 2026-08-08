@@ -978,7 +978,21 @@ function KitchenService.GetDemandRate(_self: any, player: Player): number
 		local canServe = KitchenService:GetPlannedProductionPerMinute(data)
 		capacity = math.min(capacity, canServe * Kitchen.demandHeadroom)
 	end
-	local floorRate = if Kitchen.useDemandCap then Kitchen.spawnRateMinPerMinute else 0.2
+	-- THE FLOOR MAY NEVER EXCEED WHAT THE KITCHEN CAN SERVE.
+	--
+	-- `math.max(floorRate, capacity)` used to let it, and raising the floor to 0.9
+	-- on 2026-08-06 turned that into a real regression: a level-1 café serves 15
+	-- customers an hour and was being sent 54, so 36 an hour arrived that could
+	-- never be fed and stormed out angry. That is the failure mode economy fix #4
+	-- existed to remove, reintroduced through the back door — and it is why the
+	-- room looked half-empty AND furious at the same time (owner, 2026-08-06:
+	-- "if im in lvl1 and have 4 chairs the cafe will look empty no?").
+	--
+	-- A café with no production plan at all still gets a trickle to serve by hand;
+	-- that is what ABSOLUTE_FLOOR is for, and it is small enough to be servable.
+	local ABSOLUTE_FLOOR = 0.2
+	local configured = if Kitchen.useDemandCap then Kitchen.spawnRateMinPerMinute else 0.2
+	local floorRate = math.max(ABSOLUTE_FLOOR, math.min(configured, capacity))
 	return math.clamp(rate, floorRate, math.max(floorRate, capacity))
 end
 
