@@ -172,23 +172,20 @@ function Components.Icon(
 			if waitForImage(icon, slot, ICON_GRACE_SECONDS) then
 				return
 			end
-			-- STAGE 2 — the same asset through the THUMBNAIL pipe.
+			-- STAGE 2 — the SAME asset down the OTHER delivery path.
 			--
-			-- `rbxassetid://` serves the asset itself and can refuse for reasons the
-			-- game cannot see or fix at runtime — most often a private image being
-			-- read by a client that Roblox does not consider entitled to it.
-			-- `rbxthumb://` serves Roblox's own rendered copy, which is public once
-			-- the asset is approved, so it succeeds in cases the raw id does not.
-			-- Checked against the thumbnail API on 2026-08-06: every HUD icon
-			-- reports state "Completed", meaning a thumbnail definitely exists.
-			--
-			-- This is the belt to the earlier braces. The 2026-08-06 fix only made
-			-- the game WAIT longer and poll, which does nothing when the id will
-			-- never resolve at all — the icons stayed as letters. A second delivery
-			-- path is what actually removes that failure mode.
+			-- The two are not interchangeable in practice. `rbxassetid://` serves
+			-- the asset itself and is refused for a private image the client is not
+			-- entitled to fetch; `rbxthumb://` serves Roblox's own rendered copy,
+			-- which is public once the asset is approved. HUD art is authored on
+			-- the thumbnail pipe for exactly that reason (see Config/Graphics), so
+			-- this retry runs the other way — and covers whichever pipe a future
+			-- caller happens to hand us.
 			local assetId = tonumber(string.match(image, "%d+"))
 			if assetId then
-				icon.Image = string.format("rbxthumb://type=Asset&id=%d&w=150&h=150", assetId)
+				icon.Image = if string.find(image, "rbxthumb", 1, true)
+					then string.format("rbxassetid://%d", assetId)
+					else string.format("rbxthumb://type=Asset&id=%d&w=420&h=420", assetId)
 				if waitForImage(icon, slot, ICON_RETRY_SECONDS) then
 					return
 				end

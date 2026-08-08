@@ -32,6 +32,31 @@ return function()
 			end
 		end)
 
+		it("serves every HUD icon through the thumbnail pipe", function()
+			-- These rendered as text letters on a real device for three rounds while
+			-- the environment surfaces — identical artwork pipeline, but authored
+			-- with `thumbnail()` — rendered fine in the same frame. Raw
+			-- `rbxassetid://` is refused for a private image the client is not
+			-- entitled to fetch; the thumbnail of an approved asset is public.
+			--
+			-- This test is the guard: put a raw asset id back in Graphics.UI and it
+			-- fails here rather than silently becoming letters on someone's phone.
+			local checked = 0
+			for key, image in Graphics.UI do
+				checked += 1
+				expect(type(image)).to.equal("string")
+				if string.find(image, "rbxassetid://", 1, true) == 1 then
+					error(
+						("Graphics.UI.%s uses a raw asset id; HUD art must use thumbnail() — see the note in Config/Graphics"):format(
+							key
+						)
+					)
+				end
+				expect(string.find(image, "rbxthumb://", 1, true) == 1).to.equal(true)
+			end
+			expect(checked > 0).to.equal(true)
+		end)
+
 		it("defines all six environment surfaces", function()
 			local count = 0
 			for _, image in Graphics.Surfaces do

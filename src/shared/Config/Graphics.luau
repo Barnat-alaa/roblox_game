@@ -33,38 +33,54 @@ local Graphics = {
 		Sky = 4462186698,
 		RetroFood = 134670664555156,
 	},
+	-- SERVED THROUGH THE THUMBNAIL PIPE, not the raw asset id (2026-08-06).
+	--
+	-- Every one of these rendered as a text letter on the owner's device for three
+	-- rounds. The assets were never the problem: checked against Roblox's APIs
+	-- they are AssetTypeId 1 (real Images, not Decals), created by the owner's own
+	-- account, and thumbnail state "Completed" — approved, unmoderated, present.
+	--
+	-- What settled it was the owner's own screenshot: the ROAD and SIDEWALK
+	-- textures were rendering in the same frame as the letters. Those go through
+	-- `thumbnail()` (rbxthumb://); these went through raw `rbxassetid://`. Same
+	-- game, same client, same instant — one scheme worked and the other did not,
+	-- which is the signature of a PRIVATE image the client is not entitled to
+	-- fetch directly. Roblox serves the rendered thumbnail of an approved asset
+	-- publicly, so the same artwork arrives that way.
+	--
+	-- Keep new HUD art on `thumbnail()` for the same reason.
 	UI = {
 		-- Stat pills
-		Money = "rbxassetid://138291685268649",
-		Reputation = "rbxassetid://106159084202396",
-		Buzz = "rbxassetid://105443225474473",
+		Money = thumbnail(138291685268649),
+		Reputation = thumbnail(106159084202396),
+		Buzz = thumbnail(105443225474473),
 		-- Action dock
-		Build = "rbxassetid://111961056777489",
-		Cookbook = "rbxassetid://78909102358565",
-		Staff = "rbxassetid://130832227566122",
-		Upgrades = "rbxassetid://98681656717864",
-		Shop = "rbxassetid://114379023520936",
-		Market = "rbxassetid://90121225847460",
+		Build = thumbnail(111961056777489),
+		Cookbook = thumbnail(78909102358565),
+		Staff = thumbnail(130832227566122),
+		Upgrades = thumbnail(98681656717864),
+		Shop = thumbnail(114379023520936),
+		Market = thumbnail(90121225847460),
 		-- Right rail
-		Goals = "rbxassetid://72112954485657",
-		Trophies = "rbxassetid://137488539860322",
-		Map = "rbxassetid://78785839275091",
-		Music = "rbxassetid://96404039920666",
-		MusicOff = "rbxassetid://88490987948549",
-		Settings = "rbxassetid://101966431239256",
+		Goals = thumbnail(72112954485657),
+		Trophies = thumbnail(137488539860322),
+		Map = thumbnail(78785839275091),
+		Music = thumbnail(96404039920666),
+		MusicOff = thumbnail(88490987948549),
+		Settings = thumbnail(101966431239256),
 		-- Inventory drawer button
-		Pantry = "rbxassetid://114094476715548",
+		Pantry = thumbnail(114094476715548),
 		-- Spare art from the owner's sheet, not on the HUD yet
-		Coins = "rbxassetid://106117241055513",
+		Coins = thumbnail(106117241055513),
 		-- Same asset under the SINGULAR key. Theme.Glyphs calls it `Coin` and the
 		-- HUD resolves icons dynamically via Theme.Images[def.key], so a definition
 		-- keyed "Coin" was silently missing its image and falling back to the "$"
 		-- text glyph. tests/Graphics.spec asserts the singular; both now resolve.
-		Coin = "rbxassetid://106117241055513",
-		Rankings = "rbxassetid://99014737661924",
+		Coin = thumbnail(106117241055513),
+		Rankings = thumbnail(99014737661924),
 		-- Button plates
-		PlateSquare = "rbxassetid://110496594476795",
-		PlateRound = "rbxassetid://118639991990376",
+		PlateSquare = thumbnail(110496594476795),
+		PlateRound = thumbnail(118639991990376),
 	},
 	-- Icons that carry their OWN colour and must never be tinted. The rest are
 	-- flat single-colour glyphs that Theme recolours per surface, so tinting is
