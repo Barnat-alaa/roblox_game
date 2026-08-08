@@ -80,6 +80,18 @@ local Kitchen = {
 	welcomeRushCount = 5,
 	welcomeRushIntervalSeconds = 3.5,
 
+	-- How long a diner stays at the table once the food arrives. Measured
+	-- 2026-08-06: this was 6.6s, so ONE chair turned over roughly four customers a
+	-- minute while arrivals peak at 2.4 — which is why no café ever needed a
+	-- second chair, at any level. Seats were not a constraint the game could
+	-- express. At 18s the welcome rush (5 arrivals in 18s) genuinely overlaps, so
+	-- a 4-chair café turns someone away and the shortage becomes visible.
+	--
+	-- This does NOT change the economy: the same servings are sold for the same
+	-- coins. It only changes how long a seat is held, which is exactly the knob
+	-- that makes chairs matter.
+	diningSeconds = 18,
+
 	buzzStart = 10,
 	buzzMax = 105,
 	buzzPerFedCustomer = 1,

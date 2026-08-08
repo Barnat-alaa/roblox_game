@@ -6,6 +6,7 @@
 -- loaded; only then does the "Enter my café" button light up. (Café STYLE choices
 -- will slot into this same panel later — the layout leaves room.)
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -27,6 +28,10 @@ local revealed = false
 -- True once we know this café already has a name, which turns the card from a
 -- naming prompt into a welcome-back (owner request 2026-08-05).
 local returning = false
+-- Longest the card will hold waiting for the world to stream in before letting
+-- the player through regardless. Generous, because arriving into a half-built
+-- street is worse than a couple more seconds on a card that says why it is there.
+local STREAM_WAIT_SECONDS = 15
 
 -- BlurEffect only blurs the 3D WORLD, never GUIs — so with a see-through backdrop
 -- the whole HUD showed through the intro and read as clutter. Hide it while the
@@ -130,6 +135,39 @@ local function setControlsEnabled(enabled: boolean)
 			controls:Disable()
 		end
 	end)
+end
+
+-- `WorldReady` only says the SERVER finished building the café. With
+-- Workspace.StreamingEnabled the client then streams the world in separately, so
+-- releasing the card on that signal alone dropped the player into a street whose
+-- trees and NPCs were still arriving — they popped in around you for several
+-- seconds (owner report 2026-08-06).
+--
+-- This waits for the two things the server cannot know about: that the region
+-- around the spawn has actually STREAMED to this client, and that the meshes and
+-- textures about to be on screen are DECODED. Bounded by the caller's watchdog,
+-- because a player must never be trapped behind the card by a slow asset.
+local function awaitWorldStreamed()
+	local character = player.Character or player.CharacterAdded:Wait()
+	local root = character:WaitForChild("HumanoidRootPart", 10)
+	if root and root:IsA("BasePart") then
+		pcall(function()
+			-- Radius covers the café you spawn facing plus its neighbours.
+			player:RequestStreamAroundAsync((root :: BasePart).Position, 10)
+		end)
+	end
+	local targets: { Instance } = {}
+	for _, name in { "Plots", "RoadNetwork", "Customers", "Pedestrians", "Scenery" } do
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			table.insert(targets, folder)
+		end
+	end
+	if #targets > 0 then
+		pcall(function()
+			ContentProvider:PreloadAsync(targets)
+		end)
+	end
 end
 
 local function markReady()
@@ -358,13 +396,30 @@ function IntroController.Start(_self: any)
 		elseif ui.box then
 			ui.box.Text = ""
 		end
-		markReady()
+		-- Hold the card until the street this client is about to see has actually
+		-- streamed in, with a watchdog so a slow asset can never trap anyone.
+		if ui.status then
+			ui.status.Text = "Loading the street…"
+		end
+		task.spawn(function()
+			local streamed = false
+			task.spawn(function()
+				awaitWorldStreamed()
+				streamed = true
+			end)
+			local deadline = os.clock() + STREAM_WAIT_SECONDS
+			while not streamed and os.clock() < deadline do
+				task.wait(0.2)
+			end
+			markReady()
+		end)
 	end)
 
 	-- Safety net: if WorldReady never arrives (e.g. asset service hiccup), let the
-	-- player in anyway after a few seconds rather than trapping them behind the
-	-- overlay.
-	task.delay(10, markReady)
+	-- player in anyway rather than trapping them behind the overlay. Longer than
+	-- the streaming wait above so it only ever fires when WorldReady is genuinely
+	-- lost, not merely slow.
+	task.delay(10 + STREAM_WAIT_SECONDS, markReady)
 end
 
 return IntroController
