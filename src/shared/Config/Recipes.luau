@@ -339,19 +339,29 @@ end
 -- A recipe omitted here (slow_roast) is an appointment cook, run outside the
 -- per-hour minute budget.
 local PRODUCTION_MINUTES: { [string]: number } = {
+	-- Retuned 2026-08-06 so COINS PER WORK-MINUTE rises smoothly with level:
+	-- 3.0 at level 1 through to 9.0 at level 9. Work-minutes are the only truly
+	-- scarce resource in the kitchen (CORE_LOOP_SPEC §4a), so this ratio — not
+	-- the sticker price — is what decides whether unlocking a recipe was worth
+	-- it. Before this pass Tea earned 2.67 against Espresso's 3.00 at the SAME
+	-- level, so the first thing a player unlocked was a downgrade.
+	--
+	-- Higher recipes stay slower per serving on purpose: the ladder is a trade of
+	-- VOLUME for VALUE, and a café that plans only Quiche should serve far fewer
+	-- people for far more coins than one pouring Espresso.
 	espresso = 1,
-	tea = 1.5,
-	cappuccino = 1.5,
-	latte = 2,
-	iced_tea = 1.5,
-	mocha = 2,
-	croissant = 2,
-	muffin = 2.5,
-	cinnamon_roll = 3,
-	quiche = 4,
-	sandwich = 2,
-	fruit_salad = 1.5,
-	club_sandwich = 3,
+	tea = 1.3,
+	cappuccino = 1.4,
+	latte = 1.8,
+	iced_tea = 1.4,
+	mocha = 1.9,
+	croissant = 1.9,
+	muffin = 2.2,
+	cinnamon_roll = 2.8,
+	quiche = 4.2,
+	sandwich = 1.9,
+	fruit_salad = 1.4,
+	club_sandwich = 2.9,
 }
 for id, minutes in PRODUCTION_MINUTES do
 	if Recipes[id] then

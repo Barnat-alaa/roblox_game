@@ -73,7 +73,20 @@ local Kitchen = {
 	-- little headroom, so there is always slightly more custom than you can serve
 	-- — pressure, not carnage. Raise `demandHeadroom` to make the game meaner.
 	useDemandCap = true,
-	demandHeadroom = 1.2,
+	-- 1.2 → 1.3 on 2026-08-06 (owner: keep production "slowly under the
+	-- projections"). This is the ONLY knob that sets how far demand runs ahead of
+	-- the kitchen — production times change the scale of the café, not the
+	-- shortfall, because arrivals are derived from production. At 1.3 roughly a
+	-- QUARTER of arrivals cannot be served from stock, so the kitchen is a felt
+	-- constraint with three honest answers: level a producer, add an appliance,
+	-- or run a Double Shift.
+	--
+	-- It is deliberately kept modest. The rails forbid manufactured pressure, and
+	-- the two free answers must stay ahead of the paid one: levelling a producer
+	-- adds 3 work-minutes an hour permanently, where Double Shift doubles them
+	-- for sixty minutes. Push this past ~1.4 and the café tips back toward the
+	-- permanent-walkout failure §2.6 describes.
+	demandHeadroom = 1.3,
 	-- A café is never completely dead, even with no production plan set: this many
 	-- walk-ins per minute still arrive to be served by hand.
 	-- 0.35 -> 0.9 on 2026-08-06. Measured against the live formula, a starter café
