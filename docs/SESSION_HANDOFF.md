@@ -12,6 +12,38 @@ Rokit / Wally, **server-authoritative**, **data-driven** (all tuning in
 `src/shared/Config`). Published privately as DEV place `85898641225605`,
 universe `10501568035`. You drive Roblox Studio through the **Studio MCP**.
 
+## 0a. ⚠️ SEVEN MERGES ARE UNVERIFIED LIVE — run this first (2026-08-06)
+
+The Studio MCP dropped mid-session and everything below shipped gates-green but
+without a live pass. **Studio is already staged with `test-build.rbxlx` open.**
+
+Root cause of the outage, for next time: two orphaned `StudioMCP.exe` processes
+(started hours earlier) survived the disconnect and blocked a clean handshake, so
+restarting Claude Code alone did not fix it. Kill every `StudioMCP.exe`, make
+sure Studio has a PLACE OPEN (not the start page), then restart Claude Code.
+
+Run the suite first (`§5.3`), then these in order:
+
+| # | What | How to tell it worked |
+| --- | --- | --- |
+| 1 | Test suite | 117+ passed, 0 failed |
+| 2 | HUD icons | pictures, NOT the letters BU/CB/CR/UP/SH/MK. The fallback now waits 15s and polls, and HUD art preloads before the catalogue |
+| 3 | Intro card | says "Loading the street…", and when it lifts the trees and NPCs are ALREADY there (no pop-in) |
+| 4 | Café name | a profile with a name shows "Welcome back to <name>", no text box |
+| 5 | Welcome rush | 5 customers arrive ~3.5s apart on join |
+| 6 | Café busy | 2+ diners present at level 1; they LINGER (~150s visit) rather than leaving after 7s |
+| 7 | Multi-seat sets | `set_diner_four` seats 4 at once (proved once already, re-confirm after the visit-length change) |
+| 8 | Furniture bounds | a counter at gridX=0 is REFUSED; the build ghost turns RED on bounds, overflow AND overlap |
+| 9 | Put away | Build → tap a placed item → "PUT AWAY" returns it to inventory |
+| 10 | Tutorial | step 2 is "Serve your first customer" and completes when Noah serves — 5 steps total |
+| 11 | Economy | level-1 kitchen makes 40 servings/hr; no unservable arrivals; ~23% shortfall |
+| 12 | Console | clean — no errors, 24 services, 24 controllers, 70 asset templates, 0 fell back |
+
+**Perf item that has never been measured:** longer visits push peak concurrent
+NPCs to roughly **90 per full server**. Needs a MicroProfiler pass on a low-end
+phone before soft launch — it is the one real cost of the busy-café change.
+
+
 ## 1. Read first, in this order
 
 1. **`HANDOFF.md` §1** — the ethics rails. ABSOLUTE: server-authoritative, no
