@@ -74,8 +74,26 @@ end
 -- long we keep watching for the real artwork afterwards. The grace is generous
 -- on purpose: covering early is far more damaging than a moment of empty slot,
 -- because a HUD that has fallen back to letters looks broken rather than loading.
-local ICON_GRACE_SECONDS = 15
+local ICON_GRACE_SECONDS = 12
+local ICON_RETRY_SECONDS = 10
 local ICON_WATCH_SECONDS = 180
+
+-- Poll `IsLoaded` rather than listening for it: `ImageLabel.IsLoaded` does not
+-- reliably raise a property-changed signal, which is why the original restore
+-- never fired and a glyph, once shown, stayed forever.
+local function waitForImage(icon: ImageLabel, slot: Instance, seconds: number): boolean
+	local deadline = os.clock() + seconds
+	while os.clock() < deadline do
+		if icon.Parent ~= slot then
+			return false
+		end
+		if icon.IsLoaded then
+			return true
+		end
+		task.wait(0.4)
+	end
+	return icon.IsLoaded
+end
 
 local function glyphBadge(parent: Instance, glyph: string, color: Color3?, px: number): Frame
 	local badge = Instance.new("Frame")
@@ -149,26 +167,48 @@ function Components.Icon(
 		--
 		-- Now: a longer grace before covering, and a POLL rather than a signal, so
 		-- the artwork replaces the glyph the moment it lands.
-		task.delay(ICON_GRACE_SECONDS, function()
-			if icon.Parent ~= slot or icon.IsLoaded then
+		task.spawn(function()
+			-- STAGE 1 — the asset id as authored.
+			if waitForImage(icon, slot, ICON_GRACE_SECONDS) then
+				return
+			end
+			-- STAGE 2 — the same asset through the THUMBNAIL pipe.
+			--
+			-- `rbxassetid://` serves the asset itself and can refuse for reasons the
+			-- game cannot see or fix at runtime — most often a private image being
+			-- read by a client that Roblox does not consider entitled to it.
+			-- `rbxthumb://` serves Roblox's own rendered copy, which is public once
+			-- the asset is approved, so it succeeds in cases the raw id does not.
+			-- Checked against the thumbnail API on 2026-08-06: every HUD icon
+			-- reports state "Completed", meaning a thumbnail definitely exists.
+			--
+			-- This is the belt to the earlier braces. The 2026-08-06 fix only made
+			-- the game WAIT longer and poll, which does nothing when the id will
+			-- never resolve at all — the icons stayed as letters. A second delivery
+			-- path is what actually removes that failure mode.
+			local assetId = tonumber(string.match(image, "%d+"))
+			if assetId then
+				icon.Image = string.format("rbxthumb://type=Asset&id=%d&w=150&h=150", assetId)
+				if waitForImage(icon, slot, ICON_RETRY_SECONDS) then
+					return
+				end
+			end
+			-- STAGE 3 — genuinely unavailable: show the glyph, but keep watching so
+			-- late artwork still replaces it.
+			if icon.Parent ~= slot then
 				return
 			end
 			local badge = glyphBadge(slot, glyph, color, px)
 			icon.Visible = false
-			task.spawn(function()
-				local deadline = os.clock() + ICON_WATCH_SECONDS
-				while os.clock() < deadline do
-					if icon.Parent ~= slot or badge.Parent == nil then
-						return
-					end
-					if icon.IsLoaded then
-						badge:Destroy()
-						icon.Visible = true
-						return
-					end
-					task.wait(0.5)
+			warn(
+				("[SocialCafe] HUD icon never loaded: %s (fell back to '%s')"):format(image, glyph)
+			)
+			if waitForImage(icon, slot, ICON_WATCH_SECONDS) then
+				if badge.Parent ~= nil then
+					badge:Destroy()
 				end
-			end)
+				icon.Visible = true
+			end
 		end)
 	else
 		glyphBadge(slot, glyph, color, px)

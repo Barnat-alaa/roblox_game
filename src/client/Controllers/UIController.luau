@@ -1079,6 +1079,39 @@ function UIController.Start(_self: any)
 		end
 		warmSet(hudArt)
 
+		-- REPORT what actually arrived. The HUD silently degrading to letters cost
+		-- three rounds to diagnose because nothing anywhere said "the art did not
+		-- load" — the fallback is designed to be invisible, which is exactly wrong
+		-- when it fires for all twenty icons at once. One line, once, on join.
+		task.delay(30, function()
+			local missing = {}
+			local total = 0
+			for name, content in Graphics.UI :: any do
+				if typeof(content) == "string" and content ~= "" then
+					total += 1
+					local probe = Instance.new("ImageLabel")
+					probe.Image = content
+					probe.Visible = false
+					probe.Parent = gui
+					if not probe.IsLoaded then
+						table.insert(missing, name)
+					end
+					probe:Destroy()
+				end
+			end
+			if #missing > 0 then
+				warn(
+					("[SocialCafe] HUD ART: %d/%d icons did NOT load -> %s"):format(
+						#missing,
+						total,
+						table.concat(missing, ", ")
+					)
+				)
+			else
+				print(("[SocialCafe] HUD art ready: all %d icons loaded"):format(total))
+			end
+		end)
+
 		-- Then the catalogue, which is only needed once a panel is opened.
 		local catalogue = {}
 		for _, entry in AssetManifest.furniture :: any do
