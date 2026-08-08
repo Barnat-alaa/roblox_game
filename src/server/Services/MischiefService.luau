@@ -93,13 +93,42 @@ local function cooldownLeft(userId: number): number
 	return math.max(0, math.ceil(Mischief.cooldownSeconds - (os.clock() - last)))
 end
 
--- Victim protection: a café loses at most maxStolenPerWindow customers per window.
+-- Victim protection, SCALED TO THE VICTIM'S OWN TRADE.
+--
+-- This was a flat 3 per five minutes at every stage of the game. Café throughput
+-- grows about 3.5x from level 1 to level 10, so a flat cap lands hardest on the
+-- player least able to absorb it. Measured 2026-08-06: a level-1 café takes 52
+-- arrivals an hour, and the flat ceiling let neighbours remove 36 of them —
+-- **69% of its custom and about 90% of its income** — while the same ceiling cost
+-- a level-10 café only 25%. The protection was upside down.
+--
+-- The cap is now a share of what the victim actually receives, so exposure is
+-- roughly a quarter at every level. It never falls below 1: the mechanic must
+-- always work at least once, or a small café becomes untouchable and the social
+-- rivalry disappears.
+local function victimStealCap(victimUserId: number): number
+	local ceiling = math.max(1, math.floor(Mischief.maxStolenPerWindow))
+	local victim = Players:GetPlayerByUserId(victimUserId)
+	if victim == nil or KitchenService == nil then
+		return ceiling
+	end
+	local ok, perMinute = pcall(function()
+		return KitchenService:GetDemandRate(victim)
+	end)
+	if not ok or typeof(perMinute) ~= "number" then
+		return ceiling
+	end
+	local arrivalsInWindow = perMinute * (Mischief.windowSeconds / 60)
+	local share = arrivalsInWindow * Mischief.stolenShareOfArrivals
+	return math.clamp(math.floor(share + 0.5), 1, ceiling)
+end
+
 local function victimAtCap(victimUserId: number): boolean
 	local s = stolen[victimUserId]
 	if s == nil or os.clock() - s.windowStart >= Mischief.windowSeconds then
 		return false
 	end
-	return s.count >= Mischief.maxStolenPerWindow
+	return s.count >= victimStealCap(victimUserId)
 end
 
 local function noteStolen(victimUserId: number)
@@ -120,12 +149,33 @@ local function theftCooldownLeft(userId: number): number
 	return math.max(0, math.ceil(Mischief.theftCooldownSeconds - (os.clock() - last)))
 end
 
+-- Theft scales the same way, but against what the kitchen MAKES rather than what
+-- walks in — an item can only be stolen if it was produced. The flat ceiling let
+-- a level-1 café lose 36 items an hour against 37 produced: effectively its
+-- entire output.
+local function victimItemCap(victimUserId: number): number
+	local ceiling = math.max(1, math.floor(Mischief.theftMaxPerVictimWindow))
+	local victim = Players:GetPlayerByUserId(victimUserId)
+	if victim == nil or KitchenService == nil then
+		return ceiling
+	end
+	local ok, perMinute = pcall(function()
+		return KitchenService:GetPlannedProductionPerMinute(DataService:GetProfile(victim))
+	end)
+	if not ok or typeof(perMinute) ~= "number" then
+		return ceiling
+	end
+	local madeInWindow = perMinute * (Mischief.theftVictimWindowSeconds / 60)
+	local share = madeInWindow * Mischief.stolenShareOfArrivals
+	return math.clamp(math.floor(share + 0.5), 1, ceiling)
+end
+
 local function victimAtItemCap(victimUserId: number): boolean
 	local s = itemsStolen[victimUserId]
 	if s == nil or os.clock() - s.windowStart >= Mischief.theftVictimWindowSeconds then
 		return false
 	end
-	return s.count >= Mischief.theftMaxPerVictimWindow
+	return s.count >= victimItemCap(victimUserId)
 end
 
 local function noteItemStolen(victimUserId: number)
