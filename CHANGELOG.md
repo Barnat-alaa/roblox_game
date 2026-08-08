@@ -5,6 +5,50 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — HUD icons: the real cause, found and proven on screen
+
+Fourth attempt, and this one is confirmed by a screenshot of the running game:
+**every dock and rail icon renders its artwork.**
+
+**The cause was never the assets, the ids, or the delivery pipe.** It was this:
+
+> A Roblox `ImageLabel` only fetches its texture while it is actually RENDERED.
+> `Visible = false` — or sitting inside a `ScreenGui` whose `Enabled` is false —
+> means the image is **never requested at all**.
+
+Proven on device before fixing anything: visible → `IsLoaded` true; `Visible =
+false` → false forever; inside a disabled ScreenGui → false forever.
+
+That turns the old fallback into a trap, and explains every symptom exactly:
+
+1. `IntroController` **disables the whole `HUD` ScreenGui** while the welcome card
+   is up — which is why it was precisely the bottom dock and the right rail that
+   failed, the two things living in it.
+2. Nothing in it can render, so no icon can load, so the grace period drains
+   while the player reads the card.
+3. The fallback then showed the glyph **and set `icon.Visible = false`** — after
+   which the image could *never* load, because invisible images are never
+   fetched.
+4. The watcher then polled forever for something that had been made impossible.
+   **The letters were permanent by construction.**
+
+**The fix:** the glyph now draws OVER a still-visible image (`ZIndex`), and the
+grace clock only ticks while the icon is actually renderable — so a long intro no
+longer burns the time an icon needs.
+
+Verified end to end on a realistic run: sat on the intro card for **25 seconds**
+(the case that used to guarantee failure), dismissed it, and measured
+**14 images loaded, 0 not loaded, 0 showing letters** — then captured the screen
+and confirmed the pictures by eye. 118 tests pass.
+
+**What the three earlier attempts got wrong**, recorded so the pattern is not
+repeated: each one treated a symptom without proving the mechanism — first "it is
+too slow" (longer timer), then "the restore never fires" (poll instead of signal,
+true but not sufficient), then "the id is refused" (thumbnail pipe, based on a
+Studio test that was itself invalid because it used *unrendered* ImageLabels).
+The measurement that mattered — does an invisible image ever load? — took two
+minutes once it was finally asked.
+
 ### Fix — 2026-08-06 — HUD icons: the actual cause, found in the owner's screenshot
 
 Third attempt, and this time the evidence was in the picture rather than in a
