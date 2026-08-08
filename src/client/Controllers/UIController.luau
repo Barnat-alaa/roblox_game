@@ -1049,26 +1049,45 @@ function UIController.Start(_self: any)
 	-- the background so the shop and build lists are never a wall of blanks the
 	-- first time they open.
 	task.spawn(function()
-		local warm = {}
-		local function stage(content: string)
-			local image = Instance.new("ImageLabel")
-			image.Image = content
-			image.Visible = false
-			image.Parent = gui
-			table.insert(warm, image)
+		local function warmSet(contents: { string })
+			local staged = {}
+			for _, content in contents do
+				if typeof(content) == "string" and content ~= "" then
+					local image = Instance.new("ImageLabel")
+					image.Image = content
+					image.Visible = false
+					image.Parent = gui
+					table.insert(staged, image)
+				end
+			end
+			pcall(function()
+				ContentProvider:PreloadAsync(staged)
+			end)
+			for _, image in staged do
+				image:Destroy()
+			end
 		end
+
+		-- HUD ART FIRST, in its own pass. These twenty images are the ones on
+		-- screen from the first frame, and they used to queue BEHIND every
+		-- furniture thumbnail and dish icon — about eighty-five requests. On a
+		-- phone that queue outlasted the icon fallback timer, so the entire HUD
+		-- settled onto its text glyphs and stayed there (owner report 2026-08-06).
+		local hudArt = {}
+		for _, content in Graphics.UI :: any do
+			table.insert(hudArt, content)
+		end
+		warmSet(hudArt)
+
+		-- Then the catalogue, which is only needed once a panel is opened.
+		local catalogue = {}
 		for _, entry in AssetManifest.furniture :: any do
-			stage(Graphics.ItemThumbnail(entry.assetId))
+			table.insert(catalogue, Graphics.ItemThumbnail(entry.assetId))
 		end
 		for _, content in Graphics.Dishes :: any do
-			stage(content)
+			table.insert(catalogue, content)
 		end
-		pcall(function()
-			ContentProvider:PreloadAsync(warm)
-		end)
-		for _, image in warm do
-			image:Destroy()
-		end
+		warmSet(catalogue)
 	end)
 
 	ResponsiveLayout.watch(applyResponsive)
