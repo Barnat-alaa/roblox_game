@@ -5,6 +5,64 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Feature — 2026-08-06 — HUD out of the joystick's way, and a café with people in it
+
+Six owner requests plus a demand study.
+
+**The pantry no longer sits under your thumb.** The phone stock dock shrank
+132×110 → **104×84**, a quarter off each axis, handing the bottom-left corner
+back to the joystick.
+
+**The hide tab only hides the pantry now, and moved.** It used to sit on the
+right edge at `DisplayOrder` 25 — *above* the modal layer — so whenever a panel
+was open it floated directly over that panel's close button: two buttons on the
+same pixels. It now sits at the bottom-left beside the pantry it collapses, at
+`DisplayOrder` 12 (below modals), and hides only `InventoryHUD` rather than the
+whole interface.
+
+**Customers always order.** The menu is derived from the production plan
+(`menu[id] = count > 0`), so a player who zeroes their plan empties the menu
+without realising. `pickUnlockedRecipe` returned nil and the diner then sat down,
+ordered nothing and walked out — the most confusing thing the café could do. It
+now falls back to any unlocked dish, and a toast names the cause.
+
+**The queue stopped huddling.** `QUEUE_SPACING` was 4 studs — less than a
+customer is *wide* once `displayScale` grew everything — so all three queuers
+stood inside one another. Now 7, and each one is explicitly halted on its mark so
+it cannot drift back into the huddle.
+
+**A welcome rush on join.** The first 5 arrivals come 3.5s apart instead of
+waiting on the demand rate: a full café 18 seconds after you walk in.
+
+### The demand study (owner asked: are there always customers, and do they grow?)
+
+Measured against the live formula, not the old simulator (which predates the
+economy-fix-#4 production cap):
+
+| stage | arrivals | one customer every |
+| --- | ---: | ---: |
+| starter (Barista L1) | 0.35/min | **171 s** |
+| mid (Bar+Cook L5) | 1.40/min | 43 s |
+| late (Bar+Cook L10) | 2.40/min | 25 s |
+
+**Two findings.**
+
+1. **The early café was deserted** — one visitor every three minutes.
+2. **Chairs did nothing.** Adding 26 seats changed arrivals by **+0.0%** at
+   starter and mid, +0.5% late. `spawnRatePerExtraSeat` exists but the production
+   cap clamps it away every time. Concurrency needs only **1 chair early, 3 mid,
+   5 late** — so the 4 starter chairs cover you almost to the endgame and there
+   was never a reason to buy more.
+
+`spawnRateMinPerMinute` 0.35 → **0.9** fixes the first: 171 s → **67 s** early,
+while mid and late are untouched, so the tuned economy is unchanged where it was
+already balanced. The rush fixes the second: 5 arrivals against 4 starter chairs
+turns **one away at the door**, so the shortage is met on the first visit instead
+of never.
+
+⚠️ **Not yet verified live** — the Studio MCP connection dropped mid-session, so
+this ships gates-green and study-backed but without the usual live pass.
+
 ### Fix — 2026-08-06 — furniture stays inside the café, and the ghost tells the truth
 
 Owner report: pieces go outside the restaurant, especially when rotated.

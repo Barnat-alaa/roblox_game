@@ -1,18 +1,18 @@
 --!strict
--- Hide-the-HUD tab (owner request 2026-08-01: "you can even add a sort of sliding
--- button to hide them in the phone").
+-- Collapse-the-pantry tab.
 --
--- One small chevron pinned to the right edge. Tap it and the whole interface
--- slides away, leaving the café and nothing else; tap it again and everything
--- comes back exactly as it was. It is the fastest way to actually look at the
--- thing you have been decorating, and on a phone it doubles as the escape hatch
--- when the HUD feels crowded.
+-- REWORKED 2026-08-06 on owner feedback, on two counts:
 --
--- What stays visible when hidden is deliberate:
---   • the tab itself, or there would be no way back;
---   • the camera arrows, so you can still turn and look around;
---   • the attack banner, because being robbed must never be silently missed;
---   • open panels, since hiding the HUD should not cancel what you were doing.
+-- 1. It used to hide the WHOLE HUD. It now hides only the pantry/stock dock —
+--    "make it just hide the pantry inventory". Everything else stays put.
+-- 2. It used to sit on the RIGHT edge at DisplayOrder 25, which is ABOVE the
+--    modal layer, so whenever a panel was open the tab floated directly over
+--    that panel's close button: two buttons stacked on the same pixels, and
+--    tapping "close" hit the wrong one. It now lives at the bottom-LEFT beside
+--    the thing it collapses, where nothing else is competing for the space.
+--
+-- Bottom-left is also where a thumb rests on a phone, so the tab doubles as the
+-- way to clear the corner for the joystick when the pantry is in the way.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -24,17 +24,9 @@ local Theme = require(script.Parent.Parent.UI.Theme)
 local HudToggleController = {}
 HudToggleController.Name = "HudToggleController"
 
--- Every ScreenGui the tab controls. Anything not listed here is unaffected,
--- which is how the exceptions above are expressed.
-local MANAGED = {
-	"HUD",
-	"InventoryHUD",
-	"OperationsHUD",
-	"SessionRewardHud",
-	"BoostHud",
-	"VipEventHud",
-	"TutorialHint",
-}
+-- Only the pantry/stock dock. Everything else — the stat pills, the action
+-- dock, the rail, timers — stays exactly where it was (owner 2026-08-06).
+local MANAGED = { "InventoryHUD" }
 
 local hidden = false
 local chevron: Frame? = nil
@@ -63,8 +55,9 @@ function HudToggleController.Start(_self: any)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = "HudToggleHud"
 	gui.ResetOnSpawn = false
-	-- Above the modals so the tab is always reachable, below the attack banner.
-	gui.DisplayOrder = 25
+	-- BELOW the modal layer (20) now. It used to sit at 25, above panels, which
+	-- is what put it on top of every panel's close button.
+	gui.DisplayOrder = 12
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	pcall(function()
 		gui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
@@ -75,7 +68,7 @@ function HudToggleController.Start(_self: any)
 	button.Name = "HudToggle"
 	button.Text = ""
 	button.AutoButtonColor = false
-	button.AnchorPoint = Vector2.new(1, 0.5)
+	button.AnchorPoint = Vector2.new(0, 1)
 	button.BackgroundColor3 = Theme.Colors.Espresso
 	button.BackgroundTransparency = 0.4
 	button.Size = UDim2.fromOffset(Theme.Hud.TouchTarget, Theme.Hud.TouchTarget)
@@ -111,22 +104,14 @@ function HudToggleController.Start(_self: any)
 		applyState()
 	end)
 
-	-- Right edge, BELOW the gift and VIP pills that own the extreme top-right and
-	-- ABOVE the rail's vertical run, so it covers neither. 20% of the height put
-	-- it straight through the pills.
+	-- Bottom-left, tucked against the pantry's right edge so it reads as that
+	-- panel's own collapse tab rather than a floating control. When the pantry is
+	-- hidden it stays exactly where it is — otherwise there would be no way back.
 	ResponsiveLayout.watch(function(mode, viewport)
-		local layout = ResponsiveLayout.hudLayout(mode, viewport)
-		local pillsBottom = layout.pillsBottom + 8
-		local railTop = layout.railTopFromTop or (viewport.Y - layout.railHeight) / 2
-		-- On a short screen the rail starts ABOVE where the pills end, so there is
-		-- no gap between them and clamping to [pillsBottom, railTop] would invert
-		-- its bounds — math.clamp ERRORS when max < min. Fall back to sitting
-		-- directly under the pills, which is always on-screen.
-		local lo = pillsBottom + 22
-		local hi = railTop - 22
-		local y = if hi >= lo then math.clamp((pillsBottom + railTop) / 2, lo, hi) else lo
-		button.Position =
-			UDim2.new(1, -Theme.Hud.EdgeMargin, 0, math.floor(math.min(y, viewport.Y - 30)))
+		local stockWidth = select(1, ResponsiveLayout.stockDockSize(mode, viewport))
+		local margin = Theme.Hud.EdgeMargin
+		button.Size = UDim2.fromOffset(Theme.Hud.TouchTarget, Theme.Hud.TouchTarget)
+		button.Position = UDim2.new(0, margin + stockWidth + 6, 1, -margin)
 	end)
 
 	-- Re-assert on respawn: these ScreenGuis have ResetOnSpawn = false, but the
