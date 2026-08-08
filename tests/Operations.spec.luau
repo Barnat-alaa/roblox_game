@@ -97,7 +97,8 @@ return function()
 			-- minutes are left, NOT a budget of its own. The old forecast reported
 			-- each recipe as if it had the whole kitchen to itself.
 			local budget = Kitchen.workMinutesBase
-			local cappuccinos = math.floor(budget / 3) -- eats about half the hour
+			local cappMinutes = Recipes.cappuccino.productionMinutes :: number
+			local cappuccinos = math.floor(budget / 3 / cappMinutes)
 			data.productionPlan = { Barista = { cappuccino = cappuccinos, espresso = 999 } }
 			local rates = OperationsMath.calculate(
 				data,
@@ -108,11 +109,14 @@ return function()
 				Kitchen.servingPayoutFraction,
 				Operations.offlineEarningsDivisor
 			)
-			local leftover = math.floor(budget - cappuccinos * 1.5)
+			-- Espresso costs exactly 1 work-minute, so the leftover minutes ARE the
+			-- leftover servings. Both figures are derived from config so a retune
+			-- of either recipe cannot silently invalidate this test.
+			local leftover = math.floor(budget - cappuccinos * cappMinutes)
 			expect(rates.products.cappuccino.productionPerMinute).to.equal(cappuccinos / 60)
 			expect(rates.products.espresso.productionPerMinute).to.equal(leftover / 60)
-			-- The whole point: the two together never exceed the one budget.
-			expect(cappuccinos * 1.5 + leftover <= budget).to.equal(true)
+			-- The whole point: the two together never exceed the ONE budget.
+			expect(cappuccinos * cappMinutes + leftover <= budget).to.equal(true)
 		end)
 	end)
 end

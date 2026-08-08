@@ -5,6 +5,56 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Change — 2026-08-06 — production times on a curve, and demand kept ahead of the kitchen
+
+Owner: adapt the economy, especially how long items take, *"but keep them slowly
+under the projections so they can buy the upgrade with robux"*.
+
+**Production times now follow coins-per-work-minute.** Work-minutes are the only
+genuinely scarce resource in the kitchen, so that ratio — not the sticker price —
+decides whether unlocking a recipe was worth it. It now rises smoothly **3.0 at
+level 1 → 9.0 at level 9**. Before this pass Tea earned **2.67** against
+Espresso's **3.00** at the same level, so the first thing a player unlocked was a
+downgrade.
+
+| recipe | lvl | was | now | coins/work-min |
+| --- | ---: | ---: | ---: | ---: |
+| espresso | 1 | 1.0 | 1.0 | 3.00 |
+| tea | 1 | 1.5 | **1.3** | 3.08 |
+| cappuccino | 2 | 1.5 | **1.4** | 3.57 |
+| croissant | 3 | 2.0 | **1.9** | 4.21 |
+| latte / muffin | 4 | 2.0 / 2.5 | **1.8 / 2.2** | 5.00 |
+| fruit_salad / iced_tea | 5 | 1.5 | **1.4** | 5.71 |
+| mocha / cinnamon_roll | 6 | 2.0 / 3.0 | **1.9 / 2.8** | 6.32 / 6.43 |
+| club_sandwich | 7 | 3.0 | **2.9** | 7.24 |
+| quiche | 9 | 4.0 | **4.2** | 9.05 |
+
+Higher recipes stay slower per serving on purpose: the ladder trades **volume for
+value**, so a café planning only Quiche serves far fewer people for far more
+coins than one pouring Espresso.
+
+**`demandHeadroom` 1.2 → 1.3.** This is the only knob that sets how far demand
+runs ahead of the kitchen — production times change the café's *scale*, not its
+*shortfall*, because arrivals are derived from production. At 1.3 roughly a
+**quarter of arrivals cannot be served from stock**, up from 17%, so the kitchen
+is a felt constraint with three honest answers: level a producer, add an
+appliance, or run a Double Shift.
+
+Kept deliberately modest. The rails forbid manufactured pressure and the free
+answers must stay ahead of the paid one — levelling a producer adds 3
+work-minutes an hour *permanently*, where Double Shift doubles them for sixty
+minutes. Past ~1.4 the café tips back toward the permanent-walkout failure §2.6
+describes.
+
+**Appliance capacity is the other ceiling, and it bites earlier now.** One
+machine can only cook 60 minutes an hour, so by level 3 a player holds 86
+work-minutes of staff and can use **60** — a real, legible reason to buy a second
+appliance, and a coin sink the game needed.
+
+`tests/Operations.spec` now derives both the budget and the recipe cost from
+config, so neither a work-minute retune nor a recipe retune can silently
+invalidate it.
+
 ### Fix — 2026-08-06 — the starter kitchen can feed a room (and a same-day regression)
 
 Owner: *"if im in lvl1 and have 4 chairs the cafe will look empty no? that's why
