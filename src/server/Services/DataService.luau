@@ -98,6 +98,26 @@ local function starterStaff(): { Types.StaffMember }
 	}
 end
 
+-- Spend a level-1 Barista's whole hourly budget on the two starter drinks, in
+-- the same 3:1 espresso-to-tea shape the old hand-written default had.
+--
+-- Derived rather than written down because arrivals are capped at what the
+-- kitchen PLANS to make: a plan that under-uses the budget silently throttles
+-- demand, so a stale literal here reads as "the café is empty" and nothing in
+-- the config points at the cause.
+local function defaultProductionPlan(): { [string]: { [string]: number } }
+	local budget = Kitchen.workMinutesBase
+	local espressoMinutes = tonumber(Recipes.espresso.productionMinutes) or 1
+	local teaMinutes = tonumber(Recipes.tea.productionMinutes) or 1.5
+	-- Three quarters of the hour on espresso, the rest on tea.
+	local espresso = math.max(1, math.floor(budget * 0.75 / espressoMinutes))
+	local tea = math.max(1, math.floor(budget * 0.25 / teaMinutes))
+	return {
+		Barista = { espresso = espresso, tea = tea },
+		Cook = {},
+	}
+end
+
 local function defaultKitchen(): Types.KitchenState
 	local now = os.time()
 	local kitchen: Types.KitchenState = {
@@ -217,12 +237,15 @@ local function defaultProfile(): Types.PlayerData
 		unlockedRecipes = { espresso = true, tea = true },
 		recipeMastery = {},
 		staff = starterStaff(),
-		-- Default auto-production plan (used when Kitchen.useProductionPlan is on):
-		-- a Lv1 Barista's 15 work-min/hr spent on 10 espresso + 3 tea (14.5 min).
-		productionPlan = {
-			Barista = { espresso = 10, tea = 3 },
-			Cook = {},
-		},
+		-- Default auto-production plan (used when Kitchen.useProductionPlan is on).
+		-- DERIVED from the live budget, never hard-coded: this said 10 espresso +
+		-- 3 tea, sized for the old 15 work-min/hr Barista, and was left behind when
+		-- the budget went to 40 on 2026-08-06. A new café was therefore planning
+		-- only 13.9 of its 40 minutes — and because arrivals are capped at what the
+		-- KITCHEN PLANS to make, that quietly throttled demand to one customer
+		-- every three and a half minutes. The production raise did nothing until
+		-- this was fixed (caught by live test, not by any gate).
+		productionPlan = defaultProductionPlan(),
 		operations = defaultOperations(),
 		settings = { musicVolume = 0.6, sfxVolume = 0.8, reducedEffects = false },
 		stats = {
