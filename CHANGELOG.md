@@ -5,6 +5,42 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — HUD icons: the actual cause, found in the owner's screenshot
+
+Third attempt, and this time the evidence was in the picture rather than in a
+theory. **The owner's screenshot showed the ROAD and SIDEWALK textures rendering
+in the same frame as the letter icons.**
+
+Same game, same client, same instant — so the client was fetching images fine.
+The difference is how the two are addressed:
+
+| | authored as | rendered? |
+| --- | --- | --- |
+| `Graphics.Surfaces` (road, sidewalk, floor) | `thumbnail()` → `rbxthumb://` | **yes** |
+| `Graphics.UI` (all 21 HUD icons) | raw `rbxassetid://` | **no** |
+
+`rbxassetid://` serves the asset itself and is refused for a **private** image
+the client is not entitled to fetch. `rbxthumb://` serves Roblox's own rendered
+copy, which is public once the asset is approved — and the thumbnail API confirms
+every HUD icon is state `Completed`.
+
+**All 21 HUD icons now go through `thumbnail()`, exactly like the surfaces that
+were working all along.**
+
+What the previous two attempts got wrong, for the record: the first only made the
+game wait longer and poll, which cannot help an id that never resolves; the
+second added a thumbnail *retry* after 22 seconds, which was the right idea in
+the wrong place — the artwork should simply be authored on the pipe that works.
+
+**Guarded so it cannot come back.** `tests/Graphics.spec` now fails if any
+`Graphics.UI` entry uses a raw asset id, naming the offending key. Put one back
+and the suite goes red instead of someone's phone quietly showing letters. Suite
+is 118 passed / 0 failed.
+
+The `Components.Icon` retry survives and now runs the other way — thumbnail
+first, raw id as the fallback — so a future caller handing it either form still
+gets two chances before any letter appears.
+
 ### Fix — 2026-08-06 — HUD icons get a second delivery path, and never fail silently
 
 Owner, after the first attempt: *"no still the same problem i dont see the menu
