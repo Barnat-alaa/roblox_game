@@ -1104,14 +1104,18 @@ local function eatMeal(
 				)
 			end
 
-			-- Eat with a happy bob.
+			-- Eat with a happy bob. The bob count is derived from
+			-- Kitchen.diningSeconds so table time is tuned in config rather than by
+			-- counting animation frames here.
 			local basePivot = cust.model:GetPivot()
-			for i = 1, 12 do
+			local bobs = math.max(4, math.floor((tonumber(Kitchen.diningSeconds) or 6.6) / 0.55))
+			local midBob = math.floor(bobs / 2)
+			for i = 1, bobs do
 				if cust.leaving or cust.root.Parent == nil then
 					break
 				end
 				cust.model:PivotTo(basePivot * CFrame.new(0, (i % 2) * 0.12, 0))
-				if i == 6 then
+				if i == midBob then
 					cust.bubble.Text = "😋"
 				end
 				task.wait(0.55)

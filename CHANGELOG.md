@@ -5,6 +5,42 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — the street is finished before you walk into it
+
+Owner: "it says preparing the café and then I enter but it still is rendering
+some NPC and trees".
+
+`WorldReady` only reports that the SERVER finished building the café. With
+`Workspace.StreamingEnabled` the client then streams the world in separately, so
+releasing the intro card on that signal dropped the player into a street whose
+trees, façades and NPCs were still arriving around them.
+
+The card now also waits for the two things the server cannot know: that the
+region around the spawn has actually **streamed** to this client
+(`RequestStreamAroundAsync`), and that the meshes and textures about to be on
+screen are **decoded** (`PreloadAsync` over Plots, RoadNetwork, Customers,
+Pedestrians and Scenery). It says "Loading the street…" while it does. A 15s
+watchdog releases the player regardless, so a slow asset can never trap anyone.
+
+### Change — 2026-08-06 — a diner holds their chair long enough to matter
+
+`diningSeconds` (new, 18s) replaces a hard-coded 6.6-second meal. Measured: one
+chair used to turn over about FOUR customers a minute while arrivals peak at
+2.4, so no café ever needed a second chair at any level — seats were not a
+constraint the game could express. At 18s the welcome rush (5 arrivals in 18s)
+genuinely overlaps, so a 4-chair café turns someone away and the shortage is
+visible.
+
+This does **not** touch the economy: same servings, same coins. It only changes
+how long a seat is held.
+
+**Known limit, stated plainly.** Steady-state seat demand is still only 0.5
+chairs early, 0.7 mid and 1.2 late, because the production cap holds arrivals at
+≤2.4/min. Chairs are a one-time threshold, not a scaling constraint — making
+them scale needs seats to raise the arrival cap, which is exactly what economy
+fix #4 removed to stop permanent angry-walkout failure. That is a design call,
+not a bug fix, and it is not taken here.
+
 ### Fix — 2026-08-06 — the HUD icons come back (owner: "you deleted all the foto icons")
 
 Nothing was deleted. All twenty ids were still in `Config/Graphics.UI` and
