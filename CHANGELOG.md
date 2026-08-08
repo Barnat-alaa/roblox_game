@@ -5,6 +5,60 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — two bugs the first live verification pass found
+
+The Studio MCP came back and the seven unverified merges were finally exercised
+live. Both bugs below were invisible to every gate — CI, 117 unit tests and the
+offline model all passed while the game did the wrong thing.
+
+**The default production plan was stale, and it silently throttled demand.**
+It read `espresso 10 + tea 3` — sized for the old 15 work-minute Barista — and
+was never updated when the budget went to 40. A new café planned **13.9 of its
+40 minutes**, and because arrivals are capped at what the kitchen *plans* to
+make, that quietly held the café to **one customer every 3.5 minutes**. The
+production raise did nothing at all for a new player. The plan is now DERIVED
+from `Kitchen.workMinutesBase` and the real recipe times, so it cannot go stale
+again: 30 espresso + 7 tea, **98% of the budget**, arrivals 0.28 → **0.80/min**.
+
+**The welcome rush fired at cafés with no chairs.** A brand-new profile places
+none, so the rush I added produced, measured over a new player's first sixty
+seconds: **6 arrivals, 0 ever seated, "😡 NO EMPTY CHAIR!" seventeen times** —
+about −12 Buzz from a starting 10, before the player had done anything. A rush
+at an unfurnished café is not a busy café, it is a riot. The rush now **banks its
+credits until a seat exists**, so it lands the moment the tutorial's first chairs
+go down.
+
+Measured after both fixes:
+
+| | before | after |
+| --- | --- | --- |
+| new player, 45s, no chairs | 6 arrivals, 17 chair complaints | **1 arrival, 1 complaint** |
+| same player, 80s, 4 chairs down | — | **6 arrivals, 3 seated, 0 complaints** |
+
+The room fills progressively (t=46s three in, t=78s six in, three seated) and
+nobody is turned away.
+
+### Verification pass — 2026-08-06
+
+| # | check | result |
+| --- | --- | --- |
+| 1 | test suite | **117 passed, 0 failed** |
+| 2 | HUD icons | ⚠️ **cannot verify in Studio** — see below |
+| 3 | intro card | holds ~8s, releases only when ready ✓ |
+| 5 | welcome rush | ✓ (and now gated on seating) |
+| 6 | café busy | ✓ 6 arrivals, 3 seated, 0 turned away |
+| 8 | furniture bounds | ✓ 4/4 — flush-to-wall counter refused, overlap refused, rotated overshoot refused |
+| 9 | put away | ✓ button present, hidden while idle |
+| 10 | tutorial | ✓ `tutorial_step_completed step 2 = "serve"` fired live |
+| 11 | economy config | ✓ all values live (base 40, dining 45s, linger 90s, headroom 1.30, times retuned) |
+| 12 | console | ✓ clean, 24 services, 24 controllers, **70 templates, 0 fell back** |
+
+**On the HUD icons:** this Studio session cannot load *any* image — not our
+icons, not a dish icon, not an `rbxthumb`, not even a well-known public Roblox
+decal. `PreloadAsync` returns success and `IsLoaded` stays false for all of them.
+So the icons are **not** moderated or deleted, and the earlier fix cannot be
+judged here. It has to be checked on a real device.
+
 ### Change — 2026-08-06 — production times on a curve, and demand kept ahead of the kitchen
 
 Owner: adapt the economy, especially how long items take, *"but keep them slowly

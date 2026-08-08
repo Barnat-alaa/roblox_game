@@ -1760,8 +1760,19 @@ function CustomerService.Start(_self: any)
 					local due = os.clock() >= (nextSpawnAt[player.UserId] or 0)
 					if origin and #q < MAX_QUEUE and due then
 						local owed = rushLeft[player.UserId] or 0
+						-- The rush WAITS FOR A CHAIR. Measured 2026-08-06 on a
+						-- brand-new profile, which places none: six arrivals in the
+						-- first sixty seconds, none of them ever seated, and
+						-- "😡 NO EMPTY CHAIR!" seventeen times — about −12 Buzz from
+						-- a starting 10, before the player had done anything at all.
+						-- A rush at an unfurnished café is not a busy café, it is a
+						-- riot. Banking the credits instead means the rush lands the
+						-- moment the tutorial's first chairs go down, which is
+						-- exactly when it reads as the café coming alive.
+						local data = DataService:GetProfile(player)
+						local hasSeat = data ~= nil and SeatMath.usableSeats(data) > 0
 						local interval
-						if owed > 0 then
+						if owed > 0 and hasSeat then
 							rushLeft[player.UserId] = owed - 1
 							interval = Kitchen.welcomeRushIntervalSeconds or 3.5
 						else
