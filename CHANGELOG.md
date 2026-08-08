@@ -5,6 +5,46 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — HUD icons get a second delivery path, and never fail silently
+
+Owner, after the first attempt: *"no still the same problem i dont see the menu
+icns fotos"*. The earlier fix only made the game **wait longer and poll**, which
+does nothing when an id will never resolve at all.
+
+**What the assets actually are** (checked against Roblox's own APIs, not guessed):
+
+- `AssetTypeId 1` — genuine Images, not Decals, so the classic decal/image mix-up
+  is ruled out.
+- Creator `aloulouba1`, the owner's own account.
+- Thumbnail state **`Completed`** for every one — approved, not moderated, not
+  deleted.
+
+So the artwork is fine. The failure is in **delivery**.
+
+**The fix: three stages instead of one.**
+
+1. the asset id as authored (`rbxassetid://`)
+2. **the same asset through `rbxthumb://`** — Roblox's own rendered copy, which is
+   served publicly once an asset is approved, so it succeeds in cases where the
+   raw id is refused (most often a private image read by a client Roblox does not
+   consider entitled to it)
+3. only then the letter glyph — and it keeps watching, so late art still replaces it
+
+Verified live: all **14** on-screen icon slots switched themselves to the
+thumbnail path when the raw ids did not resolve.
+
+**And it can never be silent again.** The fallback is designed to be invisible,
+which is exactly wrong when it fires for every icon at once — that is why this
+took three rounds to find. Two new reports:
+
+- per icon, on failure: `HUD icon never loaded: rbxassetid://… (fell back to 'BU')`
+- once on join: `HUD ART: 21/21 icons did NOT load -> Pantry, Upgrades, Buzz, …`
+
+⚠️ **This machine cannot confirm the cure.** This Studio install loads **no image
+at all** — not ours, not an `rbxthumb`, not two well-known public Roblox images,
+in Edit mode or in Play. The retry path is proven to fire; whether the thumbnail
+pipe succeeds can only be seen on a real device.
+
 ### Fix — 2026-08-06 — two bugs the first live verification pass found
 
 The Studio MCP came back and the seven unverified merges were finally exercised
