@@ -43,6 +43,20 @@ local Mischief = {
 	windowSeconds = 300,
 	immunitySeconds = 150,
 
+	-- The cap above is a CEILING, not the value used. MischiefService scales the
+	-- real limit to the victim's own trade — a share of the customers arriving (or
+	-- items produced) in the window, floored at 1 so the mechanic always works
+	-- once.
+	--
+	-- Why (measured 2026-08-06): a flat 3-per-window is the same absolute number
+	-- at every stage, but throughput grows ~3.5x from level 1 to level 10. A
+	-- level-1 café takes 52 arrivals an hour and the flat ceiling allowed 36 of
+	-- them to be removed — 69% of its custom and about 90% of its income — while
+	-- costing a level-10 café only 25%. The protection was upside down: hardest on
+	-- the player least able to absorb it. At a quarter share, exposure sits near
+	-- 25% at every level instead.
+	stolenShareOfArrivals = 0.25,
+
 	-- Recruit (free) success = clamp(base + reputation * repScale, min, max). The
 	-- smell bomb always succeeds when an eligible customer exists (that's what the
 	-- consumable buys); VIPs resist both by never being eligible.

@@ -493,3 +493,87 @@ it appears on its own without inviting custom the kitchen cannot feed.
 ⚠️ **Open**: peak concurrent NPCs rises to roughly 90 per full server. That needs
 a MicroProfiler pass on a low-end phone before soft launch — it is the one cost
 of this change and it has not been measured.
+
+---
+
+## 10. Full economic study — production, auto-production and neighbours (2026-08-06)
+
+Owner asked for a study of the whole economy plus the neighbour interactions
+("you can't steal unlimited times etc"), backed by simulation and real tests.
+
+### 10.1 The production ladder is healthy
+
+Net coins per hour from one appliance, after ingredients, at the retuned times:
+
+| recipe | lvl | min/serving | per hour | net coins/hr | spoils in |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| espresso | 1 | 1.0 | 60 | 180 | 4 m |
+| croissant | 3 | 1.9 | 32 | 253 | 12 m |
+| latte / muffin | 4 | 1.8 / 2.2 | 33 / 27 | 300 | 5 / 15 m |
+| iced tea / fruit salad | 5 | 1.4 | 43 | 343 | 8 / 7 m |
+| cinnamon roll | 6 | 2.8 | 21 | 386 | 12 m |
+| club sandwich | 7 | 2.9 | 21 | 434 | 8 m |
+| quiche | 9 | 4.2 | 14 | **543** | 10 m |
+
+A smooth 3× rise, and every unlock is a step up. Spoilage never binds while the
+café is selling: espresso spoils in 4 minutes but a level-1 café sells ~0.8/min
+against 0.67/min produced, so stock hovers near zero rather than rotting.
+
+### 10.2 Two ceilings govern the kitchen
+
+| level | staff work-min/hr | 1 machine | 2 machines | 3 machines | binding |
+| --- | ---: | ---: | ---: | ---: | --- |
+| L1 | 40 | 40 | 40 | 40 | staff budget |
+| L3 | 92 | 60 | 92 | 92 | **appliances** |
+| L5 | 104 | 60 | 104 | 104 | **appliances** |
+| L10 | 134 | 60 | 120 | 134 | **appliances** |
+
+One machine cooks 60 minutes an hour. From level 3 the staff budget exceeds
+that, so appliances become the real constraint — which is what makes buying a
+second machine matter, and is a coin sink the game was short of.
+
+### 10.3 Neighbour interaction: every limit, and one that was wrong
+
+Enforced in `MischiefService` / `SocialService`, all verified present in code:
+
+| limit | value | scope |
+| --- | --- | --- |
+| lure/bomb cooldown | 45 s | per caster |
+| theft cooldown | 90 s | per thief |
+| customer immunity after a pull | 150 s | per customer |
+| proximity | 55 studs (lure) / 14 (at the shelf) | per action |
+| paid help | 15 actions/neighbour/day | per helper; actions still work after |
+| **customers lost** | 3 per 5 min | **per victim, shared across all attackers** |
+| **items stolen** | 3 per 5 min | **per victim, shared across all attackers** |
+
+Nothing is unlimited, and the two that matter are per-VICTIM, so a mob cannot
+exceed what one attacker could.
+
+**But the two victim caps were flat, and that was backwards.** Café throughput
+grows ~3.5× from level 1 to level 10 while the cap stayed at 3 per window:
+
+| stage | arrivals/hr | lure ceiling | share of custom | theft ceiling | share of output |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| L1 | 52 | 36 | **69%** | 36 | **90%** |
+| L5 | 109 | 36 | 33% | 36 | 37% |
+| L10 | 143 | 36 | 25% | 36 | 27% |
+
+A level-1 café could lose **69% of its customers and about 90% of its income** to
+neighbours; a maxed café only 25%. The protection was hardest on the player least
+able to absorb it.
+
+**Fixed:** the cap is now a share of the victim's own trade
+(`Mischief.stolenShareOfArrivals = 0.25`) — a quarter of the customers arriving,
+or items produced, in the window — clamped to the old 3 as a ceiling and floored
+at 1 so the mechanic always works once. Exposure is now ~25% at every level.
+
+### 10.4 What the live tests confirmed
+
+- 117 unit tests pass; 24 services boot clean with the scaled cap in place.
+- The guard chain is genuinely reached: with the self-target block lifted
+  in-memory, a lure returns `"No waiting customer to lure there."` — and it does
+  so *before* spending the cooldown, so a no-op attempt costs the attacker
+  nothing, which is correct.
+- Exhausting a victim cap end-to-end needs two real players and several minutes
+  of windows; the Studio MCP cannot drive a second client (HANDOFF §3.4), so that
+  remains owner-verified.
