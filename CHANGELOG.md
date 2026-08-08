@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fix — 2026-08-06 — the starter kitchen can feed a room (and a same-day regression)
+
+Owner: *"if im in lvl1 and have 4 chairs the cafe will look empty no? that's why
+the number of customers must be relative to the number of chairs"*.
+
+Right on both counts, and it exposed a regression from earlier the same day.
+
+**The regression.** Raising `spawnRateMinPerMinute` to 0.9 punched through the
+production cap. A level-1 café serves 15 customers an hour and was being sent
+54 — so **36 an hour arrived who could never be fed** and stormed out angry. That
+is the failure mode economy fix #4 removed, reintroduced through the back door,
+and it is why the room looked half-empty *and* furious at once.
+
+`GetDemandRate` now clamps the floor to the serve capacity, so no configured
+floor can ever outrun the kitchen again — the number is a request, not an
+override. A small absolute floor remains so a café with no plan still gets
+walk-ins to serve by hand.
+
+**The real cause.** Chairs were never the binding constraint; the level-1 kitchen
+was. Filling four chairs honestly needs ~80 servings an hour and level 1 made
+**15**, so no demand tuning could have worked. `workMinutesBase` 15 → **40**
+with `workMinutesPerLevel` 5 → **3** raises the floor of the curve without
+lifting its ceiling: level 1 makes **2.7× more**, level 10 only **1.12×**
+(60 → 67 work-minutes an hour), so the late economy is left as tuned.
+
+| stage | servings/hr | in café | 2 chairs | 4 chairs | 6 chairs | unfed/hr |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| L1 | 40 | 2.0 | 100% | 50% | 33% | **0** |
+| L3 | 86 | 3.9 | 100% | 98% | 65% | **0** |
+| L5 | 98 | 4.5 | 100% | 100% | 75% | **0** |
+| L10 | 134 | 6.0 | 100% | 100% | 100% | **0** |
+
+Nobody arrives who cannot be served, at any level. Two chairs are full from the
+first minute, four fill by level 3, six by level 10 — so seating fills
+progressively as the kitchen grows, which is the "customers relative to chairs"
+the owner asked for, arrived at through the constraint that actually governs it.
+
+`tests/Operations.spec` now derives its expectations from
+`Kitchen.workMinutesBase` instead of the literal 15, so a future retune cannot
+silently break it.
+
 ### Change — 2026-08-06 — a café with people in it, at every level
 
 Owner: *"i want in every stage to have a cafe more or less always busy"*. Full

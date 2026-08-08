@@ -32,8 +32,21 @@ local Kitchen = {
 	-- target-stock/priority scheduler runs unchanged. The scheduler logic lands
 	-- behind this flag, then it flips on together with enforceIngredients.
 	useProductionPlan = true,
-	workMinutesBase = 15,
-	workMinutesPerLevel = 5,
+	-- 2026-08-06 — THE STARTER KITCHEN COULD NOT FEED A ROOM.
+	--
+	-- A level-1 Barista worked 15 minutes an hour: 15 servings, 0.25 a minute.
+	-- Arrivals are capped at what the kitchen can serve, so the café could never
+	-- hold more than a fraction of a person and looked empty at every level
+	-- (docs/ECONOMY_ANALYSIS.md §9). Filling four chairs honestly needs about 80
+	-- servings an hour — five times what level 1 could make — so no amount of
+	-- demand tuning could fix it; only production could.
+	--
+	-- base 15 → 40 with perLevel 5 → 3 raises the FLOOR of the curve without
+	-- lifting its ceiling: level 1 makes 2.7x more, level 10 only 1.12x more
+	-- (60 → 67 work-minutes an hour), so the late economy is left as tuned and
+	-- the change lands where the problem was.
+	workMinutesBase = 40,
+	workMinutesPerLevel = 3,
 
 	-- Auto-collect finished MANUAL cooks straight into stock the moment their
 	-- timer ends, instead of waiting for the player to press Collect (owner
@@ -69,7 +82,12 @@ local Kitchen = {
 	-- 0.25 servings a minute. The café read as deserted for the whole first hour.
 	-- 0.9 is one arrival a minute or so, which is a room with someone in it,
 	-- without lifting the ceiling that protects the economy.
-	spawnRateMinPerMinute = 0.9,
+	-- 0.35 → 0.9 → 0.8. The 0.9 was a regression: it exceeded what a level-1
+	-- kitchen could serve, so 36 customers an hour arrived who could never be fed
+	-- and stormed out angry. `GetDemandRate` now also clamps this floor to the
+	-- serve capacity, so it can never outrun the kitchen again whatever it is set
+	-- to — this number is now a request, not an override.
+	spawnRateMinPerMinute = 0.8,
 
 	-- WELCOME RUSH (owner 2026-08-06: "when a player connects make an instant rush
 	-- so many clients go to him"). The first `welcomeRushCount` arrivals after a
